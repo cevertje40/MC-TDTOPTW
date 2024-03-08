@@ -1,8 +1,23 @@
 #pragma once
-#include <vector>
+#include "ConsoleColor.h"
+#include <fstream>//input
+#include <string.h>
 #include <string>
-#include <sstream>
-#include <fstream>
+#include <time.h>// cpu time &date
+#include <map>
+#include <list>
+#include "math.h"
+#include <algorithm> 
+#include <random>
+#include <tuple>
+#include <boost/math/distributions/lognormal.hpp>
+#include <boost/math/special_functions/gamma.hpp>
+#include <boost/random.hpp>
+#include <boost/random/variate_generator.hpp>
+#include <boost/math/distributions/gamma.hpp>
+#include <boost/math/special_functions/erf.hpp>
+#include <omp.h>
+#include <boost/dynamic_bitset.hpp>
 
 using namespace std;
 
@@ -68,8 +83,7 @@ public:
 	void siftDown(int nodeIndex);
 	Node* extractMin();//end extractmin
 	Node* extractMintwee();//end extractmintwee
-}//end binary heap class
-;
+};//end binary heap class
 
 class Nodep
 {
@@ -94,8 +108,7 @@ public:
 	}
 	void addarc(Link* ARC);
 	void addprevious(Link* ARC);
-}
-;
+};
 
 class BinaryMinHeaps
 {//binary min heap for parallel computing using in the threaded dijkstra algorithm
@@ -115,16 +128,26 @@ public:
 	void siftDown(int nodeIndex, int thread);
 	Nodep* extractMin(int thread);
 	Nodep* extractMintwee(int thread);
-}//end binary heaps class
-;
+};//end binary heaps class
 
 class Graph
 {
+private:
+	double calculate_mean_d(vector<double>& input);
+	double calculate_stdv_pop_d(double mean, vector<double>& input);
+	double calculate_stdv_sample(double mean, vector<double>& input);
+public:
 	int maxnodes;
-	int maxarcs;
+	int maxlinks;
+	int maxtimeslots;
+	vector<double> time_periods;
 	vector<Link> l;
 	vector<Node> n;
-	vector<Node> np;
-	Graph(int maxnodes,int maxlinks, int maxtimeslots) {};
+	vector<Nodep> np;
+	Graph(int maxnodes,int maxlinks, int maxtimeslots);
+	double dijkstra_independent(int source, int target);//TI 1 to 1
+	vector<double> dijkstra_independent_to_all_threaded(int source, vector<int> targets, int thread);//TI 1 to all thread safe
+	double dijkstra_dependent(int source, int target, double currenttime);//TD 1 to 1
+	vector<double> dijkstra_dependent_to_all_threaded(int source, vector<int>targets, double currenttime, int thread); //TD 1 to all thread safe
 };
 

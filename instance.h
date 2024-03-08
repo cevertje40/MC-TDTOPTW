@@ -1,19 +1,5 @@
 #pragma once
-#include <fstream>//input
-#include <iostream>//output
-#include <sstream>
-#include <iomanip>
-#include <string.h>
-#include <string>
-#include <time.h>// cpu time &date
-#include <map>
-#include <list>
-#include "math.h"
-#include <algorithm> 
-#include <random>
-#include <boost/timer/timer.hpp>
-#include <vector>
-#include <boost/dynamic_bitset.hpp>
+#include "graph.h"
 
 using namespace std;
 
@@ -83,5 +69,7 @@ public:
 	vector<Tour> t;//tour objects
 
 	Ins(string filename);//construct instance by reading file
+	void construct_time_independent_traveltime(Graph& graph);
+	void construct_time_dependent_traveltime(Graph& graph);
 
 };

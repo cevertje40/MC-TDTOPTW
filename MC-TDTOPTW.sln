@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34622.214
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MC-TDTOPTW", "MC-TDTOPTW.vcxproj", "{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Debug|x64.ActiveCfg = Debug|x64
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Debug|x64.Build.0 = Debug|x64
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Debug|x86.ActiveCfg = Debug|Win32
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Debug|x86.Build.0 = Debug|Win32
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Release|x64.ActiveCfg = Release|x64
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Release|x64.Build.0 = Release|x64
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Release|x86.ActiveCfg = Release|Win32
+		{6CEAD2F0-0454-47C5-BCE2-E1E057F12BBB}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4B66EBBD-D447-4303-A66C-48DE2A8DF80E}
+	EndGlobalSection
+EndGlobal

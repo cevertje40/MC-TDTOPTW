@@ -1,5 +1,6 @@
 #pragma once
 #include <fstream>//input
+#include <iostream>//output
 #include <sstream>
 #include <iomanip>
 #include <string.h>
@@ -13,6 +14,7 @@
 #include <boost/timer/timer.hpp>
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
+
 using namespace std;
 
 class Ins//problem instance class that stores all required information f
@@ -40,18 +42,18 @@ public:
 		int id;// order id
 		int index;//index in the vertex vector
 		int score;//score
-		vector<int> serv;//service time
-		vector<int> LTW;//lower time window for per tour
-		vector<int> UTW;//upper time window for per tour
-		int weight;//weight
-		int volume;//volume
+		double serv;//service time
+		vector<double> LTW;//lower time window for per tour
+		vector<double> UTW;//upper time window for per tour
+		double weight;//weight
+		double volume;//volume
 		vector<vector<Vertex*>> nb; //pointer set of neighhours for each day
 		vector<boost::dynamic_bitset<>> nbi;// bitset of neighbours for each day
 		vector<Connec*> con;// pointer set of connections leaving from the vertex under consideration
 		//methods
 		Vertex() {}
 		~Vertex() {}
-		Vertex(int& id, int& index, int& score, int& serv, int& LTW, int& UTW, int& weight, int& volume) : id(id), index(index), score(score), serv(serv), LTW(LTW), UTW(UTW), weight(weight), volume(volume) {}
+		Vertex(int id, int index, int score, vector<double> LTW, double serv, vector<double> UTW, double weight, double volume) : id(id), index(index), score(score),serv(serv), LTW(LTW), UTW(UTW), weight(weight), volume(volume) {}
 	};
 
 	class Tour
@@ -66,16 +68,20 @@ public:
 		int T_max;//maximum allowable travel time
 		int W_max;//maximum allowable weight
 		int V_max;//maximum allowable volume
-		Tour(int& id, int& index, Vertex* startv, Vertex* endv, int EDT, int LAT, int T_max, int maxweight, int maxvol) : id(id), index(index), startv(startv), endv(endv), EDT(EDT), LAT(LAT), T_max(T_max), W_max(W_max), V_max(V_max) {}
+		Tour() {}
 		~Tour() {}
+		Tour(int id, int index, Vertex* startv, Vertex* endv, int EDT, int LAT, int T_max, int W_max, int V_max) : id(id), index(index), startv(startv), endv(endv), EDT(EDT), LAT(LAT), T_max(T_max), W_max(W_max), V_max(V_max) {}
 	};
 
 	int maxvertices;
 	int maxtours;
+	double breakstart;
+	double breakend;
+	double breakdur;
 	vector<Vertex> v;//vertex objects
 	vector<Connec> c;//connection objects
 	vector<Tour> t;//tour objects
 
-	void Ins(string name);
+	Ins(string filename);//construct instance by reading file
 
 };

@@ -84,9 +84,9 @@ void Ins::construct_time_independent_traveltime(Graph& graph)
 
 	//write to txt
 	FILE* fp = NULL;
-	char filepath[125] = "..\\..\\datasets\\TDOPSWTW\\";
+	char filepath[125] = "..\\..\\datasets\\MCTDTOPTW\\";
 	char filename[15];
-	sprintf_s(filename, sizeof(filename), "tittg%d.TXT", maxvertices);
+	sprintf_s(filename, sizeof(filename), "titt%d.TXT", maxvertices);
 	strcat_s(filepath, filename);
 	fopen_s(&fp, filepath, "w");   // open for writing 
 	if (fp != NULL)
@@ -141,7 +141,7 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 	double time = difftime(end, start) / CLOCKS_PER_SEC;
 
 	FILE* file = NULL;
-	char filepath[125] = "..\\..\\datasets\\TDOPSWTW\\";
+	char filepath[125] = "..\\..\\datasets\\MCTDTOPTW\\";
 	char storagename[50];
 	sprintf_s(storagename, sizeof(storagename), "tt%d.TXT", maxvertices);
 	strcat_s(filepath, storagename);

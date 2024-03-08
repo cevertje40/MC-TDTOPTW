@@ -120,9 +120,9 @@ private:
 	inline   int getParentIndex(int nodeIndex);
 public:
 	BinaryMinHeaps(); // default constructor
-	BinaryMinHeaps(int size, int thread); //constructor
+	BinaryMinHeaps(int size, int thread); //threaded constructor
 	~BinaryMinHeaps(); //destructor
-	void free(int thread);//theaded destructor
+	void free(int thread);//threaded destructor
 	void siftUp(int nodeIndex, int thread);
 	void insert(Nodep* Node, int thread);
 	void siftDown(int nodeIndex, int thread);

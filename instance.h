@@ -12,14 +12,13 @@ public:
 		//variables
 		int from;//vertex index of departing vertex
 		int to;// vertex index of arrival vertex
-		int dist;//length in km
-		int determin;// deterministic time-independent travel time
+		double determin;// deterministic time-independent travel time
 		vector<double> mu;//for deterministic time-dependent travel time for every timeslot
 		vector<double> nu;//for deterministic time-dependent travel time for every timeslot
 		//methods
 		Connec() {}
 		~Connec() {}
-		Connec(int& from, int& to, int& dist, int& determin) : from(from), to(to), dist(dist), determin(determin) {}
+		Connec(int& from, int& to, double& determin) : from(from), to(to), determin(determin) {}
 	};
 
 	class Vertex
@@ -67,9 +66,14 @@ public:
 	vector<Vertex> v;//vertex objects
 	vector<Connec> c;//connection objects
 	vector<Tour> t;//tour objects
-
+	
 	Ins(string filename);//construct instance by reading file
 	void construct_time_independent_traveltime(Graph& graph);
 	void construct_time_dependent_traveltime(Graph& graph);
-
+	void read_time_independent_traveltime();
+	void read_time_dependent_traveltime();
+	void create_neighbourhood(int amnt_nb);
+	int find_t(double time);
+	double travel_time(Connec* c, double start);
+	double arrival_time(Connec* c, double start);
 };

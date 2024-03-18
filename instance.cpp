@@ -1,9 +1,87 @@
 #include "instance.h"
 
+void Ins::read_time_independent_traveltime()
+{
+	// read in time-independent (freeflow) travel time
+	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	ifstream titt;
+	titt.open(filepath + "titt" + to_string(maxvertices) + ".TXT", ifstream::in);
+	if (titt.is_open())
+	{
+		cout << "reading time-independent travel time" << endl;
+		//assign connections to vertex objects and read free flow travel time
+		for (int i = 0; i < maxvertices; ++i)
+		{
+			v[i].con.resize(maxvertices);
+			string line;
+			getline(titt, line);
+			stringstream str(line);
+			for (int j = 0; j < maxvertices; ++j)
+			{
+				int counter = i * maxvertices + j;
+				c[counter].from = i;
+				c[counter].to = j;
+				str >> c[counter].determin;
+				str.ignore();
+				v[i].con[j] = &c[counter];
+			}
+		}
+		titt.close();
+	}
+	else
+	{
+		cout << red << "could not open time-independent travel time file" << endl;
+	}
+
+}
+
+void Ins::read_time_dependent_traveltime()
+{
+	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	ifstream tt;
+	tt.open(filepath + "tt" + to_string(maxvertices) + ".TXT", ifstream::in);
+	if (tt.is_open())
+	{
+		cout << "reading time-dependent travel time" << endl;
+		for (int i = 0; i < maxvertices; ++i)
+		{
+			for (int j = 0; j < maxvertices; ++j)
+			{
+				vector<double> dump(maxtimeslots);
+				string line;
+				getline(tt, line);
+				stringstream str(line);
+				for (int t = 0; t < maxtimeslots; ++t)
+				{
+					str >> dump[t];
+					str.ignore();
+				}
+				for (int t = 0; t < maxtimeslots; ++t)
+				{
+					if (t == maxtimeslots - 1)
+					{
+						v[i].con[j]->mu.push_back(double(dump[t] - dump[t]) / (time_periods[t + 1] - time_periods[t]));
+						v[i].con[j]->nu.push_back(double((dump[t]) - double(v[i].con[j]->mu[t] * time_periods[t])));
+					}
+					else
+					{
+						v[i].con[j]->mu.push_back(double(dump[t + 1] - dump[t]) / (time_periods[t + 1] - time_periods[t]));
+						v[i].con[j]->nu.push_back(double((dump[t]) - double(v[i].con[j]->mu[t] * time_periods[t])));
+					}
+				}
+			}
+		}
+		tt.close();
+	}
+	else
+	{
+		cout << red << "could not open time-dependent travel time file" << endl;
+	}
+}
 
 Ins::Ins(string filename)
 {
-//read in vertex and tour information from txt file and populate v and t objects
+	//read in vertex and tour information from txt file and populate v and t objects
 	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
 	FILE* file = NULL;
 	ifstream ifs;
@@ -55,7 +133,12 @@ Ins::Ins(string filename)
 	{
 		cout << " can not open MC-TDTOPTW instance file" << endl;
 	}
-	//read in travel time information from files and store to c objects
+	//read in travel time information
+	c.clear();
+	c.resize(maxvertices * maxvertices);
+	read_time_independent_traveltime();
+	read_time_dependent_traveltime();
+
 }
 
 void Ins::construct_time_independent_traveltime(Graph& graph)
@@ -130,10 +213,10 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 				destinations.push_back(v[j].id-1);//non neighbours will get infinity
 			}
 			//define feasible departure time zone
-			dump[i].resize(graph.maxtimeslots);
-			for (int t = 0; t < graph.maxtimeslots; ++t)
+			dump[i].resize(maxtimeslots);
+			for (int t = 0; t < maxtimeslots; ++t)
 			{
-				dump[i][t] = graph.dijkstra_dependent_to_all_threaded(v[i].id-1, destinations, graph.time_periods[t], thread);//j
+				dump[i][t] = graph.dijkstra_dependent_to_all_threaded(v[i].id-1, destinations,time_periods[t],thread);//j
 			}// for all timeslots
 		}//for all vertices
 	}//end pragma parallel
@@ -153,10 +236,11 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 		{
 			for (int j = 0; j < maxvertices; ++j)
 			{
-				for (int t = 0; t < graph.maxtimeslots; ++t)
+				for (int t = 0; t <maxtimeslots; ++t)
 				{
 					fprintf(file, "%lf;", dump[i][t][j]);
 				}
+				fprintf(file, "\n");
 			}
 		}
 		fclose(file);    // close the file before ending program 
@@ -165,4 +249,101 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 	{
 		cout << red << "error writing time-dependent traveltime to output file" << endl;
 	}
+}
+
+void Ins::create_neighbourhood(int amnt_nb)
+{
+	#pragma omp parallel
+	{//start parallel session
+		#pragma omp for nowait
+		for (int i = 0; i < maxvertices - 1; ++i)//for all regular vertices
+		{
+			v[i].nb.resize(maxtours);
+			v[i].nbi.resize(maxtours);
+			for (int d = 0; d < maxtours; ++d)
+			{
+				//calculate neighbourhood potential
+				vector<double> score;
+				for (int j = 1; j < maxvertices - 1; ++j)
+				{
+					if (i != j)
+					{
+						if (v[i].LTW[d] + v[i].serv + v[i].con[j]->determin < v[j].UTW[d])//least strict criterion, maxiumum neighbour potential
+						{
+							//score.push_back(1/v[j].score);//slecht heel veel punten van optimale zitter er niet in
+							//score.push_back(v[i].con[j]->determin/v[j].score);
+							//score.push_back((v[i].con[j]->determin + v[j].serv[0]) / v[j].score);
+							score.push_back((v[i].con[j]->determin + v[j].serv + v[j].weight + v[j].volume) / v[j].score);
+							//score.push_back(v[i].con[j]->determin);
+							v[i].nb[d].push_back(&v[j]);
+						}
+					}
+				}//end for j
+				// sort based on score potential
+				bool unsorted = true;
+				while (unsorted)
+				{
+					unsorted = false;
+					for (int j = 0; j < (int)score.size() - 1; ++j)
+					{
+						if (score[j] > score[j + 1])
+						{
+							Vertex* tempnb = v[i].nb[d][j];
+							double temps = score[j];
+							v[i].nb[d][j] = v[i].nb[d][j + 1];
+							score[j] = score[j + 1];
+							score[j + 1] = temps;
+							v[i].nb[d][j + 1] = tempnb;
+							unsorted = true;
+						}
+					}//end for
+				}//end while
+				//select top elements
+				if ((int)v[i].nb[d].size() > amnt_nb)
+				{
+					v[i].nb[d].erase(v[i].nb[d].begin() + amnt_nb, v[i].nb[d].end());
+				}
+				//automatically add the end depot
+				v[i].nb[d].push_back(&v[maxvertices - 1]);
+				//indexed list aanmaken
+				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+				v[i].nbi[d].set(0);//sets all bits to false
+				for (int x = 0; x < (int)v[i].nb[d].size(); ++x)
+				{
+					v[i].nbi[d][v[i].nb[d][x]->index] = true;
+				}
+				//for a swap operation each vertex is neighbour of itself
+				v[i].nbi[d][i] = true;
+			}//end for d
+		}//end for i
+		//and enddepot to enddepot
+		v[maxvertices - 1].nb.resize(maxtours);
+		v[maxvertices - 1].nbi.resize(maxtours);
+		for (int d = 0; d < maxtours; ++d)
+		{
+			v[maxvertices - 1].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+			v[maxvertices - 1].nb[d].push_back(&v[maxvertices - 1]);
+			v[maxvertices - 1].nbi[d][maxvertices - 1] = true;
+		}
+	}//end parallel
+}//end neighbourhood
+
+inline int Ins::find_t(double time)
+{
+	int t = (int)floor((time - time_periods[0]) / 0.25);//when you change the time unit this has to change too
+	return min(55, t);
+}
+
+double Ins::travel_time(Connec* c, double start)
+{
+	int t = find_t(start);
+	double traveltime = c->nu[t] + start * c->mu[t];
+	return traveltime;
+}
+
+double Ins::arrival_time(Connec* c, double start)
+{
+	int t = find_t(start);
+	double arrivaltime = c->nu[t] + (start)*c->mu[t] + start;
+	return arrivaltime;
 }

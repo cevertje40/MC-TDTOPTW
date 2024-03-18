@@ -288,18 +288,10 @@ double Graph::calculate_stdv_sample(double mean, vector<double>& input)//sample 
 	return sqrt(temp / (input.size() - 1));
 }
 
-Graph::Graph(int maxn, int maxl, int maxt)
+Graph::Graph(int maxn, int maxl)
 {
 	maxnodes = maxn;
 	maxlinks = maxl;
-	maxtimeslots = maxt;
-	time_periods.resize(maxtimeslots + 1);
-	time_periods[0] = 6;
-	for (int i = 1; i < maxtimeslots; ++i)
-	{
-		time_periods[i] = time_periods[i - 1] + 0.25;
-	}
-	time_periods.push_back(DBL_MAX);
 	n.resize(maxnodes);
 	np.resize(maxnodes);
 	ifstream file("..\\..\\datasets\\bemobile\\nodes_cleaned.csv");

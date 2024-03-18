@@ -18,6 +18,7 @@
 #include <boost/math/special_functions/erf.hpp>
 #include <omp.h>
 #include <boost/dynamic_bitset.hpp>
+#include "time.h"
 
 using namespace std;
 
@@ -139,12 +140,11 @@ private:
 public:
 	int maxnodes;
 	int maxlinks;
-	int maxtimeslots;
-	vector<double> time_periods;
+	
 	vector<Link> l;
 	vector<Node> n;
 	vector<Nodep> np;
-	Graph(int maxnodes,int maxlinks, int maxtimeslots);
+	Graph(int maxnodes,int maxlinks);
 	double dijkstra_independent(int source, int target);//TI 1 to 1
 	vector<double> dijkstra_independent_to_all_threaded(int source, vector<int> targets, int thread);//TI 1 to all thread safe
 	double dijkstra_dependent(int source, int target, double currenttime);//TD 1 to 1

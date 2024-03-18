@@ -146,6 +146,7 @@
     <ClInclude Include="instance.h" />
     <ClInclude Include="solution.h" />
     <ClInclude Include="solver.h" />
+    <ClInclude Include="time.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

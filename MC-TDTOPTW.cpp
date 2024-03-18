@@ -11,6 +11,13 @@ int main()
     string name = "20.txt";
     Ins instance(name);
    
+    //read neigbhorhood
+    //create datasets
+    //aco,ils class
+    //construction aco
+    //local search moves
+    //test class
+
     Solver solver;
     solver.aco(instance,1,3,0.01,20,10000);
 }

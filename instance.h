@@ -73,6 +73,8 @@ public:
 	void read_time_independent_traveltime();
 	void read_time_dependent_traveltime();
 	void create_neighbourhood(int amnt_nb);
+	void read_neighbourhood(string filepath);
+	/**acces of c object methods*/
 	int find_t(double time);
 	double travel_time(Connec* c, double start);
 	double arrival_time(Connec* c, double start);

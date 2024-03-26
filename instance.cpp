@@ -81,6 +81,7 @@ void Ins::read_time_dependent_traveltime()
 
 Ins::Ins(string filename)
 {
+	name = filename;
 	//read in vertex and tour information from txt file and populate v and t objects
 	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
 	FILE* file = NULL;
@@ -268,13 +269,9 @@ void Ins::create_neighbourhood(int amnt_nb)
 				{
 					if (i != j)
 					{
-						if (v[i].LTW[d] + v[i].serv + v[i].con[j]->determin < v[j].UTW[d])//least strict criterion, maxiumum neighbour potential
+						if (v[i].LTW[d] + v[i].serv + v[i].con[j]->determin <= v[j].UTW[d])
 						{
-							//score.push_back(1/v[j].score);//slecht heel veel punten van optimale zitter er niet in
-							//score.push_back(v[i].con[j]->determin/v[j].score);
-							//score.push_back((v[i].con[j]->determin + v[j].serv[0]) / v[j].score);
 							score.push_back((v[i].con[j]->determin + v[j].serv + v[j].weight + v[j].volume) / v[j].score);
-							//score.push_back(v[i].con[j]->determin);
 							v[i].nb[d].push_back(&v[j]);
 						}
 					}
@@ -326,7 +323,56 @@ void Ins::create_neighbourhood(int amnt_nb)
 			v[maxvertices - 1].nbi[d][maxvertices - 1] = true;
 		}
 	}//end parallel
+	ofstream file;
+	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	file.open(filepath+"nb" + name);
+	for (int i = 0; i < maxvertices; ++i)//for all regular vertices
+	{
+		for (int d = 0; d < maxtours; ++d)
+		{
+			file << v[i].nb[d].size() << "\n";
+			for (int j = 0; j < v[i].nb[d].size(); ++j)
+			{
+				file << v[i].nb[d][j]->index << ";";
+			}
+			file << "\n";
+		}
+	}
+	file.close();
 }//end neighbourhood
+
+void Ins::read_neighbourhood()
+{
+	//read nearest bemobile node
+	ifstream file;
+	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	file.open(filepath+"nb"+name);
+	string value;
+	bool stop = false;
+	for (int i = 0; i < maxvertices; ++i)//for all regular vertices
+	{
+		v[i].nbi.resize(maxtours);
+		v[i].nb.resize(maxtours);
+		for (int d = 0; d < maxtours; ++d)
+		{
+			getline(file, value, '\n');
+			int size = stoi(value);//read amount of neighbours
+			v[i].nb[d].resize(size);
+			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+			v[i].nbi[d].set(0);//set bitset to zero for all vertices
+			for (int j = 0; j < size; ++j)
+			{
+				getline(file, value, ';');
+				int index = stoi(value);
+				v[i].nb[d][j] = &v[index];
+				v[i].nbi[d][index] = true;
+			}
+			getline(file, value, '\n');
+			v[i].nbi[d][i] = true;
+		}
+	}
+	file.close();
+}
 
 inline int Ins::find_t(double time)
 {

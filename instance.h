@@ -58,6 +58,7 @@ public:
 		Tour(int id, int index, Vertex* startv, Vertex* endv, int EDT, int LAT, int T_max, int W_max, int V_max) : id(id), index(index), startv(startv), endv(endv), EDT(EDT), LAT(LAT), T_max(T_max), W_max(W_max), V_max(V_max) {}
 	};
 
+	string name;
 	int maxvertices;
 	int maxtours;
 	double breakstart;
@@ -73,7 +74,7 @@ public:
 	void read_time_independent_traveltime();
 	void read_time_dependent_traveltime();
 	void create_neighbourhood(int amnt_nb);
-	void read_neighbourhood(string filepath);
+	void read_neighbourhood();
 	/**acces of c object methods*/
 	int find_t(double time);
 	double travel_time(Connec* c, double start);

@@ -138,6 +138,7 @@
     <ClCompile Include="graph.cpp" />
     <ClCompile Include="instance.cpp" />
     <ClCompile Include="MC-TDTOPTW.cpp" />
+    <ClCompile Include="solution.cpp" />
     <ClCompile Include="solver.cpp" />
   </ItemGroup>
   <ItemGroup>

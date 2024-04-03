@@ -103,6 +103,8 @@ Ins::Ins(string filename)
 		getline(ifs, line);//third line, break info
 		str = stringstream(line);
 		str >> breakdur >> breakstart >> breakend;
+		breakstart += time_periods[0];
+		breakend += time_periods[0];
 		for (int vertex = 0; vertex < maxvertices; ++vertex)
 		{
 			getline(ifs, line);//maxvertices lines vertex info
@@ -114,6 +116,8 @@ Ins::Ins(string filename)
 			for (int tour = 0; tour < maxtours; ++tour)
 			{
 				str >> v[vertex].LTW[tour] >> v[vertex].UTW[tour];
+				v[vertex].LTW[tour] += time_periods[0];
+				v[vertex].UTW[tour] += time_periods[0];
 			}
 		}
 		for (int tour = 0; tour < maxtours; ++tour)
@@ -123,8 +127,8 @@ Ins::Ins(string filename)
 			str >> t[tour].T_max >> t[tour].W_max >> t[tour].V_max;
 			t[tour].index = tour;
 			t[tour].id = tour + 1;
-			t[tour].EDT = 0;
-			t[tour].LAT = 0 + t[tour].T_max;
+			t[tour].EDT = time_periods[0];
+			t[tour].LAT = time_periods[0] + t[tour].T_max;
 			t[tour].startv = &v[0];
 			t[tour].endv = &v[maxvertices - 1];
 		}
@@ -392,4 +396,16 @@ double Ins::arrival_time(Connec* c, double start)
 	int t = find_t(start);
 	double arrivaltime = c->nu[t] + (start)*c->mu[t] + start;
 	return arrivaltime;
+}
+
+double Ins::departure_time(Connec* c, double arrivaltime)
+{
+	int t = find_t(arrivaltime);
+	double departuretime = (arrivaltime - c->nu[t]) / (1 + c->mu[t]);
+	while ((time_periods[t] > departuretime) || (departuretime > time_periods[t + 1]))
+	{
+		--t;
+		departuretime = (arrivaltime - c->nu[t]) / (1 + c->mu[t]);
+	}
+	return departuretime;
 }

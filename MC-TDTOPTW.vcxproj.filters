@@ -27,6 +27,9 @@
     <ClCompile Include="graph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="solution.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="solution.h">

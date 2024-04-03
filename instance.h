@@ -48,14 +48,14 @@ public:
 		int index;//dayindex, to obtain corresponding time windows
 		Vertex* startv;//vertex pointer to start depot
 		Vertex* endv;//vertex pointer to end depot
-		int EDT;//earliest departure time
-		int LAT;//latest arrival time
-		int T_max;//maximum allowable travel time
-		int W_max;//maximum allowable weight
-		int V_max;//maximum allowable volume
+		double EDT;//earliest departure time
+		double LAT;//latest arrival time
+		double T_max;//maximum allowable travel time
+		double W_max;//maximum allowable weight
+		double V_max;//maximum allowable volume
 		Tour() {}
 		~Tour() {}
-		Tour(int id, int index, Vertex* startv, Vertex* endv, int EDT, int LAT, int T_max, int W_max, int V_max) : id(id), index(index), startv(startv), endv(endv), EDT(EDT), LAT(LAT), T_max(T_max), W_max(W_max), V_max(V_max) {}
+		Tour(int id, int index, Vertex* startv, Vertex* endv, double EDT, double LAT, double T_max, double W_max, double V_max) : id(id), index(index), startv(startv), endv(endv), EDT(EDT), LAT(LAT), T_max(T_max), W_max(W_max), V_max(V_max) {}
 	};
 
 	string name;
@@ -79,4 +79,5 @@ public:
 	int find_t(double time);
 	double travel_time(Connec* c, double start);
 	double arrival_time(Connec* c, double start);
+	double departure_time(Connec* c, double arrivaltime);
 };

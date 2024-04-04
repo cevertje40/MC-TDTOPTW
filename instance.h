@@ -64,6 +64,7 @@ public:
 	double breakstart;
 	double breakend;
 	double breakdur;
+	double maxscore;//total score over all vertices
 	vector<Vertex> v;//vertex objects
 	vector<Connec> c;//connection objects
 	vector<Tour> t;//tour objects

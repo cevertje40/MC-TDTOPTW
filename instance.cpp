@@ -105,12 +105,14 @@ Ins::Ins(string filename)
 		str >> breakdur >> breakstart >> breakend;
 		breakstart += time_periods[0];
 		breakend += time_periods[0];
+		maxscore = 0;
 		for (int vertex = 0; vertex < maxvertices; ++vertex)
 		{
 			getline(ifs, line);//maxvertices lines vertex info
 			str = stringstream(line);
 			v[vertex].index = vertex;
 			str >> v[vertex].id >> v[vertex].score >> v[vertex].serv >> v[vertex].weight >> v[vertex].volume;
+			maxscore += v[vertex].score;
 			v[vertex].LTW.resize(maxtours);
 			v[vertex].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)

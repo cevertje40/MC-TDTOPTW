@@ -25,6 +25,6 @@ int main()
     //local search moves
     //test class
     
-    Aco acs(instance, 1,3,0.01,20,10000);
+    Aco acs(instance, 1,3,0.01,20,10000,0.25,0.05);
     acs.solve();
 }

@@ -26,3 +26,24 @@ public:
 	void solve();
 };
 
+class Ils : public Moves
+{
+private:
+	
+	int max_ants;
+	int max_it;
+	int ni;//number of non improvement iterations
+	int max_ni;//number of iterations allowed without improvement before pheromone reset
+	vector<Sol> s;//solution container
+	Sol gb;//global best solution
+	int iter_nr;//nr of best ant of the iteration
+	double iter_score;//score of best ant of the iteration
+	void construct(Sol& sol);
+	void ruin_recreate(Sol& sol);
+public:
+	Ils(Ins& ins, int max_sol,int max_ni);
+	
+	void solve();
+};
+
+

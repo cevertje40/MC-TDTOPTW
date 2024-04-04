@@ -21,4 +21,9 @@ public:
 	Sol(Ins& ins);
 	void reset();
 	void check();
+	void update_traveltime(int tour, int start, int end);
+	void calc_maxshift(int tour, int start, int end);
+	void calc_maxshift();
+	void insertvertex(int tour, Ins::Vertex* insertion, int position);
+	void removevertex(int tour, int position);
 };

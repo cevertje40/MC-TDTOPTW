@@ -165,26 +165,37 @@ void Sol::check()
 
 void Sol::update_traveltime(int tour, int start, int end)
 {
-	for (int i = start; i < end-1; ++i)
+	double currenttime = traveltime[tour][start] + ins->t[tour].EDT;
+	for (int u = start; u < end-1; ++u)
 	{
-
-	}
+		//gather departure time and corresponding time slot
+		Ins::Vertex* o = solution[tour][u];
+		Ins::Vertex* p = solution[tour][u+1];
+		//travel time from van o to p
+		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
+		if (arrivaltime < p->LTW[tour])
+		{
+			arrivaltime = p->LTW[tour];
+		}
+		arrivaltime += p->serv + (action[tour][u+1] * ins->breakdur);
+		max_shift[tour][u+1] = (traveltime[tour][u+1] + max_shift[tour][u+1]) - (arrivaltime - ins->t[tour].EDT);
+		//(old arrival time + old maxshift) - new arrival time = new max_shift
+		traveltime[tour][u+1] = arrivaltime - ins->t[tour].EDT;
+		currenttime = arrivaltime;
+	}//end for
 }
 
-void Sol::calc_maxshift(int d, int start, int end)
+void Sol::update_maxshift(int d, int start, int end, double arrivaltime)
 {
-	end = min(end,int(solution[d].size())-1);//end is maximum the second last vertex
 	double departuretime = 0;
-	max_shift[d].back() = (ins->t[d].T_max - traveltime[d].back());
-	double arrivaltime = ins->t[d].LAT - (action[d].back() * ins->breakdur);//if you break at the end depot subtract breakduration
 	Ins::Vertex* y;
 	Ins::Vertex* z;
-	for (int i = start; i > 0 ; --i)// depots don't count
+	for (int i = end; i > start ; --i)
 	{
 		//define the 2 elements
-		y = solution[d][i-1];
-		int breaki = action[d][i-1];
-		z = solution[d][i];
+		y = solution[d][i];
+		int breaki = action[d][i];
+		z = solution[d][i+1];
 		departuretime = ins->departure_time(y->con[z->index], arrivaltime);
 		//TW check on departuretime 
 		if (departuretime > y->UTW[d] + y->serv)
@@ -201,7 +212,7 @@ void Sol::calc_maxshift(int d, int start, int end)
 			}
 		}
 		//store result
-		max_shift[d][i-1] = departuretime - (traveltime[d][i-1] + ins->t[d].EDT);
+		max_shift[d][i] = departuretime - (traveltime[d][i] + ins->t[d].EDT);
 		//reset variable for the calculation of next point
 		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
 	}// end for i
@@ -244,6 +255,56 @@ void Sol::calc_maxshift()
 			arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
 		}// end for i
 	}//end for all tours
+}
+
+void Sol::insertvertex(int tour, Ins::Vertex* candidate, int position)
+{
+	available[candidate->index] = false;
+	solution[tour].insert(solution[tour].begin() + position + 1, candidate);//insert point y after x
+	traveltime[tour].insert(traveltime[tour].begin() + position + 1, 0);//insert temporary value
+	action[tour].insert(action[tour].begin() + position + 1, 0);//insert regular visit action change later when necessary
+	scores[tour] += candidate->score;// update score of the new solution
+	score += candidate->score;// update score of the new solution
+	volume[tour] += candidate->volume;
+	weight[tour] += candidate->weight;
+	if (position < breakindex[tour])
+	{
+		breakindex[tour] += 1;//due to insertion of 1 vertex the index needs to be incremented with 1
+	}
+	max_shift[tour].insert(max_shift[tour].begin() + position + 1, 0);
+	update_traveltime(tour, position, int(solution[tour].size()));//update travel time and maxshift for all positions after insertion
+	double arrivaltime = (traveltime[tour][position + 2] + ins->t[tour].EDT + max_shift[tour][position + 2]) - (solution[tour][position + 2]->serv + action[tour][position + 2] * ins->breakdur);//service time eraftrekken
+	update_maxshift(tour, 0, position + 1, arrivaltime);//update maxshift for all positions before insertions
+}
+
+void Sol::replacevertex(int tour, Ins::Vertex* candidate, int position)
+{
+	Ins::Vertex* old = solution[tour][position];
+	available[candidate->index] = false;
+	available[old->index] = true;
+	solution[tour][position] = candidate;//replace point old with candidate
+	max_shift[tour][position] = 0;//dummy value
+	score += candidate->score - old->score;// update score of the new solution
+	scores[tour] += candidate->score - old->score;// update score of the new solution
+	update_traveltime(tour, position-1, int(solution[tour].size()));//update travel time and maxshift for all positions after replacement
+	double arrivaltime = (traveltime[tour][position + 1] + ins->t[tour].EDT + max_shift[tour][position +1]) - (solution[tour][position + 1]->serv + action[tour][position + 1] * ins->breakdur);//service time eraftrekken
+	update_maxshift(tour, 0, position, arrivaltime);//update maxshift for all positions before replacement
+}
+
+void Sol::removevertex(int tour, int position)
+{
+	Ins::Vertex* candidate = solution[tour][position];
+	available[candidate->index] = false;
+	solution[tour].erase(solution[tour].begin() + position + 1);//insert point y after x
+	traveltime[tour].erase(traveltime[tour].begin() + position + 1);//insert temporary value
+	action[tour].erase(action[tour].begin() + position + 1);//insert regular visit action change later when necessary
+	scores[tour] -= candidate->score;// update score of the new solution
+	score -= candidate->score;// update score of the new solution
+	volume[tour] -= candidate->volume;
+	weight[tour] -= candidate->weight;
+	update_traveltime(tour, position, int(solution[tour].size()));//update travel time for all after deletion
+	double arrivaltime = (traveltime[tour][position + 2] + ins->t[tour].EDT + max_shift[tour][position + 2]) - (solution[tour][position + 2]->serv + action[tour][position + 2] * ins->breakdur);//service time eraftrekken
+	calc_maxshift();//todo implement maxshift for specific tour only
 }
 
 void Sol::reset() 

@@ -85,68 +85,7 @@ void Moves::best_insert_nb(Sol& sol)
 		}//end for al paths
 		if (improvement)
 		{
-			// execute best insertion if improvement found
-			sol.available[candidate->index] = false;
-			sol.solution[bestpath].insert(sol.solution[bestpath].begin() + position + 1, candidate);//insert point y after x
-			sol.traveltime[bestpath].insert(sol.traveltime[bestpath].begin() + position + 1, 0);//insert temporary value
-			sol.action[bestpath].insert(sol.action[bestpath].begin() + position + 1, 0);//insert regular visit action change later when necessary
-			sol.scores[bestpath] += candidate->score;// update score of the new solution
-			sol.score += candidate->score;// update score of the new solution
-			sol.volume[bestpath] += candidate->volume;
-			sol.weight[bestpath] += candidate->weight;
-			if (position < sol.breakindex[bestpath])
-			{
-				sol.breakindex[bestpath] += 1;//due to insertion of 1 vertex the index needs to be incremented with 1
-			}
-			//update travel time solution vector 
-			sol.max_shift[bestpath].insert(sol.max_shift[bestpath].begin() + position + 1, 0);
-			double currenttime = sol.traveltime[bestpath][position] + ins->t[bestpath].EDT;
-			for (int u = position + 1; u < sol.solution[bestpath].size(); ++u)
-			{
-				//gather departure time and corresponding time slot
-				Ins::Vertex* o = sol.solution[bestpath][u - 1];
-				Ins::Vertex* p = sol.solution[bestpath][u];
-				//travel time from van o to p
-				double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-				if (arrivaltime + sol.action[bestpath][u] * ins->breakdur < p->LTW[bestpath])
-				{
-					arrivaltime = p->LTW[bestpath] - sol.action[bestpath][u] * ins->breakdur;
-				}
-				arrivaltime += p->serv + sol.action[bestpath][u] * ins->breakdur;
-				sol.max_shift[bestpath][u] = (sol.traveltime[bestpath][u] + sol.max_shift[bestpath][u]) - (arrivaltime - ins->t[bestpath].EDT);
-				//old arrival time + old maxshift - new arrival time = new max_shift
-				sol.traveltime[bestpath][u] = arrivaltime - ins->t[bestpath].EDT;
-				currenttime = arrivaltime;
-			}//end for
-			//the value of max_shift j+1 is now wrong but will be soon be updated
-			//complete update of max_shift for the included vertices before the insertion
-			double departuretime = 0;
-			double arrivaltime = (sol.traveltime[bestpath][position + 2] + ins->t[bestpath].EDT + sol.max_shift[bestpath][position + 2]) - (sol.solution[bestpath][position + 2]->serv + sol.action[bestpath][position + 2] * ins->breakdur);//service time eraftrekken
-			for (int vz = position + 1; vz > 0; --vz)
-			{
-				//define the 2 elements
-				Ins::Vertex* f = sol.solution[bestpath][vz];
-				int breakf = sol.action[bestpath][vz];
-				Ins::Vertex* g = sol.solution[bestpath][vz + 1];
-				//find proper departure time and time slot
-				departuretime = ins->departure_time(f->con[g->index], arrivaltime);	//utw check
-				if (departuretime > f->UTW[bestpath] + f->serv + breakf * ins->breakdur)
-				{
-					departuretime = f->UTW[bestpath] + f->serv + breakf * ins->breakdur;
-				}
-				if (breakf == 1)
-				{
-					if (departuretime > ins->breakend + ins->breakdur)
-					{
-						cout << "bij insert break verhindert een maxshift:  " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
-						departuretime = ins->breakend + ins->breakdur;
-						//breakrepositon = true;//mogelijk kan de break vervroegd worden en zo moet de break maxshift niet afremmen
-					}
-				}
-				sol.max_shift[bestpath][vz] = departuretime - (sol.traveltime[bestpath][vz] + ins->t[bestpath].EDT);
-				departuretime -= f->serv;
-				arrivaltime = departuretime;
-			}// end for vz
+			sol.insertvertex(bestpath, candidate, position);
 			//try to pull break if the break is still positioned at the end depot
 			int end = (int)sol.solution[bestpath].size();
 			if ((sol.breakindex[bestpath] == end - 1) && (ins->t[bestpath].LAT > ins->breakend + ins->breakdur))
@@ -474,55 +413,9 @@ void Moves::replace_nb(Sol& sol)
 		if (improvement)
 		{
 			// execute replacement
-			Ins::Vertex* z = sol.solution[bestpath][position];
-			improvement = true;
-			sol.available[candidate->index] = false;
-			sol.available[z->index] = true;
-			//update solution on location j
-			sol.solution[bestpath][position] = candidate;//replace point z with y
-			sol.max_shift[bestpath][position] = 0;//dummy value
-			sol.traveltime[bestpath][position] = ttxybest;//update tt
-			sol.score += candidate->score - z->score;// update score of the new solution
-			sol.scores[bestpath] += candidate->score - z->score;// update score of the new solution
-			int endj = (int)sol.solution[bestpath].size();
-			//update travel time and max_shift for >j 
-			for (int u = position + 1; u < endj; ++u)
-			{
-				//gather departure time and corresponding time slot
-				double currenttimez = sol.traveltime[bestpath][u - 1] + ins->t[bestpath].EDT;
-				Ins::Vertex* o = sol.solution[bestpath][u - 1];
-				Ins::Vertex* p = sol.solution[bestpath][u];
-				int breakz = sol.action[bestpath][u];
-				//travel time from van o to p
-				double arrivaltimez = ins->arrival_time(o->con[p->index], currenttimez);
-				if (arrivaltimez + sol.action[bestpath][u] * ins->breakdur < p->LTW[bestpath])
-				{
-					arrivaltimez = p->LTW[bestpath] - sol.action[bestpath][u] * ins->breakdur;
-				}
-				arrivaltimez += p->serv + sol.action[bestpath][u] * ins->breakdur;
-				sol.max_shift[bestpath][u] = (sol.traveltime[bestpath][u] + sol.max_shift[bestpath][u]) - (arrivaltimez - ins->t[bestpath].EDT);
-				//old arrival time + old maxshift - new arrival time = new max_shift
-				sol.traveltime[bestpath][u] = arrivaltimez - ins->t[bestpath].EDT;
-			}//end for
-			//update of max_shift for points <=j
-			double departuretimez = 0;
-			double arrivaltimez = (sol.traveltime[bestpath][position + 1] + ins->t[bestpath].EDT + sol.max_shift[bestpath][position + 1]) - sol.solution[bestpath][position + 1]->serv + sol.action[bestpath][position + 1] * ins->breakdur;
-			for (int vz = position; vz > 0; --vz)
-			{
-				//define the 2 elements
-				Ins::Vertex* f = sol.solution[bestpath][vz];
-				int breakz = sol.action[bestpath][vz];
-				Ins::Vertex* g = sol.solution[bestpath][vz + 1];
-				//find proper departure time and time slot
-				//departuretimez=Sol.traveltime[vz]+time_periods[0];
-				departuretimez = ins->departure_time(f->con[g->index], arrivaltimez);//utw check
-				if (departuretimez > f->UTW[bestpath] + f->serv + breakz * ins->breakdur)
-					departuretimez = f->UTW[bestpath] + f->serv + breakz * ins->breakdur;
-				sol.max_shift[bestpath][vz] = departuretimez - (sol.traveltime[bestpath][vz] + time_periods[0]);
-				departuretimez -= f->serv + breakz * ins->breakdur;
-				//reset variable for the calculation of next point
-				arrivaltimez = departuretimez;
-			}// end for vz
+			sol.replacevertex(bestpath, candidate, position);
+			sol.check();
+			cout << "debug here" << endl;
 		}//end if improvement
 	}//end while improvement
 }

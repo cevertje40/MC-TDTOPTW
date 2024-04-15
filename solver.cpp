@@ -276,8 +276,9 @@ void Aco::solve()
 				//two_opt_nb(s[ant]);
 				//s[ant].check();
 				s[ant].calc_maxshift();
-				replace_nb(s[ant]);
-				//relocate_nb(s[ant]);
+				//replace_nb(s[ant]);
+				//best_move_nb(s[ant]);
+				best_swap2_nb(s[ant]);
 				//exchange(s[ant]);
 				//best_insert_nb(s[ant]);
 				//reschedule_breaks(s[ant]);

@@ -22,6 +22,7 @@ public:
 	void reset();
 	void check();
 	void update_traveltime(int tour, int start, int end);
+	void update_traveltime_break(int tour, int start, int end);
 	void update_maxshift(int tour, int start, int end, double arrivaltime);//partial update within a tour
 	void calc_maxshift();//for all tours for whole solution
 	void insertvertex(int tour, Ins::Vertex* candidate, int position);

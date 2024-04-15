@@ -13,7 +13,8 @@ public:
 	void exchange(Sol& sol);
 	void swap_nb(Sol& sol);
 	void two_opt_nb(Sol& sol);
-	void relocate_nb(Sol& sol);
+	void best_move_nb(Sol& sol);
+	void best_swap2_nb(Sol & sol);
 	mt19937 mt;
 	Ins* ins;
 	Moves(Ins& ins) :ins(&ins) {}

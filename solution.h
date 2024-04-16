@@ -28,4 +28,6 @@ public:
 	void insertvertex(int tour, Ins::Vertex* candidate, int position);
 	void replacevertex(int tour, Ins::Vertex* candidate, int position);
 	void removevertex(int tour, int position);
+	void swapvertex(int tour, int i, int j);//assumption i < j
+	void optvertices(int tour, int i, int j,bool breakreschedule);//assumption i < j
 };

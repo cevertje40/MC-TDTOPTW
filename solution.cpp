@@ -163,7 +163,7 @@ void Sol::check()
 		cout << red << "score of best solution should be: " << scorecheck << " stored score is: " << score << endl;
 }
 
-void Sol::update_traveltime(int tour, int start, int end)
+void Sol::update_traveltime(int tour, int start, int end)//update travel time and max_shift but don't update break
 {
 	double currenttime = traveltime[tour][start] + ins->t[tour].EDT;
 	for (int u = start; u < end-1; ++u)
@@ -185,7 +185,7 @@ void Sol::update_traveltime(int tour, int start, int end)
 	}//end for
 }
 
-void Sol::update_traveltime_break(int tour, int start, int end)
+void Sol::update_traveltime_break(int tour, int start, int end)//update travel time and maxshift and schedule break
 {
 	double reqbreak = true;
 	double currenttime = traveltime[tour][start] + ins->t[tour].EDT;
@@ -201,6 +201,10 @@ void Sol::update_traveltime_break(int tour, int start, int end)
 			action[tour][u+1] = 1;
 			breakindex[tour] = u+1;
 			reqbreak = false;
+		}
+		else
+		{//erase previously scheduled break
+			action[tour][u+1] = 0;
 		}
 		if (arrivaltime < p->LTW[tour])
 		{
@@ -358,6 +362,41 @@ void Sol::removevertex(int tour, int position)
 	calc_maxshift();//todo implement maxshift for specific tour only
 }
 
+void Sol::swapvertex(int tour, int i, int j)
+{
+	Ins::Vertex* remember = solution[tour][i];
+	solution[tour][i] = solution[tour][j];
+	solution[tour][j] = remember;
+	if (i <= breakindex[tour])
+	{///break comes after i so might need to be replaced
+		update_traveltime_break(tour, i-1, int(solution[tour].size()));
+	}
+	else
+	{
+		update_traveltime(tour, i-1, int(solution[tour].size()));
+	}
+
+}
+
+void Sol::optvertices(int tour, int i, int j,bool breakreschedule)
+{
+	//reverse sequence
+	for (int f = 0; f < 1 + (j - i) / 2; ++f)
+	{
+		Ins::Vertex* temp = solution[tour][j - f];
+		solution[tour][j - f] = solution[tour][i + f];
+		solution[tour][i + f] = temp;
+	}
+	if (breakreschedule)
+	{
+		update_traveltime_break(tour, i - 1, int(solution[tour].size()));
+	}
+	else
+	{
+		update_traveltime(tour, i - 1, int(solution[tour].size()));
+	}
+}
+
 void Sol::reset() 
 {
 	for (int t = 0; t < ins->maxtours; ++t)
@@ -378,5 +417,4 @@ void Sol::reset()
 	score = 0;
 	available.set();//sets all bits to true
 	available[ins->v[0].index] = false;
-
 }

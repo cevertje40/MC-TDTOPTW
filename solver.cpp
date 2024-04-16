@@ -273,12 +273,15 @@ void Aco::solve()
 				s[ant].reset();
 				construct(s[ant]);
 				swap_nb(s[ant]);
-				//two_opt_nb(s[ant]);
-				//s[ant].check();
 				s[ant].calc_maxshift();
+				insert_nb(s[ant], 1);
+				replace_nb(s[ant], 1);
+				swap2_nb(s[ant], 1);
+				move_nb(s[ant], 1);
+				//replace_nb(s[ant], 0);
 				//replace_nb(s[ant]);
 				//best_move_nb(s[ant]);
-				best_swap2_nb(s[ant]);
+				//best_swap2_nb(s[ant]);
 				//exchange(s[ant]);
 				//best_insert_nb(s[ant]);
 				//reschedule_breaks(s[ant]);
@@ -290,6 +293,7 @@ void Aco::solve()
 		pheromone_update();// iteration best solution its arcs are augmented
 	}
 	end = clock();
+	cout << "best solution found with score: " << gb.score << endl;
 
 }
 

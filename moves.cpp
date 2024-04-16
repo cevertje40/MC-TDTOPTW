@@ -1,14 +1,12 @@
 #include "moves.h"
 
-void Moves::best_insert_nb(Sol& sol)
+void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to increase the score
 {
-	//1.repeat until no improvement can be found
 	bool improvement = true;
-	int counter = 0;
 	while (improvement)
 	{
 		improvement = false;
-		double ratio = 0.0;
+		double bestratio = 0.0;
 		int position = -1;
 		Ins::Vertex* candidate = NULL;
 		int bestpath = -1;
@@ -60,7 +58,7 @@ void Moves::best_insert_nb(Sol& sol)
 								double volumeavail = ins->t[d].V_max - sol.volume[d];
 								double ratiocheck;
 								int function = 0;
-								if (shift <= waitz)//als shift=0 of kleiner dan de weight is: speciaal regime toepassen
+								if (shift <= waitz)//als shift=0 of kleiner dan de wait is: speciaal regime toepassen
 								{
 									shift = 1;
 									function = 1;
@@ -70,12 +68,16 @@ void Moves::best_insert_nb(Sol& sol)
 								ratiocheck = (double(y->score * y->score) / shift) * (1 + function);
 								//ratiocheck = (double(y->score*y->score) / shift)*(1 + function)*(weightavail / y->weight);
 								//ratiocheck = (double(y->score*y->score) / shift)*(1 + function)*(volumeavail / y->volume);
-								if (ratiocheck > ratio)//enkel op minimale increase checken
+								if (ratiocheck > bestratio)//enkel op minimale increase checken
 								{//update candidates
-									ratio = ratiocheck;
+									bestratio = ratiocheck;
 									position = j;
 									candidate = y;
 									bestpath = d;
+									if (mode == 0)//first improvement, otherwise best improvement
+									{
+										goto insert;
+									}
 								}
 							}// end if check feasible insertion
 						}//if cap restrictions
@@ -85,6 +87,7 @@ void Moves::best_insert_nb(Sol& sol)
 		}//end for al paths
 		if (improvement)
 		{
+			insert:
 			sol.insertvertex(bestpath, candidate, position);
 			//try to pull break if the break is still positioned at the end depot
 			int end = (int)sol.solution[bestpath].size();
@@ -94,6 +97,98 @@ void Moves::best_insert_nb(Sol& sol)
 				pull_break(sol, bestpath);
 			}
 		}//end improvement
+	}//end while improvement
+}
+
+void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non included vertex in order to increase the score
+{
+	//1.repeat until no improvement can be found
+	bool improvement = true;
+	while (improvement)
+	{
+		improvement = false;
+		double bestratio = 0.0;
+		int position = -1;
+		Ins::Vertex* candidate = NULL;
+		double ttxybest = -1;
+		int bestpath = -1;
+		for (int d = 0; d < ins->maxtours; ++d)
+		{
+			//2.find vertices that are not yet included in the solution
+			int endj = (int)sol.solution[d].size();
+			for (int j = 1; j < endj - 1; ++j)// for all  inlcuded vertices in the solution (non-depots)
+			{//4. check for interesting replacements
+				Ins::Vertex* z = sol.solution[d][j];//z point that will be replaced
+				int breakz = sol.action[d][j];
+				int nb_size = (int)z->nb[d].size();
+				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+				{
+					Ins::Vertex* y = z->nb[d][i];//y replacement
+					Ins::Vertex* x = sol.solution[d][j - 1];//predecessor of z
+					Ins::Vertex* w = sol.solution[d][j + 1];//successor of z
+					int breakw = sol.action[d][j + 1];
+					if ((sol.available[y->index] * y->score > z->score) && (x->nbi[d][y->index]) && (y->nbi[d][w->index]))//if interesting and possible
+					{
+						// check if replacement is feasible
+						//gather departure time
+						double currenttime = sol.traveltime[d][j - 1] + ins->t[d].EDT;//service bij x zit hier al in
+						//travel time from x to y
+						double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+						if (arrivaltime + sol.action[d][j] * ins->breakdur < y->LTW[d])
+						{
+							arrivaltime = y->LTW[d] - sol.action[d][j] * ins->breakdur;
+						}
+						if (arrivaltime > y->UTW[d])
+						{
+							continue;//mag je al stoppen met rekenen voor dit punt op deze positie
+						}
+						arrivaltime += y->serv + breakz * ins->breakdur;
+						double ttxy = arrivaltime - time_periods[0];
+						//travel time from y to w
+						arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
+						if (arrivaltime + sol.action[d][j + 1] * ins->breakdur < w->LTW[d])
+						{
+							arrivaltime = w->LTW[d] - sol.action[d][j + 1] * ins->breakdur;
+						}
+						arrivaltime += w->serv + sol.action[d][j + 1] * ins->breakdur;
+						double increase = arrivaltime - currenttime;//new traveltime=>service time included ttxy +ttyw
+						increase -= (sol.traveltime[d][j + 1] - sol.traveltime[d][j - 1]);//substract old traveltime=> ttxz + ttzw
+						if (increase <= sol.max_shift[d][j + 1])//check of het punt gereplaced kan worden
+						{
+							improvement = true;
+							double ratiocheck;
+							if (increase <= 0)
+							{
+								ratiocheck = y->score - z->score;
+							}
+							else
+							{
+								ratiocheck = double(y->score - z->score) / increase;
+
+							}
+							if (ratiocheck > bestratio)//enkel op minimale increase checken
+							{
+								bestratio = ratiocheck;
+								position = j;
+								candidate = y;
+								ttxybest = ttxy;
+								bestpath = d;
+								if (mode == 0)//first improvement, otherwise best improvement
+								{
+									goto replace;
+								}
+							}
+						}//end if feasible replacement
+					}//if interesting
+				}//for i
+			}//end for j
+		}//end for d
+		if (improvement)
+		{
+			replace:
+			// execute replacement
+			sol.replacevertex(bestpath, candidate, position);
+		}//end if improvement
 	}//end while improvement
 }
 
@@ -326,100 +421,6 @@ void Moves::reschedule_breaks(Sol& sol)
 	}//end for all tours
 }//end reschedule_breaks
 
-void Moves::best_replace_nb(Sol& sol)
-{
-
-}
-
-void Moves::replace_nb(Sol& sol)
-{
-	//1.repeat until no improvement can be found
-	bool improvement = true;
-	while (improvement)
-	{
-		improvement = false;
-		double ratio = 0.0;
-		int position = -1;
-		Ins::Vertex* candidate = NULL;
-		double ttxybest = -1;
-		int bestpath = -1;
-		for (int d = 0; d < ins->maxtours; ++d)
-		{
-			//2.find vertices that are not yet included in the solution
-			int endj = (int)sol.solution[d].size();
-			for (int j = 1; j < endj - 1; ++j)// for all  inlcuded vertices in the solution (non-depots)
-			{//4. check for interesting replacements
-				Ins::Vertex* z = sol.solution[d][j];//z point that will be replaced
-				int breakz = sol.action[d][j];
-				int nb_size = (int)z->nb[d].size();
-				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
-				{
-					Ins::Vertex* y = z->nb[d][i];//y replacement
-					Ins::Vertex* x = sol.solution[d][j - 1];//predecessor of z
-					Ins::Vertex* w = sol.solution[d][j + 1];//successor of z
-					int breakw = sol.action[d][j + 1];
-					if ((sol.available[y->index] * y->score > z->score) && (x->nbi[d][y->index]) && (y->nbi[d][w->index]))//if interesting and possible
-					{
-						// check if replacement is feasible
-						//gather departure time
-						double currenttime = sol.traveltime[d][j - 1] + ins->t[d].EDT;//service bij x zit hier al in
-						//travel time from x to y
-						double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-						if (arrivaltime + sol.action[d][j] * ins->breakdur < y->LTW[d])
-						{
-							arrivaltime = y->LTW[d] - sol.action[d][j] * ins->breakdur;
-						}
-						if (arrivaltime > y->UTW[d])
-						{
-							continue;//mag je al stoppen met rekenen voor dit punt op deze positie
-						}
-						arrivaltime += y->serv + breakz * ins->breakdur;
-						double ttxy = arrivaltime - time_periods[0];
-						//travel time from y to w
-						arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
-						if (arrivaltime + sol.action[d][j + 1] * ins->breakdur < w->LTW[d])
-						{
-							arrivaltime = w->LTW[d] - sol.action[d][j + 1] * ins->breakdur;
-						}
-						arrivaltime += w->serv + sol.action[d][j + 1] * ins->breakdur;
-						double increase = arrivaltime - currenttime;//new traveltime=>service time included ttxy +ttyw
-						increase -= (sol.traveltime[d][j + 1] - sol.traveltime[d][j - 1]);//substract old traveltime=> ttxz + ttzw
-						if (increase <= sol.max_shift[d][j + 1])//check of het punt gereplaced kan worden
-						{
-							improvement = true;
-							double ratiocheck;
-							if (increase <= 0)
-							{
-								ratiocheck = y->score - z->score;
-							}
-							else
-							{
-								ratiocheck = double(y->score - z->score) / increase;
-
-							}
-							if (ratiocheck > ratio)//enkel op minimale increase checken
-							{
-								ratio = ratiocheck;
-								position = j;
-								candidate = y;
-								ttxybest = ttxy;
-								bestpath = d;
-							}
-						}//end if feasible replacement
-					}//if interesting
-				}//for i
-			}//end for j
-		}//end for d
-		if (improvement)
-		{
-			// execute replacement
-			sol.replacevertex(bestpath, candidate, position);
-			sol.check();
-			cout << "debug here" << endl;
-		}//end if improvement
-	}//end while improvement
-}
-
 void Moves::exchange(Sol& sol)
 {
 	bool improvement = true;
@@ -442,7 +443,7 @@ void Moves::exchange(Sol& sol)
 				{
 					if (d != e)
 					{
-						for (int j = 0; j < sol.solution[e].size() - 1; ++j)
+						for (int j = 0; j < (int) sol.solution[e].size() - 1; ++j)
 						{
 							Ins::Vertex* a = sol.solution[e][j];
 							Ins::Vertex* b = sol.solution[e][j + 1];
@@ -716,7 +717,7 @@ void Moves::swap_nb(Sol& sol)
 						m = sol.solution[d][i + 1];//pred swap partner 2
 					}
 					if ((k->nbi[d][z->index]) && (m->nbi[d][y->index]) && (z->nbi[d][l->index]) && (y->nbi[d][n->index]))
-					{//geen cap restricties noding hier blijft gelijk
+					{//capacity constraints remain equal
 						double delta_tt = 0;
 						double departuretime = ins->t[d].EDT + sol.traveltime[d][i - 1];//bij punt voor y
 						double currenttime = departuretime;
@@ -828,7 +829,7 @@ void Moves::swap_nb(Sol& sol)
 									sol.traveltime[d].back() += ins->breakdur;
 									sol.breakindex[d] = end - 1;
 								}
-								cout << "actual improvement" << remember - sol.traveltime[d].back() << endl;
+								//cout << "actual improvement" << remember - sol.traveltime[d].back() << endl;
 								break;
 								//i is geswapped ofwel j lus terug doorlopen ofwel naar volgende i gaan
 							}//end executed swap
@@ -1035,7 +1036,7 @@ void Moves::two_opt_nb(Sol& sol)
 	}//end for all paths
 }
 
-void Moves::best_move_nb(Sol& sol)//move 1 vertex from one path to another to save travel time
+void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another in order to save travel time
 {
 	bool improvement = true;
 	while (improvement)
@@ -1186,6 +1187,10 @@ void Moves::best_move_nb(Sol& sol)//move 1 vertex from one path to another to sa
 											bestd = d;
 											besti = i + 1;
 											improvement = true;
+											if (mode == 0)
+											{
+												goto move;
+											}
 										}
 									}
 								}//end if still capacity free
@@ -1197,6 +1202,7 @@ void Moves::best_move_nb(Sol& sol)//move 1 vertex from one path to another to sa
 		}// end for masterpath d
 		if (improvement)
 		{
+			move:
 			Ins::Vertex* candidate = sol.solution[bestd][besti];
 			sol.removevertex(bestd, besti);//remove vertex from path d
 			if ((sol.breakindex[bestd] == int(sol.solution.size()) - 1) && (ins->t[bestd].LAT > ins->breakend + ins->breakdur))
@@ -1214,7 +1220,7 @@ void Moves::best_move_nb(Sol& sol)//move 1 vertex from one path to another to sa
 	}//end while improvement
 }
 
-void Moves::best_swap2_nb(Sol& sol)
+void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours in order to save traveltime
 {
 	bool improvement = true;
 	while (improvement)
@@ -1352,6 +1358,10 @@ void Moves::best_swap2_nb(Sol& sol)
 											bestd = d;
 											besti = i + 1;
 											improvement = true;
+											if (mode == 0)
+											{
+												goto swap2;
+											}
 										}
 									}
 								}//end if still capacity free
@@ -1363,6 +1373,7 @@ void Moves::best_swap2_nb(Sol& sol)
 		}// end for masterpath d
 		if (improvement)
 		{
+			swap2:
 			Ins::Vertex *x = sol.solution[bestd][besti];
 			Ins::Vertex *b = sol.solution[beste][bestj];
 			sol.replacevertex(bestd, b, besti);

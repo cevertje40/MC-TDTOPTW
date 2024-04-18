@@ -104,13 +104,14 @@ void Aco::construct(Sol& sol)
 {
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
+		int t = sol.tourindex[d];
 		bool breaktaken = false;
-		while (sol.solution[d].back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
+		while (sol.solution[t].back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
 		{
 			vector<double> prob_v;
 			vector<double> temp_traveltime;
 			vector<int> temp_action;
-			Ins::Vertex* last = sol.solution[d].back();
+			Ins::Vertex* last = sol.solution[t].back();
 			prob_v.resize(ins->maxvertices);
 			temp_traveltime.resize(ins->maxvertices);
 			temp_action.resize(ins->maxvertices);
@@ -120,7 +121,7 @@ void Aco::construct(Sol& sol)
 				{
 					if (sol.available[i])
 					{
-						if ((sol.volume[d] + ins->v[i].volume < ins->t[d].V_max) && (sol.weight[d] + ins->v[i].weight < ins->t[d].W_max))
+						if ((sol.volume[t] + ins->v[i].volume < ins->t[t].V_max) && (sol.weight[t] + ins->v[i].weight < ins->t[t].W_max))
 						{
 							prob_v[i] = 1;
 						}
@@ -141,7 +142,7 @@ void Aco::construct(Sol& sol)
 			{
 				if (prob_v[i] != 0)
 				{
-					double currenttime = sol.traveltime[d].back() + ins->t[d].EDT;
+					double currenttime = sol.traveltime[t].back() + ins->t[t].EDT;
 					Ins::Vertex* neighbor = &ins->v[i];
 					double arrivaltime = ins->arrival_time(last->con[neighbor->index], currenttime);
 					int brk = -1;
@@ -155,12 +156,12 @@ void Aco::construct(Sol& sol)
 					{
 						brk = 0;
 					}
-					if (arrivaltime < neighbor->LTW[d])
+					if (arrivaltime < neighbor->LTW[t])
 					{
-						prob_v[i] = 1 - (double(neighbor->LTW[d] - arrivaltime) / ins->t[d].T_max);//wachttijd meegeven
-						arrivaltime = neighbor->LTW[d];//wachten als je te vroeg bent	
+						prob_v[i] = 1 - (double(neighbor->LTW[t] - arrivaltime) / ins->t[t].T_max);//wachttijd meegeven
+						arrivaltime = neighbor->LTW[t];//wachten als je te vroeg bent	
 					}
-					if (arrivaltime > neighbor->UTW[d])
+					if (arrivaltime > neighbor->UTW[t])
 					{
 						prob_v[i] = 0;
 						continue;//mag je al stoppen met rekenen
@@ -171,7 +172,7 @@ void Aco::construct(Sol& sol)
 					{
 						enddepottime += ins->breakdur;//take break at end depot
 					}
-					if (enddepottime > ins->t[d].LAT)//enddepot heeft geen service time
+					if (enddepottime > ins->t[t].LAT)//enddepot heeft geen service time
 					{
 						prob_v[i] = 0;//discard vertex if infeasible
 					}
@@ -181,7 +182,7 @@ void Aco::construct(Sol& sol)
 						{
 							enddepot = false;//if another point than the enddepot is found
 						}
-						temp_traveltime[i] = arrivaltime - ins->t[d].EDT;
+						temp_traveltime[i] = arrivaltime - ins->t[t].EDT;
 						temp_action[i] = brk;
 					}
 				}//end if prob
@@ -229,19 +230,19 @@ void Aco::construct(Sol& sol)
 				total += prob_v[sel];
 				++sel;
 			}
-			sol.solution[d].push_back(&ins->v[sel - 1]);
-			sol.traveltime[d].push_back(temp_traveltime[sel - 1]);
+			sol.solution[t].push_back(&ins->v[sel - 1]);
+			sol.traveltime[t].push_back(temp_traveltime[sel - 1]);
 			sol.available[sel - 1] = false;
-			sol.scores[d] += ins->v[sel - 1].score;
+			sol.scores[t] += ins->v[sel - 1].score;
 			sol.score += ins->v[sel - 1].score;
-			sol.max_shift[d].push_back(0);//dummy die dan in calc max shift upgedate wordt
-			sol.volume[d] += ins->v[sel - 1].volume;
-			sol.weight[d] += ins->v[sel - 1].weight;
-			sol.action[d].push_back(temp_action[sel - 1]);
+			sol.max_shift[t].push_back(0);//dummy die dan in calc max shift upgedate wordt
+			sol.volume[t] += ins->v[sel - 1].volume;
+			sol.weight[t] += ins->v[sel - 1].weight;
+			sol.action[t].push_back(temp_action[sel - 1]);
 			if (temp_action[sel - 1] == 1)
 			{
 				breaktaken = true;
-				sol.breakindex[d] = int(sol.solution[d].size()) - 1;
+				sol.breakindex[t] = int(sol.solution[t].size()) - 1;
 			}
 			prob_v[sel - 1] = 0;
 			//++counter;
@@ -250,9 +251,9 @@ void Aco::construct(Sol& sol)
 		sol.available[ins->maxvertices - 1] = true;// end depot moet terug available zijn voor de volgende tour
 		if (breaktaken == false)
 		{
-			sol.action[d].back() = 1;
-			sol.traveltime[d].back() += ins->breakdur;
-			sol.breakindex[d] = int(sol.solution[d].size()) - 1;
+			sol.action[t].back() = 1;
+			sol.traveltime[t].back() += ins->breakdur;
+			sol.breakindex[t] = int(sol.solution[t].size()) - 1;
 		}
 	}//end for all d
 	//end depot is now unavailable for inserts and replacements
@@ -273,8 +274,8 @@ void Aco::solve()
 				s[ant].reset();
 				construct(s[ant]);
 				s[ant].calc_maxshift();
-				//two_opt_nb(s[ant], 1);
-				swap_nb(s[ant],1);
+				two_opt_nb(s[ant], 1);
+				//swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
 				//if ((iter == 0) && (ant == 17))
@@ -290,6 +291,7 @@ void Aco::solve()
 	}
 	end = clock();
 	cout << "best solution found with score: " << gb.score << endl;
+	cout << "the end" << endl;
 
 }
 

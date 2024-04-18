@@ -4,6 +4,7 @@
 class Sol
 {
 public:
+	vector<int>tourindex;
 	vector<vector<Ins::Vertex*>> solution;//solution multiple paths containing a sequence of vertex pointers
 	vector<vector<double>> traveltime;// multiple paths containing departuretime-t[pathindex].EDT at each vertex
 	vector<vector<double>> max_shift;//local evaluation metric, maximum amount of time each vertex can be shifted forward in time

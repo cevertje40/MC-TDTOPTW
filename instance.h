@@ -68,7 +68,8 @@ public:
 	vector<Vertex> v;//vertex objects
 	vector<Connec> c;//connection objects
 	vector<Tour> t;//tour objects
-	
+	default_random_engine engine;
+
 	Ins(string filename);//construct instance by reading file
 	void construct_time_independent_traveltime(Graph& graph);
 	void construct_time_dependent_traveltime(Graph& graph);

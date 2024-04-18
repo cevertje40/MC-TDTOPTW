@@ -24,7 +24,9 @@ Sol::Sol(Ins& ins) :ins(&ins)
 		weight[t] = 0.0;
 		volume[t] = 0.0;
 		breakindex[t] = -1;
+		tourindex.push_back(t);
 	}
+	shuffle(tourindex.begin(), tourindex.end(), ins.engine);
 	score = 0;
 	available = boost::dynamic_bitset<>(ins.maxvertices);
 	available.set();//sets all bits to true

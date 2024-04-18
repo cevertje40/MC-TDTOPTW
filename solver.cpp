@@ -273,17 +273,15 @@ void Aco::solve()
 				s[ant].reset();
 				construct(s[ant]);
 				s[ant].calc_maxshift();
-				//s[ant].check();
-				two_opt_nb(s[ant], 1);
-				//s[ant].check();
+				//two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				//s[ant].check();
 				insert_nb(s[ant], 1);
-				//s[ant].check();
 				replace_nb(s[ant], 1);
-				//s[ant].check();
+				//if ((iter == 0) && (ant == 17))
+				//{
+					//cout << "debug here" << endl;
+				//}
 				swap2_nb(s[ant], 1);
-				//s[ant].check();
 				move_nb(s[ant], 1);
 			}
 		}

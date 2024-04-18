@@ -701,7 +701,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 		{
 			double bestdelta = 0.0;
 			int besti=-1;
-			int bestj = -1;
+			int bestj=-1;
 			improvement = false;
 			int end = (int)sol.solution[d].size();
 			for (int i = 1; i < end - 2; ++i)// every vertex except depots and second last real vertex
@@ -726,7 +726,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 						double currenttime = departuretime;
 						double newtraveltime;
 						double oldtraveltime;
-						//execute temporary swap using a auxilary linker variable
+						//execute temporary swap using a auxilary linker variable break stays at the same position
 						vector<int>linker(end, 0);
 						for (int z = 0; z < end; ++z)
 						{
@@ -744,24 +744,25 @@ void Moves::swap_nb(Sol& sol, int mode)
 							Ins::Vertex* first = sol.solution[d][linker[l]];
 							Ins::Vertex* second = sol.solution[d][linker[l + 1]];
 							double arrivaltime = ins->arrival_time(first->con[second->index], currenttime);
-							//do not account for break repositioning
+							//do not account for break repositioning so don't use linke on action
 							if (arrivaltime + sol.action[d][linker[l + 1]] * (ins->breakdur) < second->LTW[d])
 							{
-								arrivaltime = second->LTW[d] - sol.action[d][linker[l + 1]] * (ins->breakdur);
+								arrivaltime = second->LTW[d] - (sol.action[d][l + 1] * ins->breakdur);
 							}
 							if (arrivaltime > second->UTW[d])//als hij tussen  z en y over een utw gaat moet je hem stoppen
 							{
-								break;//swap is infeasible, stop for this combination
+								//swap is infeasible, stop for this combination by setting currenttime very high
+								currenttime = DBL_MAX;
+								break;
 							}
-							arrivaltime += second->serv + sol.action[d][linker[l + 1]] * ins->breakdur;
+							arrivaltime += second->serv + (sol.action[d][l + 1] * ins->breakdur);
 							currenttime = arrivaltime;
 						}// end l
 						newtraveltime = currenttime - departuretime;
-						oldtraveltime = ((ins->t[d].EDT + sol.traveltime[d][linker[j + 1]]) - departuretime);
+						oldtraveltime = (ins->t[d].EDT+sol.traveltime[d][j+1])-departuretime;
 						delta_tt = newtraveltime - oldtraveltime;
 						if (delta_tt < bestdelta)//local evaluation
 						{
-							double remember = sol.traveltime[d].back();
 							currenttime = departuretime;
 							for (int l = i - 1; l < end - 1; ++l)//global evaluation
 							{
@@ -812,7 +813,14 @@ void Moves::swap_nb(Sol& sol, int mode)
 			if (improvement)
 			{
 				swap:
+				Sol remember = sol;
 				sol.swapvertex(d, besti, bestj);
+				double actualdecrease = remember.traveltime[d].back() - sol.traveltime[d].back();
+				if (abs(-bestdelta - actualdecrease) > 0.01)
+				{
+					sol.check();
+					cout << "error swap2" << endl;
+				}
 			}
 		}//end while improvement
 	}//end for all d
@@ -976,7 +984,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 				Ins::Vertex* w = sol.solution[d][i];
 				Ins::Vertex* x = sol.solution[d][i + 1];
 				Ins::Vertex* y = sol.solution[d][i + 2];
-				int breaky = sol.action[d][i + 2];
+				int breaky = 0;
 				double ttwxy = (sol.traveltime[d][i + 2] - (y->serv + sol.action[d][i + 2] * ins->breakdur + x->serv + sol.action[d][i + 1] * ins->breakdur)) - sol.traveltime[d][i];
 				for (int e = 0; e < ins->maxtours; ++e)
 				{
@@ -990,11 +998,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 							{
 								if ((sol.weight[e] + x->weight < ins->t[e].W_max) && (sol.volume[e] + x->volume < ins->t[e].V_max))
 								{
-									bool reqbreak = false;
-									if (sol.breakindex[d] >= i + 1)//als de break op x staat moet hij verschoven worden naar achter+ door het onstane gat kan de break ook te vroeg komen en dan moet hij ook naar achter verschoven worden
-									{
-										reqbreak = true;
-									}
+									
 									//local evaluation on path e
 									double ttab = (sol.traveltime[e][j + 1] - (b->serv + sol.action[e][j + 1] * ins->breakdur)) - sol.traveltime[e][j];
 									//calculate axb
@@ -1027,6 +1031,12 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 									double arrivalb = arrivaltime + b->serv + sol.action[e][j + 1] * ins->breakdur;
 
 									//local evaluation on path d
+									//due to potential traveltime decrease break can come to early
+									bool reqbreak = false;
+									if (sol.breakindex[d] >= i + 1)
+									{
+										reqbreak = true;
+									}
 									//calculate wy
 									departuretime = ins->t[d].EDT + sol.traveltime[d][i];
 									//traveltime w to y
@@ -1036,7 +1046,6 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 									{//break na y wordt bij global evaluation in rekening gebracht
 										reqbreak = false;
 										breaky = 1;
-										//de oude 1 op x gaat verwijderd worden
 									}
 									if (arrivaltime + breaky * ins->breakdur < y->LTW[d])
 									{
@@ -1061,7 +1070,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 											//gather departure time and corresponding time slot
 											Ins::Vertex* o = sol.solution[d][m - 1];
 											Ins::Vertex* p = sol.solution[d][m];
-											int breakp = sol.action[d][m];
+											int breakp = 0;
 											//travel time from van o to p
 											double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
 											if ((reqbreak) && (arrivaltime >= ins->breakstart))
@@ -1069,11 +1078,11 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 												breakp = 1;
 												reqbreak = false;
 											}
-											if (arrivaltime + breakp * ins->breakdur < p->LTW[d])
+											if (arrivaltime + (breakp * ins->breakdur) < p->LTW[d])
 											{
 												arrivaltime = p->LTW[d] - (breakp * ins->breakdur);
 											}
-											arrivaltime += p->serv + breakp * ins->breakdur;
+											arrivaltime += p->serv + (breakp * ins->breakdur);
 											currenttime = arrivaltime;
 										}
 										if (reqbreak)//nog altijd geen break kunnen plaatsen dan moet hij op het einddepot komen
@@ -1126,14 +1135,27 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 		if (improvement)
 		{
 			move:
+			Sol remember = sol;
 			Ins::Vertex* candidate = sol.solution[bestd][besti];
 			sol.removevertex(bestd, besti);//remove vertex from path d
+			sol.insertvertex(beste, candidate, bestj);//insert vertex on path e
+
+			double actualdecrease = 0.0;
+			for (int t = 0; t < (int)sol.solution.size(); ++t)
+			{
+				actualdecrease += remember.traveltime[t].back() - sol.traveltime[t].back();
+			}
+			if (abs(bestdecrease - actualdecrease) > 0.01)
+			{
+				sol.check();
+				cout << "error swap2" << endl;
+			}
+
 			if ((sol.breakindex[bestd] == int(sol.solution.size()) - 1) && (ins->t[bestd].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
 				pull_break(sol, bestd);
 			}
-			sol.insertvertex(beste, candidate, bestj);//insert vertex on path e
 			if ((sol.breakindex[beste] == int (sol.solution[beste].size()) - 1) && (ins->t[beste].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
@@ -1161,20 +1183,20 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 				Ins::Vertex* w = sol.solution[d][i];
 				Ins::Vertex* x = sol.solution[d][i + 1];
 				Ins::Vertex* y = sol.solution[d][i + 2];
-				int breakx = sol.action[d][i + 1];
-				int breaky = sol.action[d][i + 2];
+				int breakx = 0;
+				int breaky = 0;
 				double ttwxy = (sol.traveltime[d][i + 2] - (y->serv + sol.action[d][i + 2] * ins->breakdur + x->serv + sol.action[d][i + 1] * ins->breakdur)) - sol.traveltime[d][i];
 				for (int e = 0; e < ins->maxtours; ++e)
 				{
-					if (d != e)//no relocate on the same path
+					if (d != e)//no relocate on the same tour
 					{
 						for (int j = 0; j < sol.solution[e].size() - 2; ++j)
 						{
 							Ins::Vertex* a = sol.solution[e][j];
 							Ins::Vertex* b = sol.solution[e][j + 1];
 							Ins::Vertex* c = sol.solution[e][j + 2];
-							int breakb = sol.action[e][j + 1];
-							int breakc = sol.action[e][j + 2];
+							int breakb = 0;
+							int breakc = 0;
 							if ((a->nbi[e][x->index]) && (x->nbi[e][b->index]) && (w->nbi[d][y->index]))
 							{
 								if ((sol.weight[e] + (x->weight-b->weight) < ins->t[e].W_max) && (sol.volume[e] + (x->weight-b->volume) < ins->t[e].V_max)&&(sol.weight[d] + (b->weight - x->weight) < ins->t[d].W_max)&&(sol.volume[d] + (b->volume - x->volume) < ins->t[d].V_max))
@@ -1187,7 +1209,6 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									{
 										reqbreakd = true;
 									}
-									
 									double departuretime = ins->t[d].EDT + sol.traveltime[d][i];
 									// w to b
 									double arrivaltime = ins->arrival_time(w->con[b->index], departuretime);
@@ -1225,8 +1246,9 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double diffd = (ins->t[d].EDT+sol.traveltime[d][i + 2])-arrivaltimey;
 
 									//local evaluation on path e
+									//due to potential traveltime decrease break can come to early
 									bool reqbreake = false;
-									if (sol.breakindex[e] >= j + 1)//als de break op x staat moet hij verschoven worden naar achter+ door het onstane gat kan de break ook te vroeg komen en dan moet hij ook naar achter verschoven worden
+									if (sol.breakindex[e] >= j + 1)
 									{
 										reqbreake = true;
 									}
@@ -1267,7 +1289,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double arrivaltimec =arrivaltime+ c->serv + (breakc * ins->breakdur);
 									double diffe = (ins->t[e].EDT+sol.traveltime[e][j + 2]) - arrivaltimec;
 									double localdecreasetotal = diffd + diffe;
-									//local improvement check: check if potential increase is allowed and whether there is a overall travel time gain
+									//local improvement check: check if potential increase is allowed and whether there is an overall travel time gain
 									if ((-diffd<= sol.max_shift[d][i + 1]) && (-diffe <= sol.max_shift[e][j + 1]) && (localdecreasetotal > bestdecrease))
 									{
 										//global improvement check
@@ -1275,11 +1297,10 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 										double currenttime = arrivaltimey;
 										for (int m = i + 3; m < (int) sol.solution[d].size(); ++m)
 										{
-											//gather departure time and corresponding time slot
 											Ins::Vertex* o = sol.solution[d][m - 1];
 											Ins::Vertex* p = sol.solution[d][m];
-											int breakp = sol.action[d][m];
-											//travel time from van o to p
+											int breakp = 0;
+											//travel time from o to p
 											double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
 											if ((reqbreakd) && (arrivaltime >= ins->breakstart))
 											{
@@ -1303,7 +1324,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											//gather departure time and corresponding time slot
 											Ins::Vertex* o = sol.solution[e][m - 1];
 											Ins::Vertex* p = sol.solution[e][m];
-											int breakp = sol.action[e][m];
+											int breakp = 0;
 											//travel time from van o to p
 											double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
 											if ((reqbreake) && (arrivaltime >= ins->breakstart))
@@ -1315,7 +1336,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											{
 												arrivaltime = p->LTW[e] - (breakp * ins->breakdur);
 											}
-											arrivaltime += p->serv + breakp * ins->breakdur;
+											arrivaltime += p->serv + (breakp * ins->breakdur);
 											currenttime = arrivaltime;
 										}
 										//cout << "enddepot time e: " << currenttime - t[e].EDT << endl;
@@ -1345,10 +1366,22 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 		if (improvement)
 		{
 			swap2:
+			Sol remember = sol;
 			Ins::Vertex *x = sol.solution[bestd][besti];
 			Ins::Vertex *b = sol.solution[beste][bestj];
 			sol.replacevertex(bestd, b, besti);
 			sol.replacevertex(beste, x, bestj);
+			double actualdecrease = 0.0;
+			for (int t = 0; t < (int) sol.solution.size(); ++t)
+			{
+				actualdecrease += remember.traveltime[t].back()-sol.traveltime[t].back();
+			}
+			if (abs(bestdecrease - actualdecrease) > 0.01)
+			{
+				sol.check();
+				cout << "error swap2" << endl;
+			}
+			
 		}//end if improvement
 	}//end while improvement
 

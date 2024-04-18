@@ -272,38 +272,19 @@ void Aco::solve()
 			{
 				s[ant].reset();
 				construct(s[ant]);
-				
 				s[ant].calc_maxshift();
-				s[ant].check();
+				//s[ant].check();
 				two_opt_nb(s[ant], 1);
-				
-				s[ant].check();
+				//s[ant].check();
 				swap_nb(s[ant],1);
-				s[ant].check();
+				//s[ant].check();
 				insert_nb(s[ant], 1);
-				s[ant].check();
-				
+				//s[ant].check();
 				replace_nb(s[ant], 1);
-				s[ant].check();
-				if ((iter == 21) && (ant == 8))
-				{
-					cout << "debug now" << endl;
-				}
+				//s[ant].check();
 				swap2_nb(s[ant], 1);
-				s[ant].check();
+				//s[ant].check();
 				move_nb(s[ant], 1);
-				s[ant].check();
-				//cout << iter << "<>" << ant << endl;
-				//s[ant].check();
-				//replace_nb(s[ant], 0);
-				//replace_nb(s[ant]);
-				//best_move_nb(s[ant]);
-				//best_swap2_nb(s[ant]);
-				//exchange(s[ant]);
-				//best_insert_nb(s[ant]);
-				//reschedule_breaks(s[ant]);
-				//best_insert_nb(s[ant]);
-				//s[ant].check();
 			}
 		}
 		update_global_best();//best solution is stored

@@ -355,6 +355,15 @@ void Sol::insertvertex(int tour, Ins::Vertex* candidate, int position)
 
 void Sol::replacevertex(int tour, Ins::Vertex* candidate, int position)
 {
+	bool reqbreak = false;
+	if (position <= breakindex[tour])
+	{
+		reqbreak = true;
+		for (int vv = 0; vv < solution[tour].size(); ++vv)
+		{
+			action[tour][vv] = 0;
+		}
+	}
 	Ins::Vertex* old = solution[tour][position];
 	available[candidate->index] = false;
 	available[old->index] = true;
@@ -362,9 +371,19 @@ void Sol::replacevertex(int tour, Ins::Vertex* candidate, int position)
 	max_shift[tour][position] = 0;//dummy value
 	score += candidate->score - old->score;// update score of the new solution
 	scores[tour] += candidate->score - old->score;// update score of the new solution
-	update_traveltime(tour, position-1, int(solution[tour].size()));//update travel time and maxshift for all positions after replacement
-	double arrivaltime = (traveltime[tour][position + 1] + ins->t[tour].EDT + max_shift[tour][position +1]) - (solution[tour][position + 1]->serv + action[tour][position + 1] * ins->breakdur);//service time eraftrekken
-	update_maxshift(tour, 0, position, arrivaltime);//update maxshift for all positions before replacement
+	if (reqbreak)
+	{
+		update_traveltime_break(tour, position - 1, int(solution[tour].size()));
+		//if you reposition the break, maxshift has to be recalculated
+		calc_maxshift(tour);
+	}
+	else
+	{
+		update_traveltime(tour, position - 1, int(solution[tour].size()));//update travel time and maxshift for all positions after replacement
+		double arrivaltime = (traveltime[tour][position + 1] + ins->t[tour].EDT + max_shift[tour][position + 1]) - (solution[tour][position + 1]->serv + action[tour][position + 1] * ins->breakdur);//service time eraftrekken
+		update_maxshift(tour, 0, position, arrivaltime);//update maxshift for all positions before replacement
+	}
+	
 }
 
 void Sol::removevertex(int tour, int position)

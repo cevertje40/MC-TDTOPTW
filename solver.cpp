@@ -66,10 +66,10 @@ void Aco::pheromone_update()
 		//decrease and check limits
 		for (int t = 0; t < ins->maxtours; ++t)
 		{
-			int end = (int)s[iter_nr].solution[t].size() - 1;
+			int end = (int)s[iter_nr].tours[t].seq.size() - 1;
 			for (int i = 0; i < end; ++i)
 			{
-				tau[s[iter_nr].solution[t][i]->index][s[iter_nr].solution[t][i + 1]->index] += quality;
+				tau[s[iter_nr].tours[t].seq[i]->index][s[iter_nr].tours[t].seq[i + 1]->index] += quality;
 			}
 		}
 		for (int i = 0; i < ins->maxvertices - 1; ++i)
@@ -105,13 +105,14 @@ void Aco::construct(Sol& sol)
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		int t = sol.tourindex[d];
+		Sol::Tour* tour = &sol.tours[d];
 		bool breaktaken = false;
-		while (sol.solution[t].back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
+		while (tour->seq.back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
 		{
 			vector<double> prob_v;
 			vector<double> temp_traveltime;
 			vector<int> temp_action;
-			Ins::Vertex* last = sol.solution[t].back();
+			Ins::Vertex* last = tour->seq.back();
 			prob_v.resize(ins->maxvertices);
 			temp_traveltime.resize(ins->maxvertices);
 			temp_action.resize(ins->maxvertices);
@@ -121,7 +122,7 @@ void Aco::construct(Sol& sol)
 				{
 					if (sol.available[i])
 					{
-						if ((sol.volume[t] + ins->v[i].volume < ins->t[t].V_max) && (sol.weight[t] + ins->v[i].weight < ins->t[t].W_max))
+						if ((tour->volume + ins->v[i].volume < ins->t[t].V_max) && (tour->weight + ins->v[i].weight < ins->t[t].W_max))
 						{
 							prob_v[i] = 1;
 						}
@@ -142,7 +143,7 @@ void Aco::construct(Sol& sol)
 			{
 				if (prob_v[i] != 0)
 				{
-					double currenttime = sol.traveltime[t].back() + ins->t[t].EDT;
+					double currenttime = tour->deptime.back() + ins->t[t].EDT;
 					Ins::Vertex* neighbor = &ins->v[i];
 					double arrivaltime = ins->arrival_time(last->con[neighbor->index], currenttime);
 					int brk = -1;
@@ -230,19 +231,19 @@ void Aco::construct(Sol& sol)
 				total += prob_v[sel];
 				++sel;
 			}
-			sol.solution[t].push_back(&ins->v[sel - 1]);
-			sol.traveltime[t].push_back(temp_traveltime[sel - 1]);
+			tour->seq.push_back(&ins->v[sel - 1]);
+			tour->deptime.push_back(temp_traveltime[sel - 1]);
 			sol.available[sel - 1] = false;
-			sol.scores[t] += ins->v[sel - 1].score;
+			tour->score += ins->v[sel - 1].score;
 			sol.score += ins->v[sel - 1].score;
-			sol.max_shift[t].push_back(0);//dummy die dan in calc max shift upgedate wordt
-			sol.volume[t] += ins->v[sel - 1].volume;
-			sol.weight[t] += ins->v[sel - 1].weight;
-			sol.action[t].push_back(temp_action[sel - 1]);
+			tour->max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+			tour->volume += ins->v[sel - 1].volume;
+			tour->weight += ins->v[sel - 1].weight;
+			tour->action.push_back(temp_action[sel - 1]);
 			if (temp_action[sel - 1] == 1)
 			{
 				breaktaken = true;
-				sol.breakindex[t] = int(sol.solution[t].size()) - 1;
+				tour->breakindex = int(tour->seq.size()) - 1;
 			}
 			prob_v[sel - 1] = 0;
 			//++counter;
@@ -251,9 +252,9 @@ void Aco::construct(Sol& sol)
 		sol.available[ins->maxvertices - 1] = true;// end depot moet terug available zijn voor de volgende tour
 		if (breaktaken == false)
 		{
-			sol.action[t].back() = 1;
-			sol.traveltime[t].back() += ins->breakdur;
-			sol.breakindex[t] = int(sol.solution[t].size()) - 1;
+			tour->action.back() = 1;
+			tour->deptime.back() += ins->breakdur;
+			tour->breakindex = int(tour->seq.size()) - 1;
 		}
 	}//end for all d
 	//end depot is now unavailable for inserts and replacements
@@ -290,6 +291,7 @@ void Aco::solve()
 		pheromone_update();// iteration best solution its arcs are augmented
 	}
 	end = clock();
+	gb.check();
 	cout << "best solution found with score: " << gb.score << endl;
 	cout << "the end" << endl;
 

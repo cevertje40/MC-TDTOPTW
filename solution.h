@@ -1,20 +1,28 @@
 #pragma once
 #include "instance.h"
 
+
+
 class Sol
 {
 public:
-	vector<int>tourindex;
-	vector<vector<Ins::Vertex*>> solution;//solution multiple paths containing a sequence of vertex pointers
-	vector<vector<double>> traveltime;// multiple paths containing departuretime-t[pathindex].EDT at each vertex
-	vector<vector<double>> max_shift;//local evaluation metric, maximum amount of time each vertex can be shifted forward in time
-	vector<vector<int>> action;//0 visit, 1 visit and break
+	class Tour
+	{
+		public:
+		int index;
+		vector <Ins::Vertex*> seq;//sequence of vertex pointers
+		vector<double> deptime;//departuretime-EDT at each vertex
+		vector<double> max_shift;//local evaluation metric, maximum amount of time each vertex can be shifted forward in time
+		vector<int> action;//0 visit, 1 break and visit
+		int score;//total score of tour
+		double weight;//weight per tour
+		double volume;//volume per tour
+		int breakindex;//position of break in tour
+	};
+	vector<Tour>tours;//solution consist of collection of tours
+	vector<int>tourindex;//random tour index
 	boost::dynamic_bitset<> available;// bitset that states for every vertex if it is still available for inclusion
-	vector <int> scores;//score per tour
-	vector <double> weight;//weight per tour
-	vector <double> volume;//volume per tour
-	int score;//sum of path scores
-	vector <int> breakindex;//position of break per tour
+	int score;//sum of all tour scores
 	Ins* ins;//pointer to instance object
 	//methods
 	Sol(){}

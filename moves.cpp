@@ -136,7 +136,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 						double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
 						if (arrivaltime + sol.action[d][j] * ins->breakdur < y->LTW[d])
 						{
-							arrivaltime = y->LTW[d] - sol.action[d][j] * ins->breakdur;
+							arrivaltime = y->LTW[d] - (sol.action[d][j] * ins->breakdur);
 						}
 						if (arrivaltime > y->UTW[d])
 						{
@@ -148,7 +148,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 						arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
 						if (arrivaltime + sol.action[d][j + 1] * ins->breakdur < w->LTW[d])
 						{
-							arrivaltime = w->LTW[d] - sol.action[d][j + 1] * ins->breakdur;
+							arrivaltime = w->LTW[d] - (sol.action[d][j + 1] * ins->breakdur);
 						}
 						arrivaltime += w->serv + sol.action[d][j + 1] * ins->breakdur;
 						double increase = arrivaltime - currenttime;//new traveltime=>service time included ttxy +ttyw
@@ -1025,7 +1025,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 									}
 									ttaxb += arrivaltime - departuretime;
 									double arrivalb = arrivaltime + b->serv + sol.action[e][j + 1] * ins->breakdur;
-									//on path d now
+									//local evaluation on path d
 									//calculate wy
 									departuretime = ins->t[d].EDT + sol.traveltime[d][i];
 									//traveltime w to y
@@ -1207,7 +1207,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									departuretime = ins->t[e].EDT + sol.traveltime[e][j];
 									//traveltime a to x
 									arrivaltime = ins->arrival_time(a->con[x->index], departuretime);
-									if (arrivaltime < x->LTW[e])//je mag niet breaken op x want er is al een break op de e route
+									if (arrivaltime < x->LTW[e])
 									{
 										arrivaltime = x->LTW[e];
 									}
@@ -1231,7 +1231,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double diffe = (ins->t[e].EDT+sol.traveltime[e][j + 2]) - arrivaltimec;
 									double localdecreasetotal = diffd + diffe;
 									//local improvement check: check if potential increase is allowed and whether there is a overall travel time gain
-									if ((diffd<= sol.max_shift[d][i + 1]) && (diffe <= sol.max_shift[e][j + 1]) && (localdecreasetotal > bestdecrease))
+									if ((-diffd<= sol.max_shift[d][i + 1]) && (-diffe <= sol.max_shift[e][j + 1]) && (localdecreasetotal > bestdecrease))
 									{
 										//global improvement check
 										//check enddepot time on path d
@@ -1300,6 +1300,8 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			Ins::Vertex *b = sol.solution[beste][bestj];
 			sol.replacevertex(bestd, b, besti);
 			sol.replacevertex(beste, x, bestj);
+			sol.check();
+			cout << "debug here" << endl;
 		}//end if improvement
 	}//end while improvement
 

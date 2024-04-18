@@ -185,7 +185,7 @@ void Sol::update_traveltime(int tour, int start, int end)//update travel time an
 	}//end for
 }
 
-void Sol::update_traveltime_break(int tour, int start, int end)//update travel time and maxshift and schedule break
+void Sol::update_traveltime_break(int tour, int start, int end)//update travel time and maxshift and potentially reschedule break
 {
 	double reqbreak = true;
 	double currenttime = traveltime[tour][start] + ins->t[tour].EDT;
@@ -253,6 +253,42 @@ void Sol::update_maxshift(int d, int start, int end, double arrivaltime)
 		}
 		//store result
 		max_shift[d][i] = departuretime - (traveltime[d][i] + ins->t[d].EDT);
+		//reset variable for the calculation of next point
+		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
+	}// end for i
+}
+
+void Sol::calc_maxshift(int tour)
+{
+	int size = (int)solution[tour].size();
+	double departuretime = 0;
+	max_shift[tour].back() = (ins->t[tour].T_max - traveltime[tour].back());
+	double arrivaltime = ins->t[tour].LAT - (action[tour].back() * ins->breakdur);//if you break at the end depot subtract breakduration
+	Ins::Vertex* y;
+	Ins::Vertex* z;
+	for (int i = 0; i < size - 2; ++i)// depots don't count
+	{
+		//define the 2 elements
+		y = solution[tour][size - (i + 2)];
+		int breaki = action[tour][size - (i + 2)];
+		z = solution[tour][size - (i + 1)];
+		departuretime = ins->departure_time(y->con[z->index], arrivaltime);
+		//TW check on departuretime 
+		if (departuretime > y->UTW[tour] + y->serv)
+		{
+			departuretime = y->UTW[tour] + y->serv;
+		}
+		//break may limit the maximum allowable shift
+		if (breaki == 1)
+		{
+			if (departuretime > ins->breakend + ins->breakdur)
+			{
+				cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
+				departuretime = ins->breakend + ins->breakdur;
+			}
+		}
+		//store result
+		max_shift[tour][size - (i + 2)] = departuretime - (traveltime[tour][size - (i + 2)] + ins->t[tour].EDT);
 		//reset variable for the calculation of next point
 		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
 	}// end for i
@@ -359,7 +395,7 @@ void Sol::removevertex(int tour, int position)
 	{
 		update_traveltime(tour, position-1, int(solution[tour].size()));//update travel time for all after deletion
 	}
-	calc_maxshift();//todo implement maxshift for specific tour only
+	calc_maxshift(tour);
 }
 
 void Sol::swapvertex(int tour, int i, int j)
@@ -375,7 +411,7 @@ void Sol::swapvertex(int tour, int i, int j)
 	{
 		update_traveltime(tour, i-1, int(solution[tour].size()));
 	}
-
+	calc_maxshift(tour);
 }
 
 void Sol::optvertices(int tour, int i, int j,bool breakreschedule)
@@ -395,6 +431,7 @@ void Sol::optvertices(int tour, int i, int j,bool breakreschedule)
 	{
 		update_traveltime(tour, i - 1, int(solution[tour].size()));
 	}
+	calc_maxshift(tour);
 }
 
 void Sol::reset() 

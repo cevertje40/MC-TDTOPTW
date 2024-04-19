@@ -105,7 +105,7 @@ void Aco::construct(Sol& sol)
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		int t = sol.tourindex[d];
-		Sol::Tour* tour = &sol.tours[d];
+		Sol::Tour* tour = &sol.tours[sol.tourindex[d]];
 		bool breaktaken = false;
 		while (tour->seq.back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
 		{
@@ -279,10 +279,6 @@ void Aco::solve()
 				//swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
-				//if ((iter == 0) && (ant == 17))
-				//{
-					//cout << "debug here" << endl;
-				//}
 				swap2_nb(s[ant], 1);
 				move_nb(s[ant], 1);
 			}
@@ -292,8 +288,8 @@ void Aco::solve()
 	}
 	end = clock();
 	gb.check();
-	cout << "best solution found with score: " << gb.score << endl;
-	cout << "the end" << endl;
+	cout << gb << endl;
+	cout << "debug before window closure" << endl;
 
 }
 

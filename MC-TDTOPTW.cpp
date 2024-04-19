@@ -7,6 +7,8 @@ using namespace std;
 
 int main()
 {
+
+
     //Graph bemobile(425479, 519915);
     //cout << bemobile.dijkstra_independent(41, 18467) << endl;
     //cout << bemobile.dijkstra_dependent(41,18467,6) << endl;
@@ -16,6 +18,8 @@ int main()
     //instance.create_neighbourhood(45);
     string name = "20.txt";
     Ins instance(name);
+    //instance.construct_time_independent_traveltime(bemobile);
+    //instance.construct_time_dependent_traveltime(bemobile);
     instance.read_neighbourhood();
 
     //read instance info and travel time

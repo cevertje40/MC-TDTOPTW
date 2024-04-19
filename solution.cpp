@@ -291,6 +291,42 @@ void Sol::calc_maxshift(int tour)
 	}// end for i
 }
 
+void Sol::calc_maxshift(Sol::Tour& tour)
+{
+	int size = (int)tour.seq.size();
+	double departuretime = 0;
+	tour.max_shift.back() = (ins->t[tour.index].T_max - tour.deptime.back());
+	double arrivaltime = ins->t[tour.index].LAT - (tour.action.back() * ins->breakdur);//if you break at the end depot subtract breakduration
+	Ins::Vertex* y;
+	Ins::Vertex* z;
+	for (int i = 0; i < size - 2; ++i)// depots don't count
+	{
+		//define the 2 elements
+		y = tour.seq[size - (i + 2)];
+		int breaki = tour.action[size - (i + 2)];
+		z = tour.seq[size - (i + 1)];
+		departuretime = ins->departure_time(y->con[z->index], arrivaltime);
+		//TW check on departuretime 
+		if (departuretime > y->UTW[tour.index] + y->serv)
+		{
+			departuretime = y->UTW[tour.index] + y->serv;
+		}
+		//break may limit the maximum allowable shift
+		if (breaki == 1)
+		{
+			if (departuretime > ins->breakend + ins->breakdur)
+			{
+				cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
+				departuretime = ins->breakend + ins->breakdur;
+			}
+		}
+		//store result
+		tour.max_shift[size - (i + 2)] = departuretime - (tour.deptime[size - (i + 2)] + ins->t[tour.index].EDT);
+		//reset variable for the calculation of next point
+		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
+	}// end for i
+}
+
 void Sol::calc_maxshift()
 {
 	for (int tour = 0; tour < ins->maxtours; ++tour)

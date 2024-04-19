@@ -103,8 +103,6 @@ Ins::Ins(string filename)
 		getline(ifs, line);//third line, break info
 		str = stringstream(line);
 		str >> breakdur >> breakstart >> breakend;
-		breakstart += time_periods[0];
-		breakend += time_periods[0];
 		maxscore = 0;
 		for (int vertex = 0; vertex < maxvertices; ++vertex)
 		{
@@ -118,8 +116,6 @@ Ins::Ins(string filename)
 			for (int tour = 0; tour < maxtours; ++tour)
 			{
 				str >> v[vertex].LTW[tour] >> v[vertex].UTW[tour];
-				v[vertex].LTW[tour] += time_periods[0];
-				v[vertex].UTW[tour] += time_periods[0];
 			}
 		}
 		for (int tour = 0; tour < maxtours; ++tour)
@@ -129,8 +125,8 @@ Ins::Ins(string filename)
 			str >> t[tour].T_max >> t[tour].W_max >> t[tour].V_max;
 			t[tour].index = tour;
 			t[tour].id = tour + 1;
-			t[tour].EDT = time_periods[0];
-			t[tour].LAT = time_periods[0] + t[tour].T_max;
+			t[tour].EDT = v.back().LTW[tour];
+			t[tour].LAT = t[tour].EDT + t[tour].T_max;
 			t[tour].startv = &v[0];
 			t[tour].endv = &v[maxvertices - 1];
 		}
@@ -383,7 +379,7 @@ void Ins::read_neighbourhood()
 inline int Ins::find_t(double time)
 {
 	int t = (int)floor((time - time_periods[0]) / 0.25);//when you change the time unit this has to change too
-	return min(55, t);
+	return t;
 }
 
 double Ins::travel_time(Connec* c, double start)

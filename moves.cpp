@@ -147,7 +147,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							continue;//stop the calculation for this candidate in this position
 						}
 						arrivaltime += y->serv + breakz * ins->breakdur;
-						double ttxy = arrivaltime - time_periods[0];
+						double ttxy = arrivaltime - ins->t[tour->index].EDT;
 						//travel time from y to w
 						arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
 						if (arrivaltime + tour->action[j + 1] * ins->breakdur < w->LTW[t])
@@ -994,7 +994,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			Sol::Tour* tourd = &sol.tours[d];
-			for (int i = 0; i < tourd->seq.size() - 2; ++i)
+			for (int i = 0; i < int(tourd->seq.size()) - 2; ++i)
 			{
 				Ins::Vertex* w = tourd->seq[i];
 				Ins::Vertex* x = tourd->seq[i + 1];
@@ -1006,7 +1006,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 					Sol::Tour* toure = &sol.tours[e];
 					if (d != e)//no relocate on the same path
 					{
-						for (int j = 0; j < toure->seq.size() - 2; ++j)
+						for (int j = 0; j < int(toure->seq.size()) - 2; ++j)
 						{
 							Ins::Vertex* a = toure->seq[j];
 							Ins::Vertex* b = toure->seq[j + 1];

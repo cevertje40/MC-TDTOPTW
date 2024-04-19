@@ -105,14 +105,14 @@ void Aco::construct(Sol& sol)
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		int t = sol.tourindex[d];
-		Sol::Tour* tour = &sol.tours[sol.tourindex[d]];
+		Sol::Tour& tour = sol.tours[sol.tourindex[d]];
 		bool breaktaken = false;
-		while (tour->seq.back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
+		while (tour.seq.back()->index != ins->maxvertices - 1) //until one solution is full=>sequential procedure
 		{
 			vector<double> prob_v;
 			vector<double> temp_traveltime;
 			vector<int> temp_action;
-			Ins::Vertex* last = tour->seq.back();
+			Ins::Vertex* last = tour.seq.back();
 			prob_v.resize(ins->maxvertices);
 			temp_traveltime.resize(ins->maxvertices);
 			temp_action.resize(ins->maxvertices);
@@ -122,7 +122,7 @@ void Aco::construct(Sol& sol)
 				{
 					if (sol.available[i])
 					{
-						if ((tour->volume + ins->v[i].volume < ins->t[t].V_max) && (tour->weight + ins->v[i].weight < ins->t[t].W_max))
+						if ((tour.volume + ins->v[i].volume < ins->t[t].V_max) && (tour.weight + ins->v[i].weight < ins->t[t].W_max))
 						{
 							prob_v[i] = 1;
 						}
@@ -143,7 +143,7 @@ void Aco::construct(Sol& sol)
 			{
 				if (prob_v[i] != 0)
 				{
-					double currenttime = tour->deptime.back() + ins->t[t].EDT;
+					double currenttime = tour.deptime.back() + ins->t[t].EDT;
 					Ins::Vertex* neighbor = &ins->v[i];
 					double arrivaltime = ins->arrival_time(last->con[neighbor->index], currenttime);
 					int brk = -1;
@@ -231,19 +231,19 @@ void Aco::construct(Sol& sol)
 				total += prob_v[sel];
 				++sel;
 			}
-			tour->seq.push_back(&ins->v[sel - 1]);
-			tour->deptime.push_back(temp_traveltime[sel - 1]);
+			tour.seq.push_back(&ins->v[sel - 1]);
+			tour.deptime.push_back(temp_traveltime[sel - 1]);
 			sol.available[sel - 1] = false;
-			tour->score += ins->v[sel - 1].score;
+			tour.score += ins->v[sel - 1].score;
 			sol.score += ins->v[sel - 1].score;
-			tour->max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
-			tour->volume += ins->v[sel - 1].volume;
-			tour->weight += ins->v[sel - 1].weight;
-			tour->action.push_back(temp_action[sel - 1]);
+			tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+			tour.volume += ins->v[sel - 1].volume;
+			tour.weight += ins->v[sel - 1].weight;
+			tour.action.push_back(temp_action[sel - 1]);
 			if (temp_action[sel - 1] == 1)
 			{
 				breaktaken = true;
-				tour->breakindex = int(tour->seq.size()) - 1;
+				tour.breakindex = int(tour.seq.size()) - 1;
 			}
 			prob_v[sel - 1] = 0;
 			//++counter;
@@ -252,12 +252,13 @@ void Aco::construct(Sol& sol)
 		sol.available[ins->maxvertices - 1] = true;// end depot moet terug available zijn voor de volgende tour
 		if (breaktaken == false)
 		{
-			tour->action.back() = 1;
-			tour->deptime.back() += ins->breakdur;
-			tour->breakindex = int(tour->seq.size()) - 1;
+			tour.action.back() = 1;
+			tour.deptime.back() += ins->breakdur;
+			tour.breakindex = int(tour.seq.size()) - 1;
 		}
+		sol.calc_maxshift(tour);
 	}//end for all d
-	//end depot is now unavailable for inserts and replacements
+	//make end depot unaivailable for other moves
 	sol.available[ins->maxvertices - 1] = false;
 }
 
@@ -274,7 +275,7 @@ void Aco::solve()
 			{
 				s[ant].reset();
 				construct(s[ant]);
-				s[ant].calc_maxshift();
+				//s[ant].calc_maxshift();
 				two_opt_nb(s[ant], 1);
 				//swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);

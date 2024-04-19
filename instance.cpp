@@ -349,31 +349,39 @@ void Ins::read_neighbourhood()
 	ifstream file;
 	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
 	file.open(filepath+"nb"+name);
-	string value;
-	bool stop = false;
-	for (int i = 0; i < maxvertices; ++i)//for all regular vertices
+	if (file.is_open())
 	{
-		v[i].nbi.resize(maxtours);
-		v[i].nb.resize(maxtours);
-		for (int d = 0; d < maxtours; ++d)
+		string value;
+		bool stop = false;
+		for (int i = 0; i < maxvertices; ++i)//for all regular vertices
 		{
-			getline(file, value, '\n');
-			int size = stoi(value);//read amount of neighbours
-			v[i].nb[d].resize(size);
-			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
-			v[i].nbi[d].set(0);//set bitset to zero for all vertices
-			for (int j = 0; j < size; ++j)
+			v[i].nbi.resize(maxtours);
+			v[i].nb.resize(maxtours);
+			for (int d = 0; d < maxtours; ++d)
 			{
-				getline(file, value, ';');
-				int index = stoi(value);
-				v[i].nb[d][j] = &v[index];
-				v[i].nbi[d][index] = true;
+				getline(file, value, '\n');
+				int size = stoi(value);//read amount of neighbours
+				v[i].nb[d].resize(size);
+				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+				v[i].nbi[d].set(0);//set bitset to zero for all vertices
+				for (int j = 0; j < size; ++j)
+				{
+					getline(file, value, ';');
+					int index = stoi(value);
+					v[i].nb[d][j] = &v[index];
+					v[i].nbi[d][index] = true;
+				}
+				getline(file, value, '\n');
+				v[i].nbi[d][i] = true;
 			}
-			getline(file, value, '\n');
-			v[i].nbi[d][i] = true;
 		}
+		file.close();
 	}
-	file.close();
+	else
+	{
+		cout << "error reading neighborhood" << endl;
+		create_neighbourhood(45);
+	}
 }
 
 inline int Ins::find_t(double time)

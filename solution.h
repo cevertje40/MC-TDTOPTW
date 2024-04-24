@@ -38,7 +38,7 @@ public:
 	void replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position);
 	void removevertex(Sol::Tour &tour, int position);
 	void swapvertex(Sol::Tour &tour, int i, int j);//assumption i < j
-	void optvertices(Sol::Tour &tour, int i, int j,bool breakreschedule);//assumption i < j
+	void optvertices(Sol::Tour &tour, int i, int j);//assumption i < j
 	friend ostream& operator<<(ostream& output, Sol& sol);
 	
 };

@@ -275,15 +275,10 @@ void Aco::solve()
 			{
 				s[ant].reset();
 				construct(s[ant]);
-				//s[ant].calc_maxshift();
-				two_opt_nb(s[ant], 1);
-				//swap_nb(s[ant],1);
+				//two_opt_nb(s[ant], 1);
+				swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
-				if ((iter == 5) && (ant == 2))
-				{
-					cout << "debug" << endl;
-				}
 				swap2_nb(s[ant], 1);
 				move_nb(s[ant], 1);
 			}

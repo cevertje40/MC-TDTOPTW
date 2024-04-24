@@ -113,7 +113,7 @@ void Sol::check()
 			int breakcurrent = tours[d].action[i];
 			if (tours[d].deptime[i] + ins->t[d].EDT - tours[d].seq[i]->serv < current->LTW[d])//service time zit al in traveltime
 				cout << red << "path: " << d << "FAILURE!!! LTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
-			if (tours[d].deptime[i] + ins->t[d].EDT - tours[d].seq[i]->serv > current->UTW[d])
+			if (tours[d].deptime[i] + ins->t[d].EDT - (breakcurrent*ins->breakdur+tours[d].seq[i]->serv) > current->UTW[d])
 			{
 				cout << red << "path: " << d << "FAILURE!!! UTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
 			}
@@ -137,7 +137,8 @@ void Sol::check()
 				}
 				++amountbreaks;
 				Ins::Vertex* vert = tours[d].seq[i];
-				if (((ins->t[d].EDT + tours[d].deptime[i]) - (ins->breakdur) >= ins->breakstart) && ((ins->t[d].EDT + tours[d].deptime[i]) - ins->breakdur <= ins->breakend))
+				//check if break starts within allowed time frame, break is taken before service as break can be taken before opening of vertex
+				if (((ins->t[d].EDT + tours[d].deptime[i]-tours[d].seq[i]->serv) - (ins->breakdur) >= ins->breakstart) && ((ins->t[d].EDT + tours[d].deptime[i] - tours[d].seq[i]->serv) - ins->breakdur <= ins->breakend))
 				{
 					breakcheck = true;
 					//cout<<"break ok"<<endl;
@@ -421,7 +422,16 @@ void Sol::swapvertex(Sol::Tour &tour, int i, int j)
 	Ins::Vertex* remember = tour.seq[i];
 	tour.seq[i] = tour.seq[j];
 	tour.seq[j] = remember;
+	bool reqbreak = false;
 	if (i <= tour.breakindex)
+	{
+		reqbreak = true;
+		for (int vv = i; vv < tour.seq.size(); ++vv)
+		{
+			tour.action[vv] = 0;
+		}
+	}
+	if (reqbreak)
 	{///break comes after i so might need to be replaced
 		update_traveltime_break(tour.index, i-1, int(tour.seq.size()));
 	}
@@ -432,7 +442,7 @@ void Sol::swapvertex(Sol::Tour &tour, int i, int j)
 	calc_maxshift(tour);
 }
 
-void Sol::optvertices(Sol::Tour &tour, int i, int j,bool breakreschedule)
+void Sol::optvertices(Sol::Tour &tour, int i, int j)
 {
 	//reverse sequence
 	for (int f = 0; f < 1 + (j - i) / 2; ++f)
@@ -441,7 +451,16 @@ void Sol::optvertices(Sol::Tour &tour, int i, int j,bool breakreschedule)
 		tour.seq[j - f] = tour.seq[i + f];
 		tour.seq[i + f] = temp;
 	}
-	if (breakreschedule)
+	bool reqbreak = false;
+	if (i <= tour.breakindex)
+	{
+		reqbreak = true;
+		for (int vv = i; vv < tour.seq.size(); ++vv)
+		{
+			tour.action[vv] = 0;
+		}
+	}
+	if (reqbreak)
 	{
 		update_traveltime_break(tour.index, i - 1, int(tour.seq.size()));
 	}

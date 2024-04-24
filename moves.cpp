@@ -1233,11 +1233,11 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 										breaky = 1;
 										reqbreakd = false;
 									}
-									if (arrivaltime + (breaky * ins->breakdur) < b->LTW[d])
+									if (arrivaltime + (breaky * ins->breakdur) < y->LTW[d])
 									{
-										arrivaltime = b->LTW[d] - (breaky * ins->breakdur);
+										arrivaltime = y->LTW[d] - (breaky * ins->breakdur);
 									}
-									if (arrivaltime > b->UTW[d])
+									if (arrivaltime > y->UTW[d])
 									{
 										continue;
 									}

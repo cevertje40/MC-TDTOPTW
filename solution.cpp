@@ -97,7 +97,7 @@ void Sol::check()
 			{
 				waitingtime = current->LTW[d] - (arrivaltime + breakcurrent * (ins->breakdur));
 				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<sol.solution[d][i+1]->index<<" <=> "<<waitingtime << endl;
-				arrivaltime = current->LTW[d] - breakcurrent * (ins->breakdur);
+				arrivaltime = current->LTW[d] - (breakcurrent * ins->breakdur);
 			}
 			arrivaltime += current->serv+breakcurrent*ins->breakdur;
 			//cout<<i+1<<" calc traveltime: " << arrivaltime-t[d].EDT << "stored: " << sol.traveltime[d][i+1] << endl;
@@ -212,9 +212,9 @@ void Sol::update_traveltime(int tour, int start, int end)//update travel time an
 		Ins::Vertex* p = tours[tour].seq[u+1];
 		//travel time from van o to p
 		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-		if (arrivaltime < p->LTW[tour])
+		if (arrivaltime + (tours[tour].action[u + 1] * ins->breakdur) < p->LTW[tour])
 		{
-			arrivaltime = p->LTW[tour];
+			arrivaltime = p->LTW[tour]- (tours[tour].action[u + 1] * ins->breakdur);
 		}
 		arrivaltime += p->serv + (tours[tour].action[u+1] * ins->breakdur);
 		tours[tour].max_shift[u+1] = (tours[tour].deptime[u+1] + tours[tour].max_shift[u+1]) - (arrivaltime - ins->t[tour].EDT);
@@ -245,9 +245,9 @@ void Sol::update_traveltime_break(int tour, int start, int end)//update travel t
 		{//erase previously scheduled break
 			tours[tour].action[u+1] = 0;
 		}
-		if (arrivaltime < p->LTW[tour])
+		if (arrivaltime + (tours[tour].action[u + 1] * ins->breakdur) < p->LTW[tour])
 		{
-			arrivaltime = p->LTW[tour];
+			arrivaltime = p->LTW[tour]- (tours[tour].action[u + 1] * ins->breakdur);
 		}
 		arrivaltime += p->serv + (tours[tour].action[u + 1] * ins->breakdur);
 		tours[tour].max_shift[u + 1] = (tours[tour].deptime[u + 1] + tours[tour].max_shift[u + 1]) - (arrivaltime - ins->t[tour].EDT);

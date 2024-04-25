@@ -274,15 +274,12 @@ void Aco::solve()
 			for (int ant = 0; ant < max_ants; ++ant) // for all ants
 			{
 				s[ant].reset();
+				
 				construct(s[ant]);
-				two_opt_nb(s[ant], 1);
-				//swap_nb(s[ant],1);
+				//two_opt_nb(s[ant], 1);
+				swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
-				if ((iter == 36) && (ant == 9))
-				{
-					cout << "debug now" << endl;
-				}
 				swap2_nb(s[ant], 1);
 				move_nb(s[ant], 1);
 			}

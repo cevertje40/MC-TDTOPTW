@@ -189,9 +189,11 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 		}//end for d
 		if (improvement)
 		{
-			replace:
+		replace:
+			Sol remember = sol;
 			// execute replacement
 			sol.replacevertex(*besttour, candidate, position);
+			sol.check();
 		}//end if improvement
 	}//end while improvement
 }
@@ -1211,7 +1213,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double departuretime = ins->t[d].EDT + tourd->deptime[i];
 									// w to b
 									double arrivaltime = ins->arrival_time(w->con[b->index], departuretime);
-									if ((reqbreakd) && (arrivaltime >= ins->breakstart))
+									if ((reqbreakd) && ((arrivaltime >= ins->breakstart)||(b->index==ins->maxvertices-1)))
 									{
 										breakb = 1;
 										reqbreakd = false;
@@ -1228,7 +1230,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									departuretime = arrivaltime;
 									//traveltime from b to y
 									arrivaltime = ins->arrival_time(b->con[y->index], departuretime);
-									if ((reqbreakd) && (arrivaltime >= ins->breakstart))
+									if ((reqbreakd) && ((arrivaltime >= ins->breakstart) || (y->index == ins->maxvertices - 1)))
 									{
 										breaky = 1;
 										reqbreakd = false;
@@ -1255,7 +1257,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									departuretime = ins->t[e].EDT + toure->deptime[j];
 									//traveltime a to x
 									arrivaltime = ins->arrival_time(a->con[x->index], departuretime);
-									if ((reqbreake) && (arrivaltime >= ins->breakstart))
+									if ((reqbreake) && ((arrivaltime >= ins->breakstart) || (x->index == ins->maxvertices - 1)))
 									{
 										breakx = 1;
 										reqbreake = false;
@@ -1272,7 +1274,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									departuretime = arrivaltime;
 									//traveltime from x to c
 									arrivaltime = ins->arrival_time(x->con[c->index], departuretime);
-									if ((reqbreake) && (arrivaltime >= ins->breakstart))
+									if ((reqbreake) && ((arrivaltime >= ins->breakstart) || (c->index == ins->maxvertices - 1)))
 									{
 										breakc = 1;
 										reqbreake = false;
@@ -1301,7 +1303,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											int breakp = 0;
 											//travel time from o to p
 											double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-											if ((reqbreakd) && (arrivaltime >= ins->breakstart))
+											if ((reqbreakd) && ((arrivaltime >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
 											{
 												breakp = 1;
 												reqbreakd = false;

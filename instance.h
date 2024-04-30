@@ -77,6 +77,7 @@ public:
 	void read_time_dependent_traveltime();
 	void create_neighbourhood(int amnt_nb);
 	void read_neighbourhood();
+	
 	/**acces of c object methods*/
 	int find_t(double time);
 	double travel_time(Connec* c, double start);

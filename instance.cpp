@@ -110,6 +110,9 @@ Ins::Ins(string filename)
 			str = stringstream(line);
 			v[vertex].index = vertex;
 			str >> v[vertex].id >> v[vertex].score >> v[vertex].serv >> v[vertex].weight >> v[vertex].volume;
+			v[vertex].serv = std::round(v[vertex].serv * 100.0) / 100.0;
+			v[vertex].weight = std::round(v[vertex].weight * 100.0) / 100.0;
+			v[vertex].volume = std::round(v[vertex].volume * 100.0) / 100.0;
 			maxscore += v[vertex].score;
 			v[vertex].LTW.resize(maxtours);
 			v[vertex].UTW.resize(maxtours);

@@ -35,7 +35,7 @@ public:
 	void update_maxshift(int tour, int start, int end, double arrivaltime);//partial update within a tour
 	void calc_maxshift(Sol::Tour &tour);//for specific tour of solution
 	void insertvertex(Sol::Tour &tour, Ins::Vertex* candidate, int position);
-	void replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position);
+	void replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position, bool updatebreak=false);
 	void removevertex(Sol::Tour &tour, int position);
 	void swapvertex(Sol::Tour &tour, int i, int j);//assumption i < j
 	void optvertices(Sol::Tour &tour, int i, int j);//assumption i < j

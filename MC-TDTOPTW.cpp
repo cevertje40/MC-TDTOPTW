@@ -107,7 +107,10 @@ void create_dataset()
 						}
 						output << '\n';
 					}
-					output << T_max << '\t' << W_max << '\t' << V_max << '\n';
+					for (int b = 0; b < maxtours; ++b)
+					{
+						output << T_max << '\t' << W_max << '\t' << V_max << '\n';
+					}
 					output.close();
 					
 				}//for all tw values
@@ -125,7 +128,7 @@ int main()
     //cout << bemobile.dijkstra_dependent(41,18467,6) << endl;
 
     //create datasets
-	create_dataset();
+	//create_dataset();
     //create or read neighbourhood
     //instance.create_neighbourhood(45);
     string name = "20.1.1.1.txt";

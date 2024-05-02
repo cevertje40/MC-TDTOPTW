@@ -104,7 +104,7 @@ void Sol::check()
 			currenttime = arrivaltime;
 		}//end for i
 		length = currenttime - ins->t[d].EDT;
-		if (length != tours[d].deptime.back())
+		if (abs(length-tours[d].deptime.back())>0.01)
 			cout << red << "path: " << d << "new calculated length: " << length << " stored length: " << tours[d].deptime.back() << "max length" << ins->t[d].T_max << endl;
 		//3. TW check
 		for (int i = 0; i <= end; ++i)//utw van end depot ook checken
@@ -119,10 +119,10 @@ void Sol::check()
 			}
 		}//end for i
 		//4. weight check
-		if (weightcheck != tours[d].weight)
+		if (abs(weightcheck-tours[d].weight)>0.01)
 			cout << red << "path: " << d << "new calculated weight" << weightcheck << "stored weight: " << tours[d].weight << "max: " << ins->t[d].W_max << endl;
 		//5. volume check
-		if (volumecheck != tours[d].volume)
+		if (abs(volumecheck-tours[d].volume)>0.01)
 			cout << yellow << "path: " << d << "new calculated volume" << volumecheck << "stored volume " << tours[d].volume << "max: " << ins->t[d].V_max << endl;
 		//6. break timing check
 		bool breakcheck = false;
@@ -353,15 +353,18 @@ void Sol::insertvertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 	update_maxshift(tour.index, 0, position + 1, arrivaltime);//update maxshift for all positions before insertions
 }
 
-void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
+void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position, bool updatebreak)
 {
 	bool reqbreak = false;
-	if (position <= tour.breakindex)
+	if (updatebreak)
 	{
-		reqbreak = true;
-		for (int vv = 0; vv < tour.seq.size(); ++vv)
+		if (position <= tour.breakindex)
 		{
-			tour.action[vv] = 0;
+			reqbreak = true;
+			for (int vv = 0; vv < tour.seq.size(); ++vv)
+			{
+				tour.action[vv] = 0;
+			}
 		}
 	}
 	Ins::Vertex* old = tour.seq[position];
@@ -369,6 +372,8 @@ void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 	available[old->index] = true;
 	tour.seq[position] = candidate;//replace point old with candidate
 	tour.max_shift[position] = 0;//dummy value
+	tour.volume -= old->volume - candidate->volume;
+	tour.weight -= old->weight - candidate->weight;
 	score += candidate->score - old->score;// update score of the new solution
 	tour.score += candidate->score - old->score;// update score of the new solution
 	if (reqbreak)

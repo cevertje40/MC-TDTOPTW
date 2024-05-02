@@ -98,6 +98,7 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 				//cout << "pull break" << endl;
 				pull_break(sol, besttour->index);
 			}
+			sol.check();
 		}//end improvement
 	}//end while improvement
 }
@@ -133,56 +134,60 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 					int breakw = tour->action[j + 1];
 					if ((sol.available[y->index] * y->score > z->score) && (x->nbi[t][y->index]) && (y->nbi[t][w->index]))//if interesting and possible
 					{
-						// check if replacement is feasible
-						//gather departure time
-						double currenttime = tour->deptime[j - 1] + ins->t[t].EDT;//service bij x zit hier al in
-						//travel time from x to y
-						double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-						if (arrivaltime + tour->action[j] * ins->breakdur < y->LTW[t])
+						//add weight and volume check
+						if((tour->weight + (y->weight - z->weight) < ins->t[t].W_max) && (tour->volume + (y->volume - z->volume) < ins->t[t].V_max))
 						{
-							arrivaltime = y->LTW[t] - (tour->action[j] * ins->breakdur);
-						}
-						if (arrivaltime > y->UTW[t])
-						{
-							continue;//stop the calculation for this candidate in this position
-						}
-						arrivaltime += y->serv + breakz * ins->breakdur;
-						double ttxy = arrivaltime - ins->t[tour->index].EDT;
-						//travel time from y to w
-						arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
-						if (arrivaltime + tour->action[j + 1] * ins->breakdur < w->LTW[t])
-						{
-							arrivaltime = w->LTW[t] - (tour->action[j + 1] * ins->breakdur);
-						}
-						arrivaltime += w->serv + tour->action[j + 1] * ins->breakdur;
-						double increase = arrivaltime - currenttime;//new traveltime=>service time included ttxy +ttyw
-						increase -= (tour->deptime[j + 1] - tour->deptime[j - 1]);//substract old traveltime=> ttxz + ttzw
-						if (increase <= tour->max_shift[j + 1])//check of het punt gereplaced kan worden
-						{
-							improvement = true;
-							double ratiocheck;
-							if (increase <= 0)
+							// check if replacement is feasible
+							//gather departure time
+							double currenttime = tour->deptime[j - 1] + ins->t[t].EDT;//service bij x zit hier al in
+							//travel time from x to y
+							double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+							if (arrivaltime + tour->action[j] * ins->breakdur < y->LTW[t])
 							{
-								ratiocheck = y->score - z->score;
+								arrivaltime = y->LTW[t] - (tour->action[j] * ins->breakdur);
 							}
-							else
+							if (arrivaltime > y->UTW[t])
 							{
-								ratiocheck = double(y->score - z->score) / increase;
-
+								continue;//stop the calculation for this candidate in this position
 							}
-							if (ratiocheck > bestratio)//enkel op minimale increase checken
+							arrivaltime += y->serv + breakz * ins->breakdur;
+							double ttxy = arrivaltime - ins->t[tour->index].EDT;
+							//travel time from y to w
+							arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
+							if (arrivaltime + tour->action[j + 1] * ins->breakdur < w->LTW[t])
 							{
-								bestratio = ratiocheck;
-								position = j;
-								candidate = y;
-								ttxybest = ttxy;
-								besttour = tour;
-								if (mode == 0)//first improvement, otherwise best improvement
+								arrivaltime = w->LTW[t] - (tour->action[j + 1] * ins->breakdur);
+							}
+							arrivaltime += w->serv + tour->action[j + 1] * ins->breakdur;
+							double increase = arrivaltime - currenttime;//new traveltime=>service time included ttxy +ttyw
+							increase -= (tour->deptime[j + 1] - tour->deptime[j - 1]);//substract old traveltime=> ttxz + ttzw
+							if (increase <= tour->max_shift[j + 1])//check of het punt gereplaced kan worden
+							{
+								improvement = true;
+								double ratiocheck;
+								if (increase <= 0)
 								{
-									goto replace;
+									ratiocheck = y->score - z->score;
 								}
-							}
-						}//end if feasible replacement
+								else
+								{
+									ratiocheck = double(y->score - z->score) / increase;
+
+								}
+								if (ratiocheck > bestratio)//enkel op minimale increase checken
+								{
+									bestratio = ratiocheck;
+									position = j;
+									candidate = y;
+									ttxybest = ttxy;
+									besttour = tour;
+									if (mode == 0)//first improvement, otherwise best improvement
+									{
+										goto replace;
+									}
+								}
+							}//end if feasible replacement
+						}//capacity checks
 					}//if interesting
 				}//for i
 			}//end for j
@@ -192,8 +197,9 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 		replace:
 			Sol remember = sol;
 			// execute replacement
-			sol.replacevertex(*besttour, candidate, position);
+			sol.replacevertex(*besttour, candidate, position, false);
 			sol.check();
+			cout << "debug here" << endl;
 		}//end if improvement
 	}//end while improvement
 }
@@ -1178,7 +1184,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			for (int i = 0; i < tourd->seq.size() - 2; ++i)
 			{
 				Ins::Vertex* w = tourd->seq[i];
-				Ins::Vertex* x = tourd->seq[i + 1];
+				Ins::Vertex* x = tourd->seq[i + 1];//vertex from tour d that will be swapped to tour e
 				Ins::Vertex* y = tourd->seq[i + 2];
 				double ttwxy = (tourd->deptime[i + 2] - (y->serv + tourd->action[i + 2] * ins->breakdur + x->serv + tourd->action[i + 1] * ins->breakdur)) - tourd->deptime[i];
 				for (int e = 0; e < ins->maxtours; ++e)
@@ -1189,7 +1195,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 						for (int j = 0; j < toure->seq.size() - 2; ++j)
 						{
 							Ins::Vertex* a = toure->seq[j];
-							Ins::Vertex* b = toure->seq[j + 1];
+							Ins::Vertex* b = toure->seq[j + 1];//vertex from tour e that will be swapped to tour d
 							Ins::Vertex* c = toure->seq[j + 2];
 							
 							if ((a->nbi[e][x->index]) && (x->nbi[e][b->index]) && (w->nbi[d][y->index]))
@@ -1369,8 +1375,8 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			Sol remember = sol;
 			Ins::Vertex *x = bestd->seq[besti];
 			Ins::Vertex *b = beste->seq[bestj];
-			sol.replacevertex(*bestd, b, besti);
-			sol.replacevertex(*beste, x, bestj);
+			sol.replacevertex(*bestd, b, besti,true);
+			sol.replacevertex(*beste, x, bestj,true);
 			double actualdecrease = 0.0;
 			for (int t = 0; t < (int) sol.tours.size(); ++t)
 			{

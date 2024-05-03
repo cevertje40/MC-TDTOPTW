@@ -29,8 +29,8 @@ void create_dataset()
 	double volkappa = pow(volmean, 2) / pow(volsd, 2);
 	double voltheta = pow(volsd, 2) / volmean;
 	int max_score = 40;
-	double breakstart = t_zero + 2;
-	double breakend = t_zero + 4.5;
+	double breakstart = t_zero + 3;
+	double breakend = t_zero + 7;
 	double breakdur = 0.75;
 	//automatic code
 	default_random_engine generator;
@@ -47,22 +47,22 @@ void create_dataset()
 			{
 				for (int tw = 0; tw < twseverity.size(); ++tw)
 				{
-					vector<int> ids(vertexid[v].size());
-					vector<int> scores(vertexid[v].size());
-					vector<double>services(vertexid[v].size());
-					vector<double>volumes(vertexid[v].size());
-					vector<double>weights(vertexid[v].size());
-					int maxvertices = vertexid[v].size();
+					int maxvertices = int(vertexid[v].size());
+					vector<int> ids(maxvertices);
+					vector<int> scores(maxvertices);
+					vector<double>services(maxvertices);
+					vector<double>volumes(maxvertices);
+					vector<double>weights(maxvertices);
 					int maxtours = tours[t];
-					vector<vector<double>>ltws(vertexid[v].size(),vector<double>(maxtours,0.0));
-					vector<vector<double>>utws(vertexid[v].size(),vector<double>(maxtours,0.0));
+					vector<vector<double>>ltws(maxvertices,vector<double>(maxtours,0.0));
+					vector<vector<double>>utws(maxvertices,vector<double>(maxtours,0.0));
 					double T_max = tmaxarray[tm];
 					double W_max = 22;//tons standard truck
 					double V_max = 47;//m3 standard truck
-					for (int i = 0; i < vertexid[v].size(); ++i)
+					for (int i = 0; i < maxvertices; ++i)
 					{
 						ids[i] = vertexid[v][i];
-						if ((i == 0) || (i == vertexid[v].size() - 1))//start & end vertex
+						if ((i == 0) || (i == maxvertices - 1))//start & end vertex
 						{
 							scores[i] = 0;
 							services[i] =0;
@@ -83,7 +83,7 @@ void create_dataset()
 							int severity = int(twseverity[tw] * T_max);
 							for (int b = 0; b < maxtours; ++b)
 							{
-								int dividora = T_max - severity;
+								int dividora = int(T_max - severity);
 								ltws[i][b] = t_zero + rand() % dividora;
 								int dividorb = int(t_zero + T_max - (severity + ltws[i][b]) + 1);
 								utws[i][b] = ltws[i][b] + severity + rand() % dividorb;
@@ -124,14 +124,12 @@ int main()
 {
 
     //Graph bemobile(425479, 519915);
-    //cout << bemobile.dijkstra_independent(41, 18467) << endl;
-    //cout << bemobile.dijkstra_dependent(41,18467,6) << endl;
-
+    
     //create datasets
 	//create_dataset();
     //create or read neighbourhood
     //instance.create_neighbourhood(45);
-    string name = "20.1.1.1.txt";
+    string name = "50.1.1.1.txt";
     Ins instance(name);
     //instance.construct_time_independent_traveltime(bemobile);
     //instance.construct_time_dependent_traveltime(bemobile);

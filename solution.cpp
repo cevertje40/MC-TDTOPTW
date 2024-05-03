@@ -111,9 +111,9 @@ void Sol::check()
 		{
 			Ins::Vertex* current = tours[d].seq[i];
 			int breakcurrent = tours[d].action[i];
-			if (tours[d].deptime[i] + ins->t[d].EDT - tours[d].seq[i]->serv < current->LTW[d])//service time zit al in traveltime
+			if (tours[d].deptime[i] + ins->t[d].EDT - tours[d].seq[i]->serv+0.01 < current->LTW[d])//service time zit al in traveltime
 				cout << red << "path: " << d << "FAILURE!!! LTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
-			if (tours[d].deptime[i] + ins->t[d].EDT - (breakcurrent*ins->breakdur+tours[d].seq[i]->serv) > current->UTW[d])
+			if (((tours[d].deptime[i] + ins->t[d].EDT) - tours[d].seq[i]->serv) -0.01> current->UTW[d])
 			{
 				cout << red << "path: " << d << "FAILURE!!! UTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
 			}
@@ -353,18 +353,15 @@ void Sol::insertvertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 	update_maxshift(tour.index, 0, position + 1, arrivaltime);//update maxshift for all positions before insertions
 }
 
-void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position, bool updatebreak)
+void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 {
 	bool reqbreak = false;
-	if (updatebreak)
+	if (position <= tour.breakindex)
 	{
-		if (position <= tour.breakindex)
+		reqbreak = true;
+		for (int vv = 0; vv < tour.seq.size(); ++vv)
 		{
-			reqbreak = true;
-			for (int vv = 0; vv < tour.seq.size(); ++vv)
-			{
-				tour.action[vv] = 0;
-			}
+			tour.action[vv] = 0;
 		}
 	}
 	Ins::Vertex* old = tour.seq[position];

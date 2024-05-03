@@ -150,8 +150,16 @@ void Aco::construct(Sol& sol)
 					//als je na breakstart aankomt moet je breaken
 					if ((breaktaken == false) && (arrivaltime >= ins->breakstart))
 					{
-						arrivaltime += ins->breakdur;
-						brk = 1;
+						//if(arrivaltime>ins->breakend)
+						//{//the travel time is larger than the range between breakstart and breakend
+							//prob_v[i] = 0;
+							//continue;
+						//}
+						//else
+						//{
+							arrivaltime += ins->breakdur;
+							brk = 1;
+						//}
 					}
 					else
 					{
@@ -275,16 +283,15 @@ void Aco::solve()
 			for (int ant = 0; ant < max_ants; ++ant) // for all ants
 			{
 				s[ant].reset();
-				
 				construct(s[ant]);
-				//two_opt_nb(s[ant], 1);
+				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
-				if ((iter == 5) && (ant == 8))
+				//replace_nb(s[ant], 1);
+				if ((iter == 2) && (ant == 10))
 				{
 					cout << "debug now" << endl;
 				}
-				replace_nb(s[ant], 1);
 				swap2_nb(s[ant], 1);
 				move_nb(s[ant], 1);
 			}

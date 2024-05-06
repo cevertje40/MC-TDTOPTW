@@ -1363,12 +1363,18 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											{
 												breakp = 1;
 												reqbreakd = false;
+												arrivaltime += ins->breakdur;
 											}
-											if (arrivaltime + (breakp * ins->breakdur) < p->LTW[d])
+											if (arrivaltime < p->LTW[d])
 											{
-												arrivaltime = p->LTW[d] - (breakp * ins->breakdur);
+												arrivaltime = p->LTW[d];
 											}
-											arrivaltime += p->serv + (breakp * ins->breakdur);
+											if (arrivaltime > p->UTW[d])
+											{
+												currenttime = ins->t[d].LAT;
+												continue;
+											}
+											arrivaltime += p->serv;
 											currenttime = arrivaltime;
 										}
 										double globaldecreasetotal = (tourd->deptime.back() - (currenttime - ins->t[d].EDT));
@@ -1388,12 +1394,18 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											{
 												breakp = 1;
 												reqbreake = false;
+												arrivaltime += ins->breakdur;
 											}
-											if (arrivaltime + breakp * ins->breakdur < p->LTW[e])
+											if (arrivaltime < p->LTW[e])
 											{
-												arrivaltime = p->LTW[e] - (breakp * ins->breakdur);
+												arrivaltime = p->LTW[e];
 											}
-											arrivaltime += p->serv + (breakp * ins->breakdur);
+											if (arrivaltime > p->UTW[e])
+											{
+												currenttime = ins->t[e].LAT;
+												continue;
+											}
+											arrivaltime += p->serv;
 											currenttime = arrivaltime;
 										}
 										//cout << "enddepot time e: " << currenttime - t[e].EDT << endl;

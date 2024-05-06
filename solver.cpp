@@ -288,7 +288,7 @@ void Aco::solve()
 				swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
 				//replace_nb(s[ant], 1);
-				if ((iter == 2) && (ant == 10))
+				if ((iter == 233) && (ant == 12))
 				{
 					cout << "debug now" << endl;
 				}

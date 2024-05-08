@@ -147,19 +147,11 @@ void Aco::construct(Sol& sol)
 					Ins::Vertex* neighbor = &ins->v[i];
 					double arrivaltime = ins->arrival_time(last->con[neighbor->index], currenttime);
 					int brk = -1;
-					//als je na breakstart aankomt moet je breaken
-					if ((breaktaken == false) && (arrivaltime >= ins->breakstart))
+					//als je na breakstart aankomt of moet wachten 
+					if ((breaktaken == false) && ((arrivaltime >= ins->breakstart)||(neighbor->LTW[t]>=ins->breakstart)))
 					{
-						//if(arrivaltime>ins->breakend)
-						//{//the travel time is larger than the range between breakstart and breakend
-							//prob_v[i] = 0;
-							//continue;
-						//}
-						//else
-						//{
-							arrivaltime += ins->breakdur;
-							brk = 1;
-						//}
+						arrivaltime += ins->breakdur;
+						brk = 1;
 					}
 					else
 					{
@@ -283,13 +275,14 @@ Res Aco::solve()
 			for (int ant = 0; ant < max_ants; ++ant) // for all ants
 			{
 				s[ant].reset();
-				construct(s[ant]);
-				two_opt_nb(s[ant], 1);
-				swap_nb(s[ant],1);
-				if ((iter == 12) && (ant == 1))
+				if ((iter == 1) && (ant == 7))
 				{
 					cout << "debug now" << endl;
 				}
+				construct(s[ant]);
+				two_opt_nb(s[ant], 1);
+				swap_nb(s[ant],1);
+			
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
 				

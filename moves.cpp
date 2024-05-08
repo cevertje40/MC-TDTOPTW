@@ -95,7 +95,7 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 			int end = (int) besttour->seq.size();
 			if ((besttour->breakindex == end - 1) && (ins->t[besttour->index].LAT > ins->breakend + ins->breakdur))
 			{
-				//cout << "pull break" << endl;
+				cout << "pull break" << endl;
 				pull_break(sol, besttour->index);
 			}
 			sol.check();
@@ -315,46 +315,7 @@ void Moves::pull_break(Sol& sol, int t)
 				tour->deptime[j + 1] = arrivaltime - ins->t[t].EDT;
 				currenttime = arrivaltime;
 			}
-			tour->max_shift.back() = (ins->t[t].T_max - tour->deptime.back());
-			double departuretime = 0;
-			double arrivaltime = ins->t[t].LAT;
-			if (tour->action.back() == 1)//break op enddepot
-			{
-				if (ins->t[t].LAT > ins->breakend + ins->breakdur)
-				{
-					//cout<<"path: "<<d<< "pull break break op enddepot verhindert een maxshift: " << endl;
-					tour->max_shift.back() = (ins->breakend + ins->breakdur) - (tour->deptime.back() + ins->t[t].EDT);
-					arrivaltime = ins->breakend;//zoals hieronder service of enkel break in dit geval ervan aftrekken
-				}
-			}
-			Ins::Vertex* y;
-			Ins::Vertex* z;
-			for (int i = 0; i < end - 2; ++i)// depots don't count
-			{
-				//define the 2 elements
-				y = tour->seq[end - (i + 2)];
-				int breaki = tour->action[end - (i + 2)];
-				z = tour->seq[end - (i + 1)];
-				departuretime = ins->departure_time(y->con[z->index], arrivaltime);
-				//TW check on departuretime 
-				if (departuretime > y->UTW[t] + y->serv)
-				{
-					departuretime = y->UTW[t] + y->serv;
-				}
-				//break may limit the maximum allowable shift
-				if (breaki == 1)
-				{
-					if (departuretime > ins->breakend + ins->breakdur)
-					{
-						//cout << "bij pull break break verhindert een maxshift: " << departuretime << "<=>" << breakend + breaktime << endl;
-						departuretime = ins->breakend + ins->breakdur;
-					}
-				}
-				//store result
-				tour->max_shift[end - (i + 2)] = departuretime - (tour->deptime[end - (i + 2)] + ins->t[t].EDT);
-				//reset variable for the calculation of next point
-				arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
-			}// end for i
+			sol.calc_maxshift(*tour);
 			break;
 		}//end for improvement
 	}//end for all break combinations
@@ -764,7 +725,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 		bool improvement = true;
 		while (improvement)
 		{
-			double bestdelta = 0.0;
+			double bestdelta = 0.0001;
 			int besti=-1;
 			int bestj=-1;
 			improvement = false;
@@ -819,8 +780,8 @@ void Moves::swap_nb(Sol& sol, int mode)
 						}// end l
 						newtraveltime = currenttime - departuretime;
 						oldtraveltime = (ins->t[d].EDT+tour.deptime[j+1])-departuretime;
-						delta_tt = newtraveltime - oldtraveltime;
-						if (delta_tt < bestdelta)//local evaluation
+						delta_tt = oldtraveltime-newtraveltime;
+						if (delta_tt > bestdelta)//local evaluation
 						{
 							bool reqbreak = false;
 							if (i <= tour.breakindex)
@@ -857,8 +818,8 @@ void Moves::swap_nb(Sol& sol, int mode)
 							}
 							newtraveltime = currenttime - departuretime;
 							oldtraveltime = ((ins->t[d].EDT + tour.deptime[end - 1]) - departuretime);
-							delta_tt = newtraveltime - oldtraveltime;
-							if (delta_tt < bestdelta)//global evaluation
+							delta_tt = oldtraveltime-newtraveltime;
+							if (delta_tt > bestdelta)//global evaluation
 							{
 								improvement = true;
 								bestdelta = delta_tt;
@@ -880,9 +841,8 @@ void Moves::swap_nb(Sol& sol, int mode)
 				sol.swapvertex(tour, besti, bestj);
 				double actualdecrease = remember.tours[d].deptime.back() - tour.deptime.back();
 				sol.check();
-				if (abs(-bestdelta - actualdecrease) > 0.01)
+				if (abs(bestdelta - actualdecrease) > 0.01)
 				{
-					
 					cout << "error swap2" << endl;
 				}
 			}
@@ -898,7 +858,7 @@ void Moves::two_opt_nb(Sol& sol,int mode)
 		bool improvement = true;
 		while (improvement)
 		{
-			double bestdelta = 0.0;
+			double bestdelta = 0.0001;
 			int besti = -1;
 			int bestj = -1;
 			improvement = false;
@@ -1022,7 +982,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 	while (improvement)
 	{
 		improvement = false;
-		double bestdecrease = 0;
+		double bestdecrease = 0.0001;
 		Sol::Tour *bestd=NULL;
 		Sol::Tour *beste=NULL;
 		int besti;
@@ -1211,12 +1171,12 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 			if ((bestd->breakindex == int(bestd->seq.size()) - 1) && (ins->t[bestd->index].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
-				pull_break(sol, bestd->index);
+				//pull_break(sol, bestd->index);
 			}
 			if ((beste->breakindex == int(beste->seq.size()) - 1) && (ins->t[beste->index].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
-				pull_break(sol, beste->index);
+				//pull_break(sol, beste->index);
 			}
 		}//end if improvement
 	}//end while improvement
@@ -1228,7 +1188,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 	while (improvement)
 	{
 		improvement = false;
-		double bestdecrease = 0;
+		double bestdecrease = 0.0001;
 		Sol::Tour *bestd=NULL;
 		Sol::Tour *beste=NULL;
 		int besti;

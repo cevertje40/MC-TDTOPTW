@@ -150,16 +150,17 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							{
 								breaky = 1;
 								reqbreak = false;
+								arrivaltime += ins->breakdur;
 							}
-							if (arrivaltime + breaky * ins->breakdur < y->LTW[t])
+							if (arrivaltime < y->LTW[t])
 							{
-								arrivaltime = y->LTW[t] - (breaky * ins->breakdur);
+								arrivaltime = y->LTW[t];
 							}
 							if (arrivaltime > y->UTW[t])
 							{
 								continue;//stop the calculation
 							}
-							arrivaltime += y->serv + breaky * ins->breakdur;
+							arrivaltime += y->serv;
 							double ttxy = arrivaltime - ins->t[tour->index].EDT;
 							//travel time from y to w
 							arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
@@ -167,16 +168,17 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							{
 								breakw = 1;
 								reqbreak = false;
+								arrivaltime += ins->breakdur;
 							}
-							if (arrivaltime + breakw * ins->breakdur < w->LTW[t])
+							if (arrivaltime < w->LTW[t])
 							{
-								arrivaltime = w->LTW[t] - (breakw * ins->breakdur);
+								arrivaltime = w->LTW[t];
 							}
 							if (arrivaltime > w->UTW[t])
 							{
 								continue;//stop the calculation
 							}
-							arrivaltime += w->serv + breakw * ins->breakdur;
+							arrivaltime += w->serv;
 							double increase = arrivaltime - currenttime;//new traveltime=>service time included ttxy +ttyw
 							increase -= (tour->deptime[j + 1] - tour->deptime[j - 1]);//substract old traveltime=> ttxz + ttzw
 							//increase can be negative which could lead to a break that comes to early
@@ -335,9 +337,9 @@ void Moves::pull_break(Sol& sol, int t)
 				z = tour->seq[end - (i + 1)];
 				departuretime = ins->departure_time(y->con[z->index], arrivaltime);
 				//TW check on departuretime 
-				if (departuretime > y->UTW[t] + y->serv + breaki * ins->breakdur)
+				if (departuretime > y->UTW[t] + y->serv)
 				{
-					departuretime = y->UTW[t] + y->serv + breaki * ins->breakdur;
+					departuretime = y->UTW[t] + y->serv;
 				}
 				//break may limit the maximum allowable shift
 				if (breaki == 1)
@@ -809,9 +811,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 							}
 							if (arrivaltime > second->UTW[d])//als hij tussen  z en y over een utw gaat moet je hem stoppen
 							{
-								//swap is infeasible, stop for this combination by setting currenttime very high
-								arrivaltime = ins->t[d].LAT;
-								currenttime = arrivaltime;
+								currenttime = DBL_MAX;
 								break;
 							}
 							arrivaltime += second->serv + (tour.action[l + 1] * ins->breakdur);
@@ -845,8 +845,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 								}
 								if (arrivaltime > second->UTW[d])
 								{
-									arrivaltime = ins->t[d].LAT;//swap is infeasible, invalidate this comb by setting max allowed arrivaltime
-									currenttime = arrivaltime;
+									currenttime = DBL_MAX;
 									break;
 								}
 								arrivaltime += second->serv;
@@ -953,15 +952,13 @@ void Moves::two_opt_nb(Sol& sol,int mode)
 							}
 							if (arrivaltime > second->UTW[d])
 							{
-								arrivaltime = ins->t[d].LAT;//set arrivaltime very high
-								currenttime = arrivaltime;
+								currenttime = DBL_MAX;
 								break;
 							}
 							currenttime = arrivaltime + second->serv;
 						}// end l
 						//int remember = sol.traveltime[d].back();
 						delta_tt = (ins->t[d].EDT + tour.deptime[j + 1])-currenttime;
-						//break wijzigingen kunnen niet bij een locale evaluatie
 						if (delta_tt > 0)//local evaluation
 						{
 							//global evaluation
@@ -978,6 +975,11 @@ void Moves::two_opt_nb(Sol& sol,int mode)
 								if (arrivaltime < second->LTW[d])
 								{
 									arrivaltime = second->LTW[d];
+								}
+								if (arrivaltime > second->UTW[d])
+								{
+									currenttime = DBL_MAX;
+									break;
 								}
 								arrivaltime += second->serv;
 								currenttime = arrivaltime;
@@ -1048,7 +1050,6 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 							{
 								if ((toure->weight + x->weight < ins->t[e].W_max) && (toure->volume + x->volume < ins->t[e].V_max))
 								{
-									
 									//local evaluation on path e
 									double ttab = (toure->deptime[j + 1] - (b->serv + toure->action[j + 1] * ins->breakdur)) - toure->deptime[j];
 									//calculate axb
@@ -1096,17 +1097,18 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 									{//break na y wordt bij global evaluation in rekening gebracht
 										reqbreak = false;
 										breaky = 1;
+										arrivaltime += ins->breakdur;
 									}
-									if (arrivaltime + breaky * ins->breakdur < y->LTW[d])
+									if (arrivaltime < y->LTW[d])
 									{
-										arrivaltime = y->LTW[d] - (breaky * ins->breakdur);
+										arrivaltime = y->LTW[d];
 									}
 									if (arrivaltime > y->UTW[d])
 									{
 										continue;
 									}
 									double ttwy = arrivaltime - departuretime;
-									double arrivaly = arrivaltime + y->serv + breaky * ins->breakdur;
+									double arrivaly = arrivaltime + y->serv;
 									double localincrease = (ttaxb - ttab) + x->serv;
 									double localdecreasetotal = ttwxy + ttab - (ttwy + ttaxb);
 									//local improvement check
@@ -1127,12 +1129,18 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 											{
 												breakp = 1;
 												reqbreak = false;
+												arrivaltime += ins->breakdur;
 											}
-											if (arrivaltime + (breakp * ins->breakdur) < p->LTW[d])
+											if (arrivaltime < p->LTW[d])
 											{
-												arrivaltime = p->LTW[d] - (breakp * ins->breakdur);
+												arrivaltime = p->LTW[d];
 											}
-											arrivaltime += p->serv + (breakp * ins->breakdur);
+											if (arrivaltime > p->UTW[d])
+											{
+												currenttime = DBL_MAX;
+												break;
+											}
+											arrivaltime += p->serv;
 											currenttime = arrivaltime;
 										}
 										if (reqbreak)//nog altijd geen break kunnen plaatsen dan moet hij op het einddepot komen
@@ -1244,7 +1252,6 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 							Ins::Vertex* a = toure->seq[j];
 							Ins::Vertex* b = toure->seq[j + 1];//vertex from tour e that will be swapped to tour d
 							Ins::Vertex* c = toure->seq[j + 2];
-							
 							if ((a->nbi[e][x->index]) && (x->nbi[e][b->index]) && (w->nbi[d][y->index]))
 							{
 								if ((toure->weight + (x->weight-b->weight) < ins->t[e].W_max) && (toure->volume + (x->weight-b->volume) < ins->t[e].V_max)&&(tourd->weight + (b->weight - x->weight) < ins->t[d].W_max)&&(tourd->volume + (b->volume - x->volume) < ins->t[d].V_max))
@@ -1370,9 +1377,9 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 												arrivaltime = p->LTW[d];
 											}
 											if (arrivaltime > p->UTW[d])
-											{
-												currenttime = ins->t[d].LAT;
-												continue;
+											{//utw violation due to break repositioning
+												currenttime = DBL_MAX;
+												break;
 											}
 											arrivaltime += p->serv;
 											currenttime = arrivaltime;
@@ -1401,9 +1408,9 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 												arrivaltime = p->LTW[e];
 											}
 											if (arrivaltime > p->UTW[e])
-											{
-												currenttime = ins->t[e].LAT;
-												continue;
+											{//utw violation due to break repositioning
+												currenttime = DBL_MAX;
+												break;
 											}
 											arrivaltime += p->serv;
 											currenttime = arrivaltime;

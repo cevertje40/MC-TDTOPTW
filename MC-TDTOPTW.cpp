@@ -4,7 +4,6 @@
 
 using namespace std;
 
-
 void create_dataset()
 {
 	//user input
@@ -119,29 +118,61 @@ void create_dataset()
 	}//for all maxvertex size values
 }
 
+list <string> read_dataset(string filename)
+{//reads in all the dataset names
+	list <string> files; //filenames list with iterator
+	ifstream ifs;
+	ifs.open(filename, ifstream::in);
+	if (ifs.is_open())
+	{
+		string line;
+		while (getline(ifs, line))//read 1 full line
+		{
+			stringstream str(line);//store line as stringstream
+			files.push_back(line);
+		}
+		ifs.close();
+	}
+	else
+	{
+		printf("\ninput error in filenames file");
+	}
+	return files;
+}
+
+void solve_dataset(int testruns)
+{
+	cout << fixed << setprecision(2) << "enter name of dataset" << endl;
+	string filename;
+	getline(std::cin, filename);
+	if (filename.size() == 0)
+	{
+		filename = "all.txt";
+	}
+	list<string> files = read_dataset(filename);
+	vector<Res> resdataset;
+	list <string>::iterator it;
+	for (it = files.begin(); it != files.end(); ++it)
+	{
+		cout << *it << endl;
+		Ins instance(*it);
+		instance.read_neighbourhood();
+		Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+		resdataset.push_back(acs.solve());
+	}
+}
+
+void debug_instance()
+{
+	vector<Res> resdataset;
+	Ins instance("20.1.2.1.txt");
+	instance.read_neighbourhood();
+	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+	resdataset.push_back(acs.solve());
+}
 
 int main()
 {
-
-    //Graph bemobile(425479, 519915);
-    
-    //create datasets
-	//create_dataset();
-    //create or read neighbourhood
-    //instance.create_neighbourhood(45);
-    string name = "50.1.1.1.txt";
-    Ins instance(name);
-    //instance.construct_time_independent_traveltime(bemobile);
-    //instance.construct_time_dependent_traveltime(bemobile);
-    instance.read_neighbourhood();
-
-    //read instance info and travel time
-   
-    //aco,ils class
-    //construction aco
-    //local search moves
-    //test class
-    
-    Aco acs(instance, 1,3,0.01,20,10000,0.25,0.05);
-    acs.solve();
+	//solve_dataset(1);
+	debug_instance();
 }

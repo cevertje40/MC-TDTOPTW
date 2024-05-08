@@ -271,7 +271,7 @@ void Aco::construct(Sol& sol)
 	sol.check();
 }
 
-void Aco::solve()
+Res Aco::solve()
 {
 	clock_t start, end;
 	start = clock();
@@ -286,12 +286,13 @@ void Aco::solve()
 				construct(s[ant]);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				insert_nb(s[ant], 1);
-				//replace_nb(s[ant], 1);
-				if ((iter == 233) && (ant == 12))
+				if ((iter == 12) && (ant == 1))
 				{
 					cout << "debug now" << endl;
 				}
+				insert_nb(s[ant], 1);
+				replace_nb(s[ant], 1);
+				
 				swap2_nb(s[ant], 1);
 				move_nb(s[ant], 1);
 			}
@@ -300,10 +301,12 @@ void Aco::solve()
 		pheromone_update();// iteration best solution its arcs are augmented
 	}
 	end = clock();
+	double cpuTime;
+	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
 	cout << gb << endl;
 	cout << "debug before window closure" << endl;
-
+	return Res(gb.score,cpuTime);
 }
 
 Ils::Ils(Ins& ins, int max_it,int max_ni): Moves(ins), max_it(max_it), max_ni(max_ni)

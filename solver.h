@@ -1,6 +1,15 @@
 #pragma once
 #include "moves.h"
 
+class Res
+{
+private:
+	int score;
+	double time;
+public:
+	Res(int& score, double& time) :score(score), time(time) {}
+};
+
 class Aco: public Moves
 {
 private:
@@ -23,7 +32,7 @@ public:
 	Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_sol, double max_ni_p,double p_best);
 	void update_global_best();
 	void pheromone_update();
-	void solve();
+	Res solve();
 };
 
 class Ils : public Moves
@@ -43,7 +52,7 @@ private:
 public:
 	Ils(Ins& ins, int max_sol,int max_ni);
 	
-	void solve();
+	Res solve();
 };
 
 

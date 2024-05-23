@@ -160,7 +160,7 @@ void Sol::check()
 					else
 					{//mistakes to break scheduling found
 
-						if ((ins->t[d].EDT + tours[d].deptime[i]) - (ins->breakdur) < ins->breakstart)
+						if ((ins->t[d].EDT + tours[d].deptime[i] - tours[d].seq[i]->serv) - (ins->breakdur) < ins->breakstart)
 						{
 							cout << red << "path: " << d << "break too early" << endl;
 						}
@@ -226,7 +226,7 @@ void Sol::update_traveltime(int tour, int start, int end)//update travel time an
 
 void Sol::update_traveltime_break(int tour, int start, int end)//update travel time and maxshift and potentially reschedule break
 {
-	double reqbreak = true;
+	bool reqbreak = true;
 	double currenttime = tours[tour].deptime[start] + ins->t[tour].EDT;
 	for (int u = start; u < end - 1; ++u)
 	{
@@ -235,7 +235,7 @@ void Sol::update_traveltime_break(int tour, int start, int end)//update travel t
 		Ins::Vertex* p = tours[tour].seq[u + 1];
 		//travel time from van o to p
 		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-		if ((reqbreak) && (arrivaltime >= ins->breakstart))
+		if ((reqbreak) &&(max(p->LTW[tour] - ins->breakdur,arrivaltime) >= ins->breakstart))
 		{
 			tours[tour].action[u+1] = 1;
 			tours[tour].breakindex = u+1;

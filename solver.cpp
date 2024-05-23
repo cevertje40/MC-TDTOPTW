@@ -148,7 +148,7 @@ void Aco::construct(Sol& sol)
 					double arrivaltime = ins->arrival_time(last->con[neighbor->index], currenttime);
 					int brk = -1;
 					//als je na breakstart aankomt of moet wachten 
-					if ((breaktaken == false) && ((arrivaltime >= ins->breakstart)||(neighbor->LTW[t]>=ins->breakstart)))
+					if ((breaktaken == false) && ((arrivaltime >= ins->breakstart)||(neighbor->LTW[t]-ins->breakdur>=ins->breakstart)))
 					{
 						arrivaltime += ins->breakdur;
 						brk = 1;
@@ -275,17 +275,15 @@ Res Aco::solve()
 			for (int ant = 0; ant < max_ants; ++ant) // for all ants
 			{
 				s[ant].reset();
-				if ((iter == 1) && (ant == 7))
-				{
-					cout << "debug now" << endl;
-				}
 				construct(s[ant]);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-			
 				insert_nb(s[ant], 1);
+				if ((iter == 48) && (ant == 19))
+				{
+					cout << "debug now" << endl;
+				}
 				replace_nb(s[ant], 1);
-				
 				swap2_nb(s[ant], 1);
 				move_nb(s[ant], 1);
 			}

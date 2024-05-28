@@ -353,10 +353,11 @@ void Sol::insertvertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 	update_maxshift(tour.index, 0, position + 1, arrivaltime);//update maxshift for all positions before insertions
 }
 
-void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
+void Sol::replacevertex(Sol::Tour &tour, Ins::Vertex* candidate, int position, bool repositionbreak)
 {
+	
 	bool reqbreak = false;
-	if (position <= tour.breakindex)
+	if ((repositionbreak)&&(position <= tour.breakindex))
 	{
 		reqbreak = true;
 		for (int vv = 0; vv < tour.seq.size(); ++vv)

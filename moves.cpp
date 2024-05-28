@@ -111,6 +111,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 	{
 		improvement = false;
 		double bestratio = 0.0;
+		bool bestbreak = false;
 		int position = -1;
 		Ins::Vertex* candidate = NULL;
 		double ttxybest = -1;
@@ -162,9 +163,9 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							}
 							arrivaltime += y->serv;
 							double ttxy = arrivaltime - ins->t[tour->index].EDT;
-							//travel time from y to w
+							//travel time from y to w (can be enddepot)
 							arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
-							if ((reqbreak) && (max(w->LTW[t]-ins->breakdur,arrivaltime) >= ins->breakstart))
+							if ((reqbreak) && ((max(w->LTW[t]-ins->breakdur,arrivaltime) >= ins->breakstart)||(w->index == ins->maxvertices - 1)))
 							{
 								breakw = 1;
 								reqbreak = false;
@@ -184,14 +185,14 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							//increase can be negative which could lead to a break that comes to early
 							if (increase <= tour->max_shift[j + 1])//check of het punt gereplaced kan worden
 							{
-								//global evaluation is necessary if the break is still not inserted
-								if (reqbreak)
+								//global evaluation is necessary if the break and we arrive earlier at w
+								if (increase<0)
 								{
 									double currenttime = arrivaltime;
 									for (int m = j+1; m < (int)tour->seq.size(); ++m)
 									{
 										Ins::Vertex* o = tour->seq[m - 1];
-										Ins::Vertex* p = tour->seq[m];//can be de end depot
+										Ins::Vertex* p = tour->seq[m];//can be the end depot
 										int breakp = 0;
 										//travel time from o to p
 										double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
@@ -230,6 +231,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 										candidate = y;
 										ttxybest = ttxy;
 										besttour = tour;
+										bestbreak = false;
 										if (mode == 0)//first improvement, otherwise best improvement
 										{
 											goto replace;
@@ -247,7 +249,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 		replace:
 			Sol remember = sol;
 			// execute replacement
-			sol.replacevertex(*besttour, candidate, position);
+			sol.replacevertex(*besttour, candidate, position,bestbreak);
 			sol.check();
 			cout << "hier" << endl;
 		}//end if improvement
@@ -771,7 +773,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 							{
 								arrivaltime = second->LTW[d] - (tour.action[l + 1] * ins->breakdur);
 							}
-							if (arrivaltime > second->UTW[d])//als hij tussen  z en y over een utw gaat moet je hem stoppen
+							if (arrivaltime > second->UTW[d])
 							{
 								currenttime = DBL_MAX;
 								break;
@@ -1236,9 +1238,14 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double arrivaltime = ins->arrival_time(w->con[b->index], departuretime);
 									if ((reqbreakd) && (max(b->LTW[d] - ins->breakdur,arrivaltime) >= ins->breakstart))
 									{
+										if(max(b->LTW[d] - ins->breakdur, arrivaltime)>ins->breakend)
+										{
+											continue;
+										}
 										breakb = 1;
 										reqbreakd = false;
 										arrivaltime += ins->breakdur;
+										
 									}
 									if (arrivaltime < b->LTW[d])
 									{
@@ -1282,6 +1289,11 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									arrivaltime = ins->arrival_time(a->con[x->index], departuretime);
 									if ((reqbreake) && (max(x->LTW[e] - ins->breakdur,arrivaltime) >= ins->breakstart))
 									{
+
+										if (max(x->LTW[e] - ins->breakdur, arrivaltime) > ins->breakend)
+										{
+											continue;
+										}
 										breakx = 1;
 										reqbreake = false;
 										arrivaltime += ins->breakdur;
@@ -1407,8 +1419,8 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			Sol remember = sol;
 			Ins::Vertex *x = bestd->seq[besti];
 			Ins::Vertex *b = beste->seq[bestj];
-			sol.replacevertex(*bestd, b, besti);
-			sol.replacevertex(*beste, x, bestj);
+			sol.replacevertex(*bestd, b, besti,true);
+			sol.replacevertex(*beste, x, bestj,true);
 			double actualdecrease = 0.0;
 			for (int t = 0; t < (int) sol.tours.size(); ++t)
 			{

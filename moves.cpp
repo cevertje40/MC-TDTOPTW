@@ -111,7 +111,6 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 	{
 		improvement = false;
 		double bestratio = 0.0;
-		bool bestbreak = false;
 		int position = -1;
 		Ins::Vertex* candidate = NULL;
 		double ttxybest = -1;
@@ -136,26 +135,24 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 						//add weight and volume check
 						if((tour->weight + (y->weight - z->weight) < ins->t[t].W_max) && (tour->volume + (y->volume - z->volume) < ins->t[t].V_max))
 						{
-							bool reqbreak = false;
-							if (tour->breakindex >= j)
-							{
-								reqbreak = true;
-							}
-							int breaky = 0;
-							int breakw = 0;
+						
+							int breaky = tour->action[j];
+							int breakw = tour->action[j+1];
 							//gather departure time
 							double currenttime = tour->deptime[j - 1] + ins->t[t].EDT;//service bij x zit hier al in
 							//travel time from x to y
 							double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-							if ((reqbreak) && (max(y->LTW[t]-ins->breakdur,arrivaltime) >= ins->breakstart))
+							if (arrivaltime +(breaky*ins->breakdur) < y->LTW[t])
 							{
-								breaky = 1;
-								reqbreak = false;
-								arrivaltime += ins->breakdur;
+								arrivaltime = y->LTW[t]- (breaky*ins->breakdur);
 							}
-							if (arrivaltime < y->LTW[t])
+							//break can be scheduled too early or too late
+							if (breaky)
 							{
-								arrivaltime = y->LTW[t];
+								if ((arrivaltime < ins->breakstart)||(arrivaltime>ins->breakend))
+									continue;
+								else
+									arrivaltime += ins->breakdur;
 							}
 							if (arrivaltime > y->UTW[t])
 							{
@@ -163,17 +160,19 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							}
 							arrivaltime += y->serv;
 							double ttxy = arrivaltime - ins->t[tour->index].EDT;
-							//travel time from y to w (can be enddepot)
+							//travel time from y to w
 							arrivaltime = ins->arrival_time(y->con[w->index], arrivaltime);
-							if ((reqbreak) && ((max(w->LTW[t]-ins->breakdur,arrivaltime) >= ins->breakstart)||(w->index == ins->maxvertices - 1)))
+							if (arrivaltime +(breakw*ins->breakdur) < w->LTW[t])
 							{
-								breakw = 1;
-								reqbreak = false;
-								arrivaltime += ins->breakdur;
+								arrivaltime = w->LTW[t]-(breakw*ins->breakdur);
 							}
-							if (arrivaltime < w->LTW[t])
+							//break can be scheduled too early (max_shift check too late)
+							if (breakw)
 							{
-								arrivaltime = w->LTW[t];
+								if (arrivaltime < ins->breakstart)
+									continue;
+								else
+									arrivaltime += ins->breakdur;
 							}
 							if (arrivaltime > w->UTW[t])
 							{
@@ -185,34 +184,35 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 							//increase can be negative which could lead to a break that comes to early
 							if (increase <= tour->max_shift[j + 1])//check of het punt gereplaced kan worden
 							{
-								//global evaluation is necessary if the break and we arrive earlier at w
+								bool breakcheck = true;
 								if (increase<0)
-								{
+								{//global evaluation is necessary as break can fall before breakstart when increase is negative
 									double currenttime = arrivaltime;
-									for (int m = j+1; m < (int)tour->seq.size(); ++m)
+									for (int m = j+2; m < (int)tour->seq.size(); ++m)
 									{
 										Ins::Vertex* o = tour->seq[m - 1];
 										Ins::Vertex* p = tour->seq[m];//can be the end depot
-										int breakp = 0;
+										int breakp = tour->action[m];
 										//travel time from o to p
 										double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-										if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
+										if (arrivaltime + (breakp * ins->breakdur) < p->LTW[t])
 										{
-											breakp = 1;
-											reqbreak = false;
+											arrivaltime = p->LTW[t] - (breakp * ins->breakdur);
 										}
-										if (arrivaltime + (breakp * ins->breakdur) < p->LTW[d])
+										if (breakp)
 										{
-											arrivaltime = p->LTW[d] - (breakp * ins->breakdur);
+											if (arrivaltime < ins->breakstart)
+											{
+												breakcheck = false;
+												continue;
+											}
 										}
 										arrivaltime += p->serv + (breakp * ins->breakdur);
 										currenttime = arrivaltime;
 									}
-									increase = (arrivaltime - ins->t[t].EDT) - tour->deptime.back();
-									cout << red << "unfinished code replace" << endl;
 								}
-								else
-								{
+								if(breakcheck)
+								{//
 									improvement = true;
 									double ratiocheck;
 									if (increase <= 0)
@@ -231,7 +231,6 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 										candidate = y;
 										ttxybest = ttxy;
 										besttour = tour;
-										bestbreak = false;
 										if (mode == 0)//first improvement, otherwise best improvement
 										{
 											goto replace;
@@ -249,7 +248,12 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 		replace:
 			Sol remember = sol;
 			// execute replacement
-			sol.replacevertex(*besttour, candidate, position,bestbreak);
+			sol.replacevertex(*besttour, candidate, position, false);
+			if ((besttour->breakindex == int(besttour->seq.size()) - 1) && (ins->t[besttour->index].LAT > ins->breakend + ins->breakdur))
+			{
+				cout << "break pulled" << endl;
+				pull_break(sol, besttour->index);
+			}
 			sol.check();
 			cout << "hier" << endl;
 		}//end if improvement
@@ -1175,12 +1179,12 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 			if ((bestd->breakindex == int(bestd->seq.size()) - 1) && (ins->t[bestd->index].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
-				//pull_break(sol, bestd->index);
+				pull_break(sol, bestd->index);
 			}
 			if ((beste->breakindex == int(beste->seq.size()) - 1) && (ins->t[beste->index].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
-				//pull_break(sol, beste->index);
+				pull_break(sol, beste->index);
 			}
 		}//end if improvement
 	}//end while improvement

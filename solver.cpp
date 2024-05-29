@@ -279,7 +279,7 @@ Res Aco::solve()
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
 				insert_nb(s[ant], 1);
-				if ((iter == 0) && (ant == 15))
+				if ((iter == 19) && (ant == 2))
 				{
 					cout << "debug now" << endl;
 				}

@@ -249,6 +249,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 			Sol remember = sol;
 			// execute replacement
 			sol.replacevertex(*besttour, candidate, position, false);
+			sol.check();
 			if ((besttour->breakindex == int(besttour->seq.size()) - 1) && (ins->t[besttour->index].LAT > ins->breakend + ins->breakdur))
 			{
 				cout << "break pulled" << endl;
@@ -284,14 +285,15 @@ void Moves::pull_break(Sol& sol, int t)
 			Ins::Vertex* last = tour->seq[j];
 			Ins::Vertex* current = tour->seq[j + 1];
 			int breakcurrent = 0;
-			if (j == i)
+			if (j+1 == i)
 			{
 				breakcurrent = 1;
 			}
 			double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-			if (arrivaltime + breakcurrent * (ins->breakdur) < current->LTW[t])
+			arrivaltime += breakcurrent * ins->breakdur;
+			if (arrivaltime < current->LTW[t])
 			{
-				arrivaltime = current->LTW[t] - (breakcurrent * ins->breakdur);
+				arrivaltime = current->LTW[t];
 			}
 			//utw check want je kan later aankomen door de break vroeger te schedulen
 			if (arrivaltime > current->UTW[t])
@@ -299,7 +301,7 @@ void Moves::pull_break(Sol& sol, int t)
 				feasible = false;
 				break;
 			}
-			arrivaltime += current->serv + breakcurrent * ins->breakdur;
+			arrivaltime += current->serv;
 			currenttime = arrivaltime;
 		}
 		if ((feasible) && (currenttime <= ins->t[t].EDT + tour->deptime.back()))
@@ -314,11 +316,12 @@ void Moves::pull_break(Sol& sol, int t)
 				Ins::Vertex* current = tour->seq[j + 1];
 				int breakcurrent = tour->action[j + 1];
 				double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-				if (arrivaltime + breakcurrent * (ins->breakdur) < current->LTW[t])
+				arrivaltime += breakcurrent * ins->breakdur;
+				if (arrivaltime < current->LTW[t])
 				{
-					arrivaltime = current->LTW[t] - (breakcurrent * ins->breakdur);
+					arrivaltime = current->LTW[t];
 				}
-				arrivaltime += current->serv + breakcurrent * ins->breakdur;
+				arrivaltime += current->serv;
 				tour->deptime[j + 1] = arrivaltime - ins->t[t].EDT;
 				currenttime = arrivaltime;
 			}

@@ -173,6 +173,6 @@ void debug_instance()
 
 int main()
 {
-	//solve_dataset(1);
-	debug_instance();
+	solve_dataset(1);
+	//debug_instance();
 }

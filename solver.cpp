@@ -281,10 +281,6 @@ Res Aco::solve()
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
 				swap2_nb(s[ant], 1);
-				if ((iter == 65) && (ant == 8))
-				{
-					cout << "debug now" << endl;
-				}
 				move_nb(s[ant], 1);
 			}
 		}

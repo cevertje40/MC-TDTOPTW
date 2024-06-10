@@ -1184,12 +1184,12 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 			}
 			if ((bestd->breakindex == int(bestd->seq.size()) - 1) && (ins->t[bestd->index].LAT > ins->breakend + ins->breakdur))
 			{
-				//cout << "break pulled" << endl;
+				cout << "break pulled" << endl;
 				pull_break(sol, bestd->index);
 			}
 			if ((beste->breakindex == int(beste->seq.size()) - 1) && (ins->t[beste->index].LAT > ins->breakend + ins->breakdur))
 			{
-				//cout << "break pulled" << endl;
+				cout << "break pulled" << endl;
 				pull_break(sol, beste->index);
 			}
 			sol.check();

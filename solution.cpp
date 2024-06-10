@@ -286,7 +286,7 @@ void Sol::update_maxshift(int tour, int start, int end, double arrivaltime)
 		{
 			if (departuretime > ins->breakend + ins->breakdur)
 			{
-				cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
+				//cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
 				departuretime = ins->breakend + ins->breakdur;
 			}
 		}
@@ -322,7 +322,7 @@ void Sol::calc_maxshift(Sol::Tour& tour)
 		{
 			if (departuretime > ins->breakend + ins->breakdur)
 			{
-				cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
+				//cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
 				departuretime = ins->breakend + ins->breakdur;
 			}
 		}

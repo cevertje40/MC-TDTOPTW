@@ -303,6 +303,15 @@ void Sol::calc_maxshift(Sol::Tour& tour)
 	double departuretime = 0;
 	tour.max_shift.back() = (ins->t[tour.index].T_max - tour.deptime.back());
 	double arrivaltime = ins->t[tour.index].LAT - (tour.action.back() * ins->breakdur);//if you break at the end depot subtract breakduration
+	if (tour.action.back() == 1)//break op enddepot
+	{
+		if (ins->t[tour.index].EDT+ins->t[tour.index].T_max > ins->breakend + ins->breakdur)
+		{
+			//cout<<"path: "<<d<< " bij calc maxshift break op enddepot verhindert een maxshift: " << endl;
+			tour.max_shift.back() = (ins->breakend + ins->breakdur) - (tour.deptime.back() + ins->t[tour.index].EDT);
+			arrivaltime = ins->breakend;//zoals hieronder service of enkel break in dit geval ervan aftrekken
+		}
+	}
 	Ins::Vertex* y;
 	Ins::Vertex* z;
 	for (int i = 0; i < size - 2; ++i)// depots don't count

@@ -165,7 +165,7 @@ void solve_dataset(int testruns)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins instance("100.2.3.3.txt");
+	Ins instance("20.1.3.2.txt");
 	instance.read_neighbourhood();
 	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	resdataset.push_back(acs.solve());

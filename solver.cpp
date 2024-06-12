@@ -278,6 +278,10 @@ Res Aco::solve()
 				construct(s[ant]);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
+				//if ((iter == 1) && (ant == 6))
+				//{
+					//cout << "debug" << endl;
+				//}
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
 				swap2_nb(s[ant], 1);

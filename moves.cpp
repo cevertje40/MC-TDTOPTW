@@ -89,7 +89,8 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 		}//end for al paths
 		if (improvement)
 		{
-			insert:
+		insert:
+			Sol remember = sol;
 			sol.insertvertex(*besttour, candidate, position);
 			//try to pull break if the break is still positioned at the end depot
 			int end = (int) besttour->seq.size();
@@ -255,6 +256,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 				pull_break(sol, besttour->index);
 			}
 			sol.check();
+			//cout << "hier" << endl;
 		}//end if improvement
 	}//end while improvement
 }

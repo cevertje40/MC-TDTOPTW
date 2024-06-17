@@ -55,7 +55,7 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 							double shift = (arrivaltime - ins->t[t].EDT) - tour->deptime[j + 1];//increase in travel time
 							if (shift <= tour->max_shift[j + 1])//check of het punt geinsert kan worden
 							{
-								improvement = true;
+								
 								double weightavail = ins->t[t].W_max - tour->weight;
 								double volumeavail = ins->t[t].V_max - tour->volume;
 								double ratiocheck;
@@ -72,6 +72,7 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 								//ratiocheck = (double(y->score*y->score) / shift)*(1 + function)*(volumeavail / y->volume);
 								if (ratiocheck > bestratio)//enkel op minimale increase checken
 								{//update candidates
+									improvement = true;
 									bestratio = ratiocheck;
 									position = j;
 									candidate = y;
@@ -1443,6 +1444,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			Ins::Vertex *b = beste->seq[bestj];
 			sol.replacevertex(*bestd, b, besti,true);
 			sol.replacevertex(*beste, x, bestj,true);
+			sol.available[bestd->seq[besti]->index] = false;
 			double actualdecrease = 0.0;
 			for (int t = 0; t < (int) sol.tours.size(); ++t)
 			{

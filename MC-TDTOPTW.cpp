@@ -1,6 +1,12 @@
 // MC-TDTOPTW.cpp
 
 #include "solver.h"
+string set1 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\1set\\";
+string set2 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\";
+string set3 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\3set\\";
+string set4 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set1\\";
+string set5 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\";
+string set6 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set3\\";
 
 using namespace std;
 
@@ -174,7 +180,7 @@ void debug_instance()
 void debug_ctop()
 {
 	vector<Res> resdataset;
-	Ins::CTOP textfile = { "..\\..\\datasets\\CTOP\\","b30.txt" };
+	Ins::CTOP textfile = {set1,"b8.txt"};
 	Ins instance(textfile);
 	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	resdataset.push_back(acs.solve());

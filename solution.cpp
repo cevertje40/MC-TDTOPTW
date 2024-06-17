@@ -192,10 +192,27 @@ void Sol::check()
 		}
 
 	}//end for all d
-	for (int i = 1; i < ins->maxvertices; ++i)//enddepot are multiply included
+	for (int i = 1; i < ins->maxvertices-1; ++i)//depot can be included multiple times
 	{
-		if (included[i] > 1)
+		if (included[i] > 1)//regular vertex included more than once
+		{
 			cout << red << "FAILURE!!! inclusion check fails for vertex:" << i << endl;
+		}
+		if (included[i] == 1)
+		{
+			if (available[i] == true)
+			{
+				cout << red << "error in availability bitset for vertex: " << i << endl;
+			}
+		}
+		if (included[i] == 0)
+		{
+			if (available[i] == false)
+			{
+				cout << red << "error in availability bitset for vertex: " << i << endl;
+			}
+		}
+
 	}
 	// 6.score check
 	if (scorecheck != score)

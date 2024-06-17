@@ -278,15 +278,11 @@ Res Aco::solve()
 				construct(s[ant]);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
 				swap2_nb(s[ant], 1);
-				//if ((iter == 355) && (ant == 19))
-				//{
-					//cout << "debug" << endl;
-				//}
 				move_nb(s[ant], 1);
+				insert_nb(s[ant], 1);
 			}
 		}
 		update_global_best();//best solution is stored
@@ -297,7 +293,7 @@ Res Aco::solve()
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
 	cout << gb << endl;
-	cout << "debug before window closure" << endl;
+	cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
 	return Res(gb.score,cpuTime);
 }
 

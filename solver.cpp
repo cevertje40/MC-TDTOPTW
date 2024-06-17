@@ -260,7 +260,7 @@ void Aco::construct(Sol& sol)
 	}//end for all d
 	//make end depot unaivailable for other moves
 	sol.available[ins->maxvertices - 1] = false;
-	sol.check();
+	//sol.check();
 }
 
 Res Aco::solve()

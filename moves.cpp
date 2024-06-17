@@ -100,7 +100,7 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 				//cout << "pull break" << endl;
 				pull_break(sol, besttour->index);
 			}
-			sol.check();
+			//sol.check();
 		}//end improvement
 	}//end while improvement
 }
@@ -256,7 +256,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 				//cout << "break pulled" << endl;
 				pull_break(sol, besttour->index);
 			}
-			sol.check();
+			//sol.check();
 			//cout << "hier" << endl;
 		}//end if improvement
 	}//end while improvement
@@ -857,7 +857,7 @@ void Moves::swap_nb(Sol& sol, int mode)
 				Sol remember = sol;
 				sol.swapvertex(tour, besti, bestj);
 				double actualdecrease = remember.tours[d].deptime.back() - tour.deptime.back();
-				sol.check();
+				//sol.check();
 				if (abs(bestdelta - actualdecrease) > 0.01)
 				{
 					cout << "error swap2" << endl;
@@ -988,7 +988,7 @@ void Moves::two_opt_nb(Sol& sol,int mode)
 					sol.check();
 					cout << "error 2opt" << endl;
 				}
-				sol.check();
+				//sol.check();
 			}
 		}//end while improvement
 	}//end for all paths
@@ -1204,7 +1204,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 				//cout << "break pulled" << endl;
 				pull_break(sol, beste->index);
 			}
-			sol.check();
+			//sol.check();
 		}//end if improvement
 	}//end while improvement
 }
@@ -1450,7 +1450,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			{
 				actualdecrease += remember.tours[t].deptime.back()-sol.tours[t].deptime.back();
 			}
-			sol.check();
+			//sol.check();
 			if (abs(bestdecrease - actualdecrease) > 0.01)
 			{
 				

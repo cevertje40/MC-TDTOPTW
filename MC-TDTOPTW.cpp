@@ -180,7 +180,7 @@ void debug_instance()
 void debug_ctop()
 {
 	vector<Res> resdataset;
-	Ins::CTOP textfile = {set1,"b8.txt"};
+	Ins::CTOP textfile = {set6,"b30.txt"};
 	Ins instance(textfile);
 	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	resdataset.push_back(acs.solve());

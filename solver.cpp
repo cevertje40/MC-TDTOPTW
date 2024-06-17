@@ -16,7 +16,7 @@ Aco::Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_
 			tau[i][j] = 1.0;
 			if (i != j)
 			{
-				eta[i][j] = ins.v[j].score / (ins.v[i].con[j]->determin);
+				eta[i][j] = max(0.001,ins.v[j].score) / (ins.v[i].con[j]->determin);
 			}
 			else
 				eta[i][j] = 0.0;
@@ -278,13 +278,14 @@ Res Aco::solve()
 				construct(s[ant]);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				//if ((iter == 1) && (ant == 6))
-				//{
-					//cout << "debug" << endl;
-				//}
+				
 				insert_nb(s[ant], 1);
 				replace_nb(s[ant], 1);
 				swap2_nb(s[ant], 1);
+				//if ((iter == 355) && (ant == 19))
+				//{
+					//cout << "debug" << endl;
+				//}
 				move_nb(s[ant], 1);
 			}
 		}

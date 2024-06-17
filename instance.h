@@ -6,6 +6,18 @@ using namespace std;
 class Ins//problem instance class that stores all required information f
 {
 public:
+	struct MCTDTOPTW 
+	{
+		string path;
+		string name;
+		
+	};
+
+	struct CTOP {
+		string path;
+		string name;
+	};
+
 	class Connec
 	{
 	public:
@@ -58,7 +70,6 @@ public:
 		Tour(int id, int index, Vertex* startv, Vertex* endv, double EDT, double LAT, double T_max, double W_max, double V_max) : id(id), index(index), startv(startv), endv(endv), EDT(EDT), LAT(LAT), T_max(T_max), W_max(W_max), V_max(V_max) {}
 	};
 
-	string name;
 	int maxvertices;
 	int maxtours;
 	double breakstart;
@@ -70,13 +81,16 @@ public:
 	vector<Tour> t;//tour objects
 	default_random_engine engine;
 
-	Ins(string filename);//construct instance by reading file
+	
+	Ins(struct MCTDTOPTW);//construct instance by reading file
+	Ins(struct CTOP);//convert CTOP instance
+
 	void construct_time_independent_traveltime(Graph& graph);
 	void construct_time_dependent_traveltime(Graph& graph);
 	void read_time_independent_traveltime();
 	void read_time_dependent_traveltime();
-	void create_neighbourhood(int amnt_nb);
-	void read_neighbourhood();
+	void create_neighbourhood(string path, string name,int amnt_nb);
+	void read_neighbourhood(string path,string name);
 	
 	/**acces of c object methods*/
 	int find_t(double time);

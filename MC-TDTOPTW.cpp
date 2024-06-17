@@ -155,8 +155,8 @@ void solve_dataset(int testruns)
 	for (it = files.begin(); it != files.end(); ++it)
 	{
 		cout << *it << endl;
-		Ins instance(*it);
-		instance.read_neighbourhood();
+		Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\", *it};
+		Ins instance(textfile);
 		Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 		resdataset.push_back(acs.solve());
 	}
@@ -165,14 +165,23 @@ void solve_dataset(int testruns)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins instance("20.1.3.2.txt");
-	instance.read_neighbourhood();
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.3.3.3.txt" };
+	Ins instance(textfile);
+	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+	resdataset.push_back(acs.solve());
+}
+
+void debug_ctop()
+{
+	vector<Res> resdataset;
+	Ins::CTOP textfile = { "..\\..\\datasets\\CTOP\\","b30.txt" };
+	Ins instance(textfile);
 	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	resdataset.push_back(acs.solve());
 }
 
 int main()
 {
-	solve_dataset(1);
-	//debug_instance();
+	//solve_dataset(1);
+	debug_ctop();
 }

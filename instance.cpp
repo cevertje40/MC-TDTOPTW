@@ -79,14 +79,12 @@ void Ins::read_time_dependent_traveltime()
 	}
 }
 
-Ins::Ins(string filename)
+Ins::Ins(MCTDTOPTW textfile)
 {
-	name = filename;
 	//read in vertex and tour information from txt file and populate v and t objects
-	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
 	FILE* file = NULL;
 	ifstream ifs;
-	ifs.open(filepath + filename, ifstream::in);
+	ifs.open(textfile.path + textfile.name, ifstream::in);
 	if (ifs.is_open())
 	{
 
@@ -140,11 +138,163 @@ Ins::Ins(string filename)
 		cout << " can not open MC-TDTOPTW instance file" << endl;
 	}
 	//read in travel time information
-	c.clear();
-	c.resize(maxvertices * maxvertices);
 	read_time_independent_traveltime();
 	read_time_dependent_traveltime();
+	//create or read neighborhood
+	read_neighbourhood(textfile.path,textfile.name);
 
+}
+
+Ins::Ins(CTOP textfile)
+{
+	FILE* file = NULL;
+	ifstream ifs;
+	string filepath = textfile.path + textfile.name;
+	ifs.open(filepath, ifstream::in);
+	if (ifs.is_open())
+	{
+		string line;
+		string dump;
+		vector<double> x_coordinates;//initialised in read_in
+		vector<double> y_coordinates;//initialised in read_in
+		double C_max;
+		double T_max;
+		getline(ifs, line);//first line contains name
+		getline(ifs, line);//second line is empty
+		getline(ifs, line);//third line max vehicles
+		stringstream str(line);//store line as stringstream
+		str >> dump;
+		str >> maxtours;
+		getline(ifs, line);//fourth line maximum capacity
+		str = stringstream(line);
+		str >> dump;
+		str >> C_max;
+		getline(ifs, line);//fifth line maximum time
+		str = stringstream(line);//store line as stringstream
+		str >> dump;
+		str >> T_max;
+		getline(ifs, line);//sixth line is empty
+		getline(ifs, line);//seventh line depot coordinates
+		str = stringstream(line);//store line as stringstream
+		str >> dump;
+		double depotx = 0.0;
+		double depoty = 0.0;
+		str >> depotx;
+		str >> depoty;
+		getline(ifs, line);//eight line is empty
+		getline(ifs, line);//ninth line is maxvertices
+		str = stringstream(line);//store line as stringstream
+		str >> dump;
+		str >> maxvertices;
+		maxvertices += 2;//add two vertices for the depots
+		x_coordinates.resize(maxvertices, 0);
+		y_coordinates.resize(maxvertices, 0);
+		x_coordinates[0] = depotx;
+		y_coordinates[0] = depoty;
+		x_coordinates[maxvertices - 1] = depotx;
+		y_coordinates[maxvertices - 1] = depoty;
+		v.resize(maxvertices);
+		t.resize(maxtours);
+		c.resize(maxvertices * maxvertices);
+		getline(ifs, line);//tenth line is empty
+		getline(ifs, line);//eleventh line is text
+		//regular vertices creation
+		for (int i = 1; i < maxvertices - 1; ++i)//read maxvertices-2 amount regular vertices
+		{
+			v[i].id = i;
+			v[i].index = i;
+			getline(ifs, line);
+			str = stringstream(line);
+			str >> x_coordinates[i];
+			str >> y_coordinates[i];
+			str >> v[i].weight;
+			v[i].volume = v[i].weight;
+			str >> v[i].serv;
+			str >> v[i].score;
+			v[i].LTW.resize(maxtours);
+			v[i].UTW.resize(maxtours);
+			for (int tour = 0; tour < maxtours; ++tour)
+			{
+				v[i].LTW[tour] = time_periods[0];
+				v[i].UTW[tour] = time_periods[0] + T_max;
+			}
+		}
+		ifs.close();
+		//start & end depot creation
+		v[0].id = 0;
+		v[0].index = 0;
+		v[0].score = 0;
+		v[0].serv = 0;
+		v[0].weight = 0;
+		v[0].volume = 0;
+		v[0].LTW.resize(maxtours);
+		v[0].UTW.resize(maxtours);
+		for (int tour = 0; tour < maxtours; ++tour)
+		{
+			v[0].LTW[tour] = time_periods[0];
+			v[0].UTW[tour] = time_periods[0] + T_max;
+		}
+		v[maxvertices - 1].id = maxvertices - 1;
+		v[maxvertices - 1].index = maxvertices - 1;
+		v[maxvertices - 1].score = 0;
+		v[maxvertices - 1].serv = 0;
+		v[maxvertices - 1].weight = 0;
+		v[maxvertices - 1].volume = 0;
+		v[maxvertices - 1].LTW.resize(maxtours);
+		v[maxvertices - 1].UTW.resize(maxtours);
+		for (int tour = 0; tour < maxtours; ++tour)
+		{
+			v[maxvertices - 1].LTW[tour] = time_periods[0];
+			v[maxvertices - 1].UTW[tour] = time_periods[0] + T_max;
+		}
+
+		// route setup
+		for (int tour = 0; tour < maxtours; ++tour)
+		{
+			t[tour].index = tour;
+			t[tour].id = tour + 1;
+			t[tour].T_max = T_max;
+			t[tour].W_max = C_max;//CTOP only has one capacity constraint
+			t[tour].V_max = C_max;//CTOP only has one capacity constraint
+			t[tour].EDT = time_periods[0];
+			t[tour].LAT = time_periods[0] + T_max;
+			t[tour].startv = &v[0];
+			t[tour].endv = &v[maxvertices - 1];
+		}
+		//break setup
+		breakstart = time_periods[0];
+		breakdur = 0.0;
+		breakend = DBL_MAX;
+
+		//construct travel time matrix
+		for (int i = 0; i < maxvertices; ++i)
+		{
+			v[i].con.resize(maxvertices);
+			for (int j = 0; j < maxvertices; ++j)
+			{
+				int counter = i * maxvertices + j;
+				c[counter].from = i;
+				c[counter].to = j;
+				//calculate euclidean distance
+				c[counter].determin = sqrt(pow(x_coordinates[i] - x_coordinates[j], 2) + pow(y_coordinates[i] - y_coordinates[j], 2));
+				c[counter].mu.resize(maxtimeslots);
+				c[counter].nu.resize(maxtimeslots);
+				for (int t = 0; t < maxtimeslots; ++t)
+				{
+					c[counter].mu[t] = 0.0;
+					c[counter].nu[t] = c[counter].determin;
+				}
+				v[i].con[j] = &c[counter];
+			}
+		}
+
+		//read or construct neigbourhood
+		read_neighbourhood(textfile.path, textfile.name);
+	}
+	else
+	{
+		cout << endl << " can not open CTOP instance file" << endl;;
+	}
 }
 
 void Ins::construct_time_independent_traveltime(Graph& graph)
@@ -257,7 +407,7 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 	}
 }
 
-void Ins::create_neighbourhood(int amnt_nb)
+void Ins::create_neighbourhood(string path, string name, int amnt_nb)
 {
 	#pragma omp parallel
 	{//start parallel session
@@ -329,8 +479,7 @@ void Ins::create_neighbourhood(int amnt_nb)
 		}
 	}//end parallel
 	ofstream file;
-	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
-	file.open(filepath+"nb" + name);
+	file.open(path+"nb" + name);
 	for (int i = 0; i < maxvertices; ++i)//for all regular vertices
 	{
 		for (int d = 0; d < maxtours; ++d)
@@ -346,12 +495,11 @@ void Ins::create_neighbourhood(int amnt_nb)
 	file.close();
 }//end neighbourhood
 
-void Ins::read_neighbourhood()
+void Ins::read_neighbourhood(string path,string name)
 {
 	//read nearest bemobile node
 	ifstream file;
-	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
-	file.open(filepath+"nb"+name);
+	file.open(path+"nb"+name);
 	if (file.is_open())
 	{
 		string value;
@@ -382,15 +530,15 @@ void Ins::read_neighbourhood()
 	}
 	else
 	{
-		cout << "error reading neighborhood" << endl;
-		create_neighbourhood(45);
+		cout << "can not find neighborhood file" << endl;
+		create_neighbourhood(path,name,500);
 	}
 }
 
 inline int Ins::find_t(double time)
 {
 	int t = (int)floor((time - time_periods[0]) / 0.25);//when you change the time unit this has to change too
-	return t;
+	return min(55,t);
 }
 
 double Ins::travel_time(Connec* c, double start)

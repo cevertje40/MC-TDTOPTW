@@ -1072,6 +1072,10 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 									//break niet meetellen voor local evaluation
 									if ((reqbreak) && ((max(y->LTW[d]-ins->breakdur,arrivaltime) >= ins->breakstart) || (y->index == ins->maxvertices - 1)))
 									{//break na y wordt bij global evaluation in rekening gebracht
+										if (arrivaltime > ins->breakend)//pushing to break to right after removal does not work
+										{
+											continue;
+										}
 										reqbreak = false;
 										breaky = 1;
 										arrivaltime += ins->breakdur;
@@ -1104,6 +1108,11 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 											double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
 											if ((reqbreak) && ((max(p->LTW[d]-ins->breakdur,arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
 											{
+												if (arrivaltime > ins->breakend)//pushing to break to right after removal does not work
+												{
+													currenttime = DBL_MAX;
+													break;
+												}
 												breakp = 1;
 												reqbreak = false;
 												arrivaltime += ins->breakdur;

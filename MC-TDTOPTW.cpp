@@ -186,6 +186,17 @@ void debug_ctop()
 	resdataset.push_back(acs.solve());
 }
 
+void ctop_gap()
+{
+	//read in best known/optimal score of 6 sets
+	//solve and return best solution + cpu time for each instance
+	//write results to txt
+	//compute gap
+	//calculate avg gap and cpu per set
+	//write results to txt
+
+}
+
 int main()
 {
 	//solve_dataset(1);

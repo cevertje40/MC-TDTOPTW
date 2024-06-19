@@ -3,17 +3,18 @@
 
 class Res
 {
-private:
+public:
 	int score;
 	double time;
 	int bestknown;
 	double gap;
-public:
-	Res(int& score, double& time) :score(score), time(time) {}
+	Res(int& score, double& time) :score(score), time(time), bestknown(0), gap(0.0) {}
 	Res(int& score, double& time,int& bestknown):score(score), time(time), bestknown(bestknown)
 	{
 		gap = (bestknown - score) / bestknown;
+		cout << this << endl;
 	}
+	friend ostream& operator<<(ostream& output, Sol& res);
 };
 
 class Aco: public Moves

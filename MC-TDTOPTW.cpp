@@ -218,14 +218,15 @@ void ctop_gap()
 		filename = "set1.txt";
 	}
 	vector<Dataset> set = read_dataset(filename);
-	vector<Res> resdataset;
+	vector<Res> resset;
 	vector<Dataset>::iterator it;
 	for (it = set.begin(); it != set.end(); ++it)
 	{
 		Ins::CTOP textfile = {it->path,it->filename };
 		Ins instance(textfile);
 		Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
-		resdataset.push_back(acs.solve(it->bestscore));
+		resset.push_back(acs.solve(it->bestscore));
+		cout << "hier" << endl;
 	}
 	//read in best known/optimal score of 6 sets
 	//solve and return best solution + cpu time for each instance

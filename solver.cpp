@@ -263,6 +263,13 @@ void Aco::construct(Sol& sol)
 	//sol.check();
 }
 
+ostream& operator<<(ostream& output, Res& res)
+{
+	output << "test" << "\n";
+	output << "score: " << res.score << " after: " << res.time << " gap: " << res.gap << "\n";
+	return output;
+}
+
 Res Aco::solve(int bestknown)
 {
 	clock_t start, end;

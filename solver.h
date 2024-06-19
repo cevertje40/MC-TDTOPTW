@@ -6,8 +6,14 @@ class Res
 private:
 	int score;
 	double time;
+	int bestknown;
+	double gap;
 public:
 	Res(int& score, double& time) :score(score), time(time) {}
+	Res(int& score, double& time,int& bestknown):score(score), time(time), bestknown(bestknown)
+	{
+		gap = (bestknown - score) / bestknown;
+	}
 };
 
 class Aco: public Moves
@@ -32,7 +38,7 @@ public:
 	Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_sol, double max_ni_p,double p_best);
 	void update_global_best();
 	void pheromone_update();
-	Res solve();
+	Res solve(int bestknown=0);
 };
 
 class Ils : public Moves

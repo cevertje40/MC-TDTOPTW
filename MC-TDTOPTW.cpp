@@ -1,6 +1,22 @@
 // MC-TDTOPTW.cpp
 
 #include "solver.h"
+
+
+class Dataset
+{
+public:
+	string path;
+	string filename;
+	int bestscore;
+ Dataset(string& path, string& filename, int& bestscore) : path(path), filename(filename), bestscore(bestscore) {}
+};
+
+
+
+using namespace std;
+
+
 string set1 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\1set\\";
 string set2 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\";
 string set3 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\3set\\";
@@ -8,7 +24,6 @@ string set4 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set1\\";
 string set5 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\";
 string set6 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set3\\";
 
-using namespace std;
 
 void create_dataset()
 {
@@ -124,18 +139,26 @@ void create_dataset()
 	}//for all maxvertex size values
 }
 
-list <string> read_dataset(string filename)
+vector<Dataset> read_dataset(string filename)
 {//reads in all the dataset names
-	list <string> files; //filenames list with iterator
+	vector<Dataset> set;
+	string path;
 	ifstream ifs;
 	ifs.open(filename, ifstream::in);
 	if (ifs.is_open())
 	{
 		string line;
+		getline(ifs, line);
+		stringstream str(line);
+		path = line;
 		while (getline(ifs, line))//read 1 full line
 		{
-			stringstream str(line);//store line as stringstream
-			files.push_back(line);
+			str=stringstream(line);//store line as stringstream
+			string name;
+			int bestscore;
+			str>> name;
+			str>> bestscore;
+			set.push_back(Dataset(path, name, bestscore));
 		}
 		ifs.close();
 	}
@@ -143,7 +166,7 @@ list <string> read_dataset(string filename)
 	{
 		printf("\ninput error in filenames file");
 	}
-	return files;
+	return set;
 }
 
 void solve_dataset(int testruns)
@@ -155,15 +178,14 @@ void solve_dataset(int testruns)
 	{
 		filename = "all.txt";
 	}
-	list<string> files = read_dataset(filename);
+	vector<Dataset> set = read_dataset(filename);
 	vector<Res> resdataset;
-	list <string>::iterator it;
-	for (it = files.begin(); it != files.end(); ++it)
+	vector<Dataset>::iterator it;
+	for (it = set.begin(); it != set.end(); ++it)
 	{
-		cout << *it << endl;
-		Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\", *it};
+		Ins::MCTDTOPTW textfile = { it->path,it->filename };
 		Ins instance(textfile);
-		Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+		Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
 		resdataset.push_back(acs.solve());
 	}
 }
@@ -188,6 +210,23 @@ void debug_ctop()
 
 void ctop_gap()
 {
+	cout << fixed << setprecision(2) << "enter name of dataset" << endl;
+	string filename;
+	getline(std::cin, filename);
+	if (filename.size() == 0)
+	{
+		filename = "set1.txt";
+	}
+	vector<Dataset> set = read_dataset(filename);
+	vector<Res> resdataset;
+	vector<Dataset>::iterator it;
+	for (it = set.begin(); it != set.end(); ++it)
+	{
+		Ins::CTOP textfile = {it->path,it->filename };
+		Ins instance(textfile);
+		Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
+		resdataset.push_back(acs.solve(it->bestscore));
+	}
 	//read in best known/optimal score of 6 sets
 	//solve and return best solution + cpu time for each instance
 	//write results to txt
@@ -200,5 +239,6 @@ void ctop_gap()
 int main()
 {
 	//solve_dataset(1);
-	debug_ctop();
+	//debug_ctop();
+	ctop_gap();
 }

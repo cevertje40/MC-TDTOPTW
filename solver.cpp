@@ -263,7 +263,7 @@ void Aco::construct(Sol& sol)
 	//sol.check();
 }
 
-Res Aco::solve()
+Res Aco::solve(int bestknown)
 {
 	clock_t start, end;
 	start = clock();
@@ -294,7 +294,7 @@ Res Aco::solve()
 	gb.check();
 	cout << gb << endl;
 	cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
-	return Res(gb.score,cpuTime);
+	return Res(gb.score,cpuTime,bestknown);
 }
 
 Ils::Ils(Ins& ins, int max_it,int max_ni): Moves(ins), max_it(max_it), max_ni(max_ni)

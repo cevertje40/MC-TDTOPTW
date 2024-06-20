@@ -27,7 +27,7 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 					int breakz = tour->action[j + 1];
 					if ((sol.available[y->index]) && (y->nbi[t][z->index]))//y moet buur van z zijn want 
 					{
-						if ((tour->volume + y->volume < ins->t[t].V_max) && (tour->weight + y->weight < ins->t[t].W_max))
+						if ((tour->volume + y->volume <= ins->t[t].V_max) && (tour->weight + y->weight <= ins->t[t].W_max))
 						{//increase in capacity moet nog gecontroleerd worden
 							//gather departure time
 							double currenttime = tour->deptime[j] + ins->t[t].EDT;//service bij x zit hier al in
@@ -135,7 +135,7 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 					if ((sol.available[y->index] * y->score > z->score) && (x->nbi[t][y->index]) && (y->nbi[t][w->index]))//if interesting and possible
 					{
 						//add weight and volume check
-						if((tour->weight + (y->weight - z->weight) < ins->t[t].W_max) && (tour->volume + (y->volume - z->volume) < ins->t[t].V_max))
+						if((tour->weight + (y->weight - z->weight) <= ins->t[t].W_max) && (tour->volume + (y->volume - z->volume) <= ins->t[t].V_max))
 						{
 						
 							int breaky = tour->action[j];
@@ -461,7 +461,6 @@ void Moves::reschedule_breaks(Sol& sol)
 	}//end for all tours
 }//end reschedule_breaks
 
-
 void Moves::exchange(Sol& sol)
 {
 	bool improvement = true;
@@ -557,7 +556,7 @@ void Moves::exchange(Sol& sol)
 				int breakz = bestpathb->action[bestindexb + 1];
 				if ((sol.available[y->index]) && (y->nbi[bestpathb->index][z->index]))
 				{
-					if ((bestpathb->volume + y->nb[bestpathb->index][i]->volume < ins->t[bestpathb->index].V_max) && (bestpathb->weight + y->nb[bestpathb->index][i]->weight < ins->t[bestpathb->index].W_max))
+					if ((bestpathb->volume + y->nb[bestpathb->index][i]->volume <= ins->t[bestpathb->index].V_max) && (bestpathb->weight + y->nb[bestpathb->index][i]->weight <= ins->t[bestpathb->index].W_max))
 					{
 						//gather departure time
 						double currenttime = bestpathb->deptime[bestindexb - 1] + ins->t[bestpathb->index].EDT;//service bij x zit hier al in
@@ -1026,7 +1025,7 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 							Ins::Vertex* b = toure->seq[j + 1];
 							if ((a->nbi[e][x->index]) && (x->nbi[e][b->index]) && (w->nbi[d][y->index]))
 							{
-								if ((toure->weight + x->weight < ins->t[e].W_max) && (toure->volume + x->volume < ins->t[e].V_max))
+								if ((toure->weight + x->weight <= ins->t[e].W_max) && (toure->volume + x->volume <= ins->t[e].V_max))
 								{
 									//local evaluation on path e
 									double ttab = (toure->deptime[j + 1] - (b->serv + toure->action[j + 1] * ins->breakdur)) - toure->deptime[j];
@@ -1241,7 +1240,7 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 							Ins::Vertex* c = toure->seq[j + 2];
 							if ((a->nbi[e][x->index]) && (x->nbi[e][b->index]) && (w->nbi[d][y->index]))
 							{
-								if ((toure->weight + (x->weight-b->weight) < ins->t[e].W_max) && (toure->volume + (x->weight-b->volume) < ins->t[e].V_max)&&(tourd->weight + (b->weight - x->weight) < ins->t[d].W_max)&&(tourd->volume + (b->volume - x->volume) < ins->t[d].V_max))
+								if ((toure->weight + (x->weight-b->weight) <= ins->t[e].W_max) && (toure->volume + (x->weight-b->volume) <= ins->t[e].V_max)&&(tourd->weight + (b->weight - x->weight) <= ins->t[d].W_max)&&(tourd->volume + (b->volume - x->volume) <= ins->t[d].V_max))
 								{//check if a potential increase in volume and weight is allowed on each tour
 									
 									//reset all temp break variables

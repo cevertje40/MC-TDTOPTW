@@ -122,7 +122,7 @@ void Aco::construct(Sol& sol)
 				{
 					if (sol.available[i])
 					{
-						if ((tour.volume + ins->v[i].volume < ins->t[t].V_max) && (tour.weight + ins->v[i].weight < ins->t[t].W_max))
+						if ((tour.volume + ins->v[i].volume <= ins->t[t].V_max) && (tour.weight + ins->v[i].weight <= ins->t[t].W_max))
 						{
 							prob_v[i] = 1;
 						}
@@ -265,7 +265,6 @@ void Aco::construct(Sol& sol)
 
 ostream& operator<<(ostream& output, Res& res)
 {
-	output << "test" << "\n";
 	output << "score: " << res.score << " after: " << res.time << " gap: " << res.gap << "\n";
 	return output;
 }
@@ -292,6 +291,7 @@ Res Aco::solve(int bestknown)
 				insert_nb(s[ant], 1);
 			}
 		}
+		//cout << iter << endl;
 		update_global_best();//best solution is stored
 		pheromone_update();// iteration best solution its arcs are augmented
 	}
@@ -299,9 +299,9 @@ Res Aco::solve(int bestknown)
 	double cpuTime;
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
-	cout << gb << endl;
-	cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
-	return Res(gb.score,cpuTime,bestknown);
+	//cout << gb << endl;
+	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
+	return Res(gb.score, cpuTime, bestknown);
 }
 
 Ils::Ils(Ins& ins, int max_it,int max_ni): Moves(ins), max_it(max_it), max_ni(max_ni)

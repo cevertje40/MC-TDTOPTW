@@ -1,0 +1,11 @@
+..\..\datasets\CTOP\LargeScale CTOP\set1\
+b1.txt	4172
+b2.txt	4784
+b3.txt	5201
+b4.txt	5828
+b5.txt	6445
+b6.txt	7071
+b7.txt	4355
+b8.txt	5194
+b9.txt	6183
+b10.txt	7239

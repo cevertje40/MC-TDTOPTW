@@ -3,9 +3,9 @@ b1.txt	1409
 b2.txt	761
 b3.txt	1327
 b4.txt	1409
-b5.txt	2064
+b5.txt	2065
 b6.txt	3048
 b7.txt	1287
 b8.txt	1710
 b9.txt	2159
-b10.txt	2968
+b10.txt	3066

@@ -9,21 +9,12 @@ public:
 	string path;
 	string filename;
 	int bestscore;
- Dataset(string& path, string& filename, int& bestscore) : path(path), filename(filename), bestscore(bestscore) {}
+	Res result;
+	Dataset(string& path, string& filename, int& bestscore) : path(path), filename(filename), bestscore(bestscore) {}
 };
 
 
-
 using namespace std;
-
-
-string set1 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\1set\\";
-string set2 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\";
-string set3 = "..\\..\\datasets\\CTOP\\DatasetsCTOP\\3set\\";
-string set4 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set1\\";
-string set5 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\";
-string set6 = "..\\..\\datasets\\CTOP\\LargeScale CTOP\\set3\\";
-
 
 void create_dataset()
 {
@@ -201,11 +192,12 @@ void debug_instance()
 
 void debug_ctop()
 {
-	vector<Res> resdataset;
-	Ins::CTOP textfile = {set6,"b30.txt"};
+	Res res;
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b8.txt"};
 	Ins instance(textfile);
 	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
-	resdataset.push_back(acs.solve());
+	res=acs.solve();
+	cout << res.score << " cpu time: " << res.time << endl;
 }
 
 void ctop_gap()
@@ -215,19 +207,33 @@ void ctop_gap()
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set1.txt";
+		filename = "set3.txt";
 	}
+	ofstream output;
+	output.open("output.txt", ios::out);
+	output << "SACS for the CTOP \n";
+	output << "filename,bestscore,score,cpu,gap\n";
+	output.close();
+	//solve the dataset
 	vector<Dataset> set = read_dataset(filename);
-	vector<Res> resset;
 	vector<Dataset>::iterator it;
+	double avggap = 0.0;
 	for (it = set.begin(); it != set.end(); ++it)
 	{
 		Ins::CTOP textfile = {it->path,it->filename };
 		Ins instance(textfile);
-		Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
-		resset.push_back(acs.solve(it->bestscore));
-		cout << "hier" << endl;
+		Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+		it->result=acs.solve(it->bestscore);
+		avggap += it->result.gap;
+		cout <<"name: " << it->filename << " best score: " << it->bestscore<< " ACS score: " << it->result.score<<" cpu time: " << it->result.time <<" gap: " << it->result.gap << endl;
+		output.open("output.txt", ios::out | ios::app);
+		output << it->filename << ";" << it->bestscore << ";" << it->result.score << ";" << it->result.time << ";" << it->result.gap << "\n";
+		output.close();
 	}
+	//calculate dataset performance
+	avggap /= set.size();
+	cout << "average gap of "<< filename <<" is: " << avggap << endl;
+
 	//read in best known/optimal score of 6 sets
 	//solve and return best solution + cpu time for each instance
 	//write results to txt

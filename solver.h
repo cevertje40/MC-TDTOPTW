@@ -8,11 +8,11 @@ public:
 	double time;
 	int bestknown;
 	double gap;
+	Res() {}
 	Res(int& score, double& time) :score(score), time(time), bestknown(0), gap(0.0) {}
 	Res(int& score, double& time,int& bestknown):score(score), time(time), bestknown(bestknown)
 	{
-		gap = (bestknown - score) / bestknown;
-		cout << this << endl;
+		gap = (double(bestknown - score) / bestknown)*100;
 	}
 	friend ostream& operator<<(ostream& output, Sol& res);
 };

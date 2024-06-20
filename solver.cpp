@@ -299,7 +299,7 @@ Res Aco::solve(int bestknown)
 	double cpuTime;
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
-	//cout << gb << endl;
+	cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
 	return Res(gb.score, cpuTime, bestknown);
 }

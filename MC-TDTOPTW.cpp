@@ -195,7 +195,7 @@ void debug_ctop()
 	Res res;
 	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b8.txt"};
 	Ins instance(textfile);
-	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+	Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
 	res=acs.solve();
 	cout << res.score << " cpu time: " << res.time << endl;
 }
@@ -207,7 +207,7 @@ void ctop_gap()
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set3.txt";
+		filename = "set2.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -222,7 +222,7 @@ void ctop_gap()
 	{
 		Ins::CTOP textfile = {it->path,it->filename };
 		Ins instance(textfile);
-		Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+		Aco acs(instance, 1, 2, 0.01, 20, 100000, 0.25, 0.05);
 		it->result=acs.solve(it->bestscore);
 		avggap += it->result.gap;
 		cout <<"name: " << it->filename << " best score: " << it->bestscore<< " ACS score: " << it->result.score<<" cpu time: " << it->result.time <<" gap: " << it->result.gap << endl;
@@ -233,19 +233,11 @@ void ctop_gap()
 	//calculate dataset performance
 	avggap /= set.size();
 	cout << "average gap of "<< filename <<" is: " << avggap << endl;
-
-	//read in best known/optimal score of 6 sets
-	//solve and return best solution + cpu time for each instance
-	//write results to txt
-	//compute gap
-	//calculate avg gap and cpu per set
-	//write results to txt
-
 }
 
 int main()
 {
 	//solve_dataset(1);
-	//debug_ctop();
-	ctop_gap();
+	debug_ctop();
+	//ctop_gap();
 }

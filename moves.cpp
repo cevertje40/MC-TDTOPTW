@@ -59,17 +59,17 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 								double weightavail = ins->t[t].W_max - tour->weight;
 								double volumeavail = ins->t[t].V_max - tour->volume;
 								double ratiocheck;
-								int function = 0;
-								if (shift <= waitz)//als shift=0 of kleiner dan de wait is: speciaal regime toepassen
-								{
-									shift = 1;
-									function = 1;
+								double consumption = 1;
+								if (shift <= waitz)//shift smaller than wait or 0 means there is no time consumption
+								{//avg consumption of 2 resources
+									consumption = ((y->weight / weightavail) + (y->volume / volumeavail))/2;
 								}
-								//ratiocheck = (double(y->score) / shift);
-								//ratiocheck = (double(y->score*y->score) / shift);
-								ratiocheck = (double(y->score * y->score) / shift) * (1 + function);
-								//ratiocheck = (double(y->score*y->score) / shift)*(1 + function)*(weightavail / y->weight);
-								//ratiocheck = (double(y->score*y->score) / shift)*(1 + function)*(volumeavail / y->volume);
+								else
+								{//avg consumption of 3 resources
+									consumption = ((shift / tour->max_shift[j + 1]) + (y->weight / weightavail) + (y->volume / volumeavail))/3;
+								}
+								ratiocheck = (double(y->score * y->score) / consumption);
+								//double ratiocheck = y->score / max(shift, 0);
 								if (ratiocheck > bestratio)//enkel op minimale increase checken
 								{//update candidates
 									improvement = true;
@@ -215,19 +215,26 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 								}
 								if(breakcheck)
 								{//
-									improvement = true;
-									double ratiocheck;
-									if (increase <= 0)
-									{
-										ratiocheck = y->score - z->score;
-									}
-									else
-									{
-										ratiocheck = double(y->score - z->score) / increase;
-
-									}
+									
+									//double ratiocheck;
+									//double weightincrease= (y->weight - z->weight);
+									//double weightavailable=ins->t[t].W_max-tour->weight;
+									//double volumeincrease= (y->volume - z->volume);
+									//double volumeavailable=ins->t[t].V_max-tour->volume;
+									//double consumption = 1;
+									//if (increase <= 0)//shift smaller than wait or 0 means there is no time consumption
+									//{//avg consumption of 2 resources
+									//	consumption = (weightincrease/weightavailable) + (volumeincrease/volumeavailable) / 2;
+									//}
+									//else
+									//{//avg consumption of 3 resources
+									//	consumption = ((increase/ tour->max_shift[j + 1]) + (weightincrease/weightavailable) + (volumeincrease/volumeavailable)) / 3;
+									//}
+									//ratiocheck = double(y->score - z->score) / consumption;
+									double ratiocheck = double(y->score - z->score);
 									if (ratiocheck > bestratio)//enkel op minimale increase checken
 									{
+										improvement = true;
 										bestratio = ratiocheck;
 										position = j;
 										candidate = y;

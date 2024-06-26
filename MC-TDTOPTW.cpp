@@ -186,17 +186,21 @@ void debug_instance()
 	vector<Res> resdataset;
 	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.3.3.3.txt" };
 	Ins instance(textfile);
-	Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+	Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	resdataset.push_back(acs.solve());
 }
 
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b8.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b82.txt"};
 	Ins instance(textfile);
-	Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
-	res=acs.solve();
+
+	Ils ils(instance, 10000, 10, 20, 30);
+	res = ils.solve();
+
+	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
+	//res=acs.solve();
 	cout << res.score << " cpu time: " << res.time << endl;
 }
 
@@ -222,8 +226,10 @@ void ctop_gap()
 	{
 		Ins::CTOP textfile = {it->path,it->filename };
 		Ins instance(textfile);
-		Aco acs(instance, 1, 2, 0.01, 20, 100000, 0.25, 0.05);
-		it->result=acs.solve(it->bestscore);
+		//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+		//it->result=acs.solve(it->bestscore);
+		Ils ils(instance, 10000, 10, 20, 30);
+		it->result = ils.solve(it->bestscore);
 		avggap += it->result.gap;
 		cout <<"name: " << it->filename << " best score: " << it->bestscore<< " ACS score: " << it->result.score<<" cpu time: " << it->result.time <<" gap: " << it->result.gap << endl;
 		output.open("output.txt", ios::out | ios::app);
@@ -238,6 +244,6 @@ void ctop_gap()
 int main()
 {
 	//solve_dataset(1);
-	debug_ctop();
-	//ctop_gap();
+	//debug_ctop();
+	ctop_gap();
 }

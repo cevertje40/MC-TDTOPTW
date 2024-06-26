@@ -430,6 +430,7 @@ void Sol::removevertex(Sol::Tour& tour, int position)
 	available[candidate->index] = false;
 	tour.seq.erase(tour.seq.begin() + position);//insert point y after x
 	tour.deptime.erase(tour.deptime.begin() + position);//insert temporary value
+	tour.max_shift.erase(tour.max_shift.begin() + position);
 	tour.action.erase(tour.action.begin() + position);//insert regular visit action change later when necessary
 	tour.score -= candidate->score;// update score of the new solution
 	score -= candidate->score;// update score of the new solution

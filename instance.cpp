@@ -217,7 +217,7 @@ Ins::Ins(CTOP textfile)
 			for (int tour = 0; tour < maxtours; ++tour)
 			{
 				v[i].LTW[tour] = time_periods[0];
-				v[i].UTW[tour] = time_periods[0] + T_max+1;
+				v[i].UTW[tour] = time_periods[0] + T_max;
 			}
 		}
 		ifs.close();
@@ -233,7 +233,7 @@ Ins::Ins(CTOP textfile)
 		for (int tour = 0; tour < maxtours; ++tour)
 		{
 			v[0].LTW[tour] = time_periods[0];
-			v[0].UTW[tour] = time_periods[0] + T_max+1;
+			v[0].UTW[tour] = time_periods[0] + T_max;
 		}
 		v[maxvertices - 1].id = maxvertices - 1;
 		v[maxvertices - 1].index = maxvertices - 1;
@@ -246,19 +246,19 @@ Ins::Ins(CTOP textfile)
 		for (int tour = 0; tour < maxtours; ++tour)
 		{
 			v[maxvertices - 1].LTW[tour] = time_periods[0];
-			v[maxvertices - 1].UTW[tour] = time_periods[0] + T_max+1;
+			v[maxvertices - 1].UTW[tour] = time_periods[0] + T_max;
 		}
 
 		// route setup
 		for (int tour = 0; tour < maxtours; ++tour)
 		{
 			t[tour].index = tour;
-			t[tour].id = tour + 1;
-			t[tour].T_max = T_max+1;
-			t[tour].W_max = C_max+1;//CTOP only has one capacity constraint
-			t[tour].V_max = C_max+1;//CTOP only has one capacity constraint
+			t[tour].id = tour;
+			t[tour].T_max = T_max;
+			t[tour].W_max = C_max;//CTOP only has one capacity constraint
+			t[tour].V_max = C_max;//CTOP only has one capacity constraint
 			t[tour].EDT = time_periods[0];
-			t[tour].LAT = time_periods[0] + T_max+1;
+			t[tour].LAT = time_periods[0] + T_max;
 			t[tour].startv = &v[0];
 			t[tour].endv = &v[maxvertices - 1];
 		}

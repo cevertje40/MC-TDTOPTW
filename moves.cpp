@@ -56,20 +56,20 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 							if (shift <= tour->max_shift[j + 1])//check of het punt geinsert kan worden
 							{
 								
-								double weightavail = ins->t[t].W_max - tour->weight;
-								double volumeavail = ins->t[t].V_max - tour->volume;
-								double ratiocheck;
-								double consumption = 1;
-								if (shift <= waitz)//shift smaller than wait or 0 means there is no time consumption
-								{//avg consumption of 2 resources
-									consumption = ((y->weight / weightavail) + (y->volume / volumeavail))/2;
-								}
-								else
-								{//avg consumption of 3 resources
-									consumption = ((shift / tour->max_shift[j + 1]) + (y->weight / weightavail) + (y->volume / volumeavail))/3;
-								}
-								ratiocheck = (double(y->score * y->score) / consumption);
-								//double ratiocheck = y->score / max(shift, 0);
+								//double weightavail = ins->t[t].W_max - tour->weight;
+								//double volumeavail = ins->t[t].V_max - tour->volume;
+								//double ratiocheck;
+								//double consumption = 1;
+								//if (shift <= waitz)//shift smaller than wait or 0 means there is no time consumption
+								//{//avg consumption of 2 resources
+									//consumption = ((y->weight / weightavail) + (y->volume / volumeavail))/2;
+								//}
+								//else
+								//{//avg consumption of 3 resources
+									//consumption = ((shift / tour->max_shift[j + 1]) + (y->weight / weightavail) + (y->volume / volumeavail))/3;
+								//}
+								//ratiocheck = (double(y->score * y->score) / consumption);
+								double ratiocheck = y->score / y->weight;
 								if (ratiocheck > bestratio)//enkel op minimale increase checken
 								{//update candidates
 									improvement = true;
@@ -231,7 +231,8 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 									//	consumption = ((increase/ tour->max_shift[j + 1]) + (weightincrease/weightavailable) + (volumeincrease/volumeavailable)) / 3;
 									//}
 									//ratiocheck = double(y->score - z->score) / consumption;
-									double ratiocheck = double(y->score - z->score);
+									//double ratiocheck = double(y->score - z->score);
+									double ratiocheck = double(y->score - z->score) / max(1, (y->weight - z->weight));
 									if (ratiocheck > bestratio)//enkel op minimale increase checken
 									{
 										improvement = true;

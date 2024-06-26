@@ -288,7 +288,6 @@ Ins::Ins(CTOP textfile)
 				v[i].con[j] = &c[counter];
 			}
 		}
-
 		//read or construct neigbourhood
 		read_neighbourhood(textfile.path, textfile.name);
 	}
@@ -469,16 +468,17 @@ void Ins::create_neighbourhood(string path, string name, int amnt_nb)
 				v[i].nbi[d][i] = true;
 			}//end for d
 		}//end for i
-		//and enddepot to enddepot
-		v[maxvertices - 1].nb.resize(maxtours);
-		v[maxvertices - 1].nbi.resize(maxtours);
-		for (int d = 0; d < maxtours; ++d)
-		{
-			v[maxvertices - 1].nbi[d] = boost::dynamic_bitset<>(maxvertices);
-			v[maxvertices - 1].nb[d].push_back(&v[maxvertices - 1]);
-			v[maxvertices - 1].nbi[d][maxvertices - 1] = true;
-		}
 	}//end parallel
+	//and enddepot to enddepot
+	v[maxvertices - 1].nb.resize(maxtours);
+	v[maxvertices - 1].nbi.resize(maxtours);
+	for (int d = 0; d < maxtours; ++d)
+	{
+		v[maxvertices - 1].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+		//v[maxvertices - 1].nbi[d].set(0);
+		v[maxvertices - 1].nb[d].push_back(&v[maxvertices - 1]);
+		v[maxvertices - 1].nbi[d][maxvertices - 1] = true;
+	}
 	ofstream file;
 	file.open(path+"nb" + name);
 	for (int i = 0; i < maxvertices; ++i)//for all regular vertices

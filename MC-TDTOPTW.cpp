@@ -196,7 +196,7 @@ void debug_ctop()
 	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b82.txt"};
 	Ins instance(textfile);
 
-	Ils ils(instance, 10000, 10, 20, 30);
+	Ils ils(instance, 10000, 100, 20, 30);
 	res = ils.solve();
 
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
@@ -222,15 +222,17 @@ void ctop_gap()
 	vector<Dataset> set = read_dataset(filename);
 	vector<Dataset>::iterator it;
 	double avggap = 0.0;
+	double avgscore = 0.0;
 	for (it = set.begin(); it != set.end(); ++it)
 	{
 		Ins::CTOP textfile = {it->path,it->filename };
 		Ins instance(textfile);
-		//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+		//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 		//it->result=acs.solve(it->bestscore);
-		Ils ils(instance, 10000, 10, 20, 30);
+		Ils ils(instance, 10000, 1000, 2, 3);
 		it->result = ils.solve(it->bestscore);
 		avggap += it->result.gap;
+		avgscore += it->result.score;
 		cout <<"name: " << it->filename << " best score: " << it->bestscore<< " ACS score: " << it->result.score<<" cpu time: " << it->result.time <<" gap: " << it->result.gap << endl;
 		output.open("output.txt", ios::out | ios::app);
 		output << it->filename << ";" << it->bestscore << ";" << it->result.score << ";" << it->result.time << ";" << it->result.gap << "\n";
@@ -238,7 +240,8 @@ void ctop_gap()
 	}
 	//calculate dataset performance
 	avggap /= set.size();
-	cout << "average gap of "<< filename <<" is: " << avggap << endl;
+	avgscore /= set.size();
+	cout << "average gap of "<< filename <<" is: " << avggap <<" avg score: "<<avgscore << endl;
 }
 
 int main()

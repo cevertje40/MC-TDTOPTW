@@ -20,7 +20,7 @@ Sol::Sol(Ins& ins) :ins(&ins)
 		tours[t].index = t;
 		tourindex.push_back(t);
 	}
-	shuffle(tourindex.begin(), tourindex.end(), ins.engine);
+	shuffle(tourindex.begin(), tourindex.end(),engine);
 	score = 0;
 	available = boost::dynamic_bitset<>(ins.maxvertices);
 	available.set();//sets all bits to true

@@ -226,7 +226,7 @@ void Aco::construct(Sol& sol)
 			double total = 0.0;
 			int sel = 0;
 			uniform_real_distribution<double> dist(0, 1);
-			double random = dist(mt);
+			double random = dist(engine);
 			while (random >= total)
 			{
 				total += prob_v[sel];
@@ -431,7 +431,7 @@ void Ils::construct(Sol& sol)
 			double total = 0.0;
 			int sel = 0;
 			uniform_real_distribution<double> dist(0, 1);
-			double random = dist(mt);
+			double random = dist(engine);
 			while (random >= total)
 			{
 				total += prob_v[sel];
@@ -486,6 +486,7 @@ void Ils::shake(Sol& sol, int post, int cons)
 		}
 		for (int i = 0; i < cons; ++i)
 		{
+			//remove vertices one by one at position post
 			sol.score-= tour.seq[post]->score;
 			tour.score-= tour.seq[post]->score;
 			tour.weight-= tour.seq[post]->weight;
@@ -496,7 +497,7 @@ void Ils::shake(Sol& sol, int post, int cons)
 			tour.max_shift.erase(tour.max_shift.begin() + post);
 			tour.action.erase(tour.action.begin() + post);
 			if (post == tour.seq.size() - 1)
-			{//removal has reached last regular vertex, start from beginning
+			{//removal has reached last regular vertex, continue from beginning
 				post = 1;
 				breakupdate = true;//if you remove the first vertex of the route a breakupdate is required
 			}

@@ -79,7 +79,6 @@ public:
 	vector<Vertex> v;//vertex objects
 	vector<Connec> c;//connection objects
 	vector<Tour> t;//tour objects
-	default_random_engine engine;
 
 	
 	Ins(struct MCTDTOPTW);//construct instance by reading file

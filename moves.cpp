@@ -1,8 +1,9 @@
 #include "moves.h"
 
-void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to increase the score
+bool Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to increase the score
 {
 	bool improvement = true;
+	bool succes = false;
 	while (improvement)
 	{
 		improvement = false;
@@ -101,14 +102,17 @@ void Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to
 				pull_break(sol, besttour->index);
 			}
 			//sol.check();
+			succes = true;
 		}//end improvement
 	}//end while improvement
+	return succes;
 }
 
-void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non included vertex in order to increase the score
+bool Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non included vertex in order to increase the score
 {
 	//1.repeat until no improvement can be found
 	bool improvement = true;
+	bool succes = false;
 	while (improvement)
 	{
 		improvement = false;
@@ -266,8 +270,10 @@ void Moves::replace_nb(Sol& sol, int mode)//replace a vertex of a tour with non 
 			}
 			//sol.check();
 			//cout << "hier" << endl;
+			succes = true;
 		}//end if improvement
 	}//end while improvement
+	return succes;
 }
 
 void Moves::pull_break(Sol& sol, int t)
@@ -469,9 +475,10 @@ void Moves::reschedule_breaks(Sol& sol)
 	}//end for all tours
 }//end reschedule_breaks
 
-void Moves::exchange(Sol& sol)
+bool Moves::exchange(Sol& sol)
 {
 	bool improvement = true;
+	bool succes = false;
 	while (improvement)
 	{
 		improvement = false;
@@ -727,6 +734,7 @@ void Moves::exchange(Sol& sol)
 					departuretime -= f->serv + breakf * ins->breakdur;
 					arrivaltime = departuretime;
 				}// end for vz
+				succes = true;
 			}
 			else
 			{
@@ -735,14 +743,16 @@ void Moves::exchange(Sol& sol)
 				bestpathb->volume += exch->volume;
 				bestpathb->weight += exch->weight;
 			}
-			sol.check();
+			//sol.check();
 		}//end if improvement
 	}//end while improvement
-}
+	return succes;
+}//end exchange
 
 
-void Moves::swap_nb(Sol& sol, int mode)
+bool Moves::swap_nb(Sol& sol, int mode)
 {
+	bool succes = false;
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		Sol::Tour& tour = sol.tours[d];
@@ -869,13 +879,16 @@ void Moves::swap_nb(Sol& sol, int mode)
 				{
 					cout << "error swap2" << endl;
 				}
+				succes = true;
 			}
 		}//end while improvement
 	}//end for all d
+	return succes;
 }
 
-void Moves::two_opt_nb(Sol& sol,int mode)
+bool Moves::two_opt_nb(Sol& sol,int mode)
 {
+	bool succes = false;
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		Sol::Tour& tour = sol.tours[d];
@@ -992,18 +1005,19 @@ void Moves::two_opt_nb(Sol& sol,int mode)
 				double actualdecrease = remember.tours[d].deptime.back() - tour.deptime.back();
 				if (abs(bestdelta - actualdecrease) > 0.01)
 				{
-					sol.check();
 					cout << "error 2opt" << endl;
 				}
-				//sol.check();
+				succes = true;
 			}
 		}//end while improvement
 	}//end for all paths
+	return succes;
 }
 
-void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another in order to save travel time
+bool Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another in order to save travel time
 {
 	bool improvement = true;
+	bool succes = false;
 	while (improvement)
 	{
 		improvement = false;
@@ -1212,13 +1226,16 @@ void Moves::move_nb(Sol& sol,int mode)//move 1 vertex from one tour to another i
 				pull_break(sol, beste->index);
 			}
 			//sol.check();
+			succes = false;
 		}//end if improvement
 	}//end while improvement
-}
+	return succes;
+}//end move_nb
 
-void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours in order to save traveltime
+bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours in order to save traveltime
 {
 	bool improvement = true;
+	bool succes = false;
 	while (improvement)
 	{
 		improvement = false;
@@ -1463,8 +1480,8 @@ void Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 				
 				cout << "error swap2" << endl;
 			}
-			
+			succes = true;
 		}//end if improvement
 	}//end while improvement
-
+	return succes;
 }

@@ -549,12 +549,27 @@ Res Ils::solve(int bestknown)
 		{
 			shake(s, post, cons);
 		}
+
 		two_opt_nb(s, 1);
 		swap_nb(s, 1);
 		swap2_nb(s, 1);
 		move_nb(s, 1);
 		insert_nb(s, 1);
 		replace_nb(s, 1);
+		/*
+		int cont = 1;
+		while (cont >= 1)
+		{
+			cont = 0;
+			cont += two_opt_nb(s, 1);
+			cont += swap_nb(s, 1);
+			cont += swap2_nb(s, 1);
+			cont += move_nb(s, 1);
+			cont += insert_nb(s, 1);
+			cont += replace_nb(s, 1);
+			//cout << "debug here" << endl;
+		}
+		*/
 		if (s.score > gb.score)
 		{
 			gb = s;

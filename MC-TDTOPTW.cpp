@@ -237,7 +237,7 @@ void ctop_gap(int max_rep=5)
 			Ins instance(textfile);
 			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 			//it->result=acs.solve(it->bestscore);
-			Ils ils(instance, 10000, 1000, 2, 3);
+			Ils ils(instance, 10000,1000,2,3);
 			it->result[rep] = ils.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;
@@ -252,7 +252,6 @@ void ctop_gap(int max_rep=5)
 		cout << "average gap of " << filename << " is: " << avggap << " avg score: " << avgscore << endl;
 	}
 	//calculate results over all replicates
-
 	double globalgap = 0.0;
 	for (it = set.begin(); it != set.end(); ++it)
 	{
@@ -267,12 +266,11 @@ void ctop_gap(int max_rep=5)
 	}
 	globalgap /= set.size();
 	cout << "global avg gap is: " << globalgap << endl;
-
-}
+}//end ctop_gap
 
 int main()
 {
 	//solve_dataset(1);
 	//debug_ctop();
-	ctop_gap(5);
+	ctop_gap(1);
 }

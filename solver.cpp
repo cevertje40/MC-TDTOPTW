@@ -478,47 +478,50 @@ void Ils::shake(Sol& sol, int post, int cons)
 	{
 		int t = sol.tourindex[d];
 		Sol::Tour& tour = sol.tours[sol.tourindex[d]];
-		cons = min(cons, (int)tour.seq.size() - 2);//const is only capped by maxpaths not the maximum size of the route under consideration
-		bool breakupdate = false;
-		if (post <= tour.breakindex)
+		if (tour.seq.size() > 2)//only shake tours containing regular vertices
 		{
-			breakupdate = true;
-		}
-		for (int i = 0; i < cons; ++i)
-		{
-			//remove vertices one by one at position post
-			sol.score-= tour.seq[post]->score;
-			tour.score-= tour.seq[post]->score;
-			tour.weight-= tour.seq[post]->weight;
-			tour.volume-= tour.seq[post]->volume;
-			sol.available[tour.seq[post]->index] = true;
-			tour.seq.erase(tour.seq.begin() + post);
-			tour.deptime.erase(tour.deptime.begin() + post);
-			tour.max_shift.erase(tour.max_shift.begin() + post);
-			tour.action.erase(tour.action.begin() + post);
-			if (post == tour.seq.size() - 1)
-			{//removal has reached last regular vertex, continue from beginning
-				post = 1;
-				breakupdate = true;//if you remove the first vertex of the route a breakupdate is required
-			}
-		}
-		if (breakupdate)
-		{
-			for (int vv = 0; vv < tour.seq.size(); ++vv)
+			cons = min(cons, (int)tour.seq.size() - 2);//const is only capped by maxpaths not the maximum size of the route under consideration
+			bool breakupdate = false;
+			if (post <= tour.breakindex)
 			{
-				tour.action[vv] = 0;
+				breakupdate = true;
 			}
-			sol.update_traveltime_break(tour.index, post - 1, int(tour.seq.size()));
-			
-		}
-		else
-		{
-			sol.update_traveltime(tour.index, post - 1, int(tour.seq.size()));
-		}
-		sol.calc_maxshift(tour);
-	}
-	//sol.check();
-}
+			for (int i = 0; i < cons; ++i)
+			{	
+				//removal has reached last regular vertex, continue from beginning
+				if (post >= tour.seq.size() - 1)
+				{
+					post = 1;
+					breakupdate = true;//if you remove the first vertex of the route a breakupdate is required
+				}
+				//remove vertices one by one at position post
+				sol.score -= tour.seq[post]->score;
+				tour.score -= tour.seq[post]->score;
+				tour.weight -= tour.seq[post]->weight;
+				tour.volume -= tour.seq[post]->volume;
+				sol.available[tour.seq[post]->index] = true;
+				tour.seq.erase(tour.seq.begin() + post);
+				tour.deptime.erase(tour.deptime.begin() + post);
+				tour.max_shift.erase(tour.max_shift.begin() + post);
+				tour.action.erase(tour.action.begin() + post);
+			}
+			if (breakupdate)
+			{
+				for (int vv = 0; vv < tour.seq.size(); ++vv)
+				{
+					tour.action[vv] = 0;
+				}
+				sol.update_traveltime_break(tour.index, post - 1, int(tour.seq.size()));
+
+			}
+			else
+			{
+				sol.update_traveltime(tour.index, post - 1, int(tour.seq.size()));
+			}
+			sol.calc_maxshift(tour);
+		}//end if tour is not empty
+	}//end for all tours
+}//end shake
 
 Ils::Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3): Moves(ins), threshold1(threshold1), threshold2(threshold2), threshold3(threshold3)
 {
@@ -595,7 +598,10 @@ Res Ils::solve(int bestknown)
 		for (int t = 0; t < ins->maxtours; ++t)
 		{
 			maxpathsize = max(maxpathsize, (int)s.tours[t].seq.size() - 2);
-			minpathsize = min(minpathsize, (int)s.tours[t].seq.size() - 2);
+			if (s.tours[t].seq.size() > 2)//only routes that contain regular vertices are checked for minpath size
+			{
+				minpathsize = min(minpathsize, (int)s.tours[t].seq.size() - 2);
+			}
 		}
 		if (cons > maxpathsize)
 		{
@@ -603,7 +609,7 @@ Res Ils::solve(int bestknown)
 		}
 		while (post > minpathsize)
 		{
-			post -= minpathsize;
+			post -=minpathsize;
 		}
 	}
 	end = clock();

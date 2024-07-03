@@ -291,13 +291,13 @@ Res Aco::solve(int bestknown)
 				//swap2_nb(s[ant], 1);
 				//move_nb(s[ant], 1);
 				insert_nb(s[ant], 1);
-				replace_nb(s[ant], 1);
+				exchange_nb(s[ant], 1);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant], 1);
 				//swap2_nb(s[ant], 1);
 				//move_nb(s[ant], 1);
 				insert_nb(s[ant], 1);
-				replace_nb(s[ant], 1);
+				exchange_nb(s[ant], 1);
 				//insert_nb(s[ant], 1);
 			}
 		}
@@ -544,6 +544,7 @@ Res Ils::solve(int bestknown)
 	int cons = 1;//cons -->amount of vertices to be removed
 	for (int iter = 0; iter < max_it; ++iter)//iteration loop
 	{
+		//cout << iter << endl;
 		if ((noimpr > threshold2) && ((noimpr + 1) % threshold3 == 0))
 		{
 			next_permutation(s.tourindex.begin(), s.tourindex.end());//permutates the path index that is stored in the solution
@@ -553,12 +554,15 @@ Res Ils::solve(int bestknown)
 			shake(s, post, cons);
 		}
 
-		two_opt_nb(s, 1);
-		swap_nb(s, 1);
-		swap2_nb(s, 1);
-		move_nb(s, 1);
-		insert_nb(s, 1);
-		replace_nb(s, 1);
+		two_opt_nb(s,1);
+		swap_nb(s,1);
+		swap2_nb(s,1);
+		move_nb(s,1);
+		insert_nb(s,1);
+		one_one_replace_nb(s, 1);
+		//cout << "hier" << endl;
+		//exchange_nb(s,1);
+		//cout << "hier" << endl;
 		/*
 		int cont = 1;
 		while (cont >= 1)

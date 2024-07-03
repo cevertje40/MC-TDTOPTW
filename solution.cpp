@@ -427,7 +427,7 @@ void Sol::removevertex(Sol::Tour& tour, int position)
 		}
 	}
 	Ins::Vertex* candidate = tour.seq[position];
-	available[candidate->index] = false;
+	available[candidate->index] = true;//make vertex back available
 	tour.seq.erase(tour.seq.begin() + position);//insert point y after x
 	tour.deptime.erase(tour.deptime.begin() + position);//insert temporary value
 	tour.max_shift.erase(tour.max_shift.begin() + position);

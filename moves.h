@@ -16,6 +16,7 @@ public:
 	bool swap2_nb(Sol & sol,int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool one_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool two_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
+	bool one_two_replace(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	Ins* ins;
 	Moves(Ins& ins) :ins(&ins) {}
 };

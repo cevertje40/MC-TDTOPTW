@@ -18,6 +18,7 @@
 #include <omp.h>
 #include <boost/dynamic_bitset.hpp>
 #include "time.h"
+#include <boost/heap/priority_queue.hpp>
 
 
 using namespace std;

@@ -288,16 +288,19 @@ Res Aco::solve(int bestknown)
 				construct(s[ant]);
 				two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
+				swap2_nb(s[ant], 1);
+				move_nb(s[ant], 1);
+				insert_nb(s[ant], 1);
+				one_one_replace_nb(s[ant], 1);
+				two_one_replace_nb(s[ant], 1);
+				one_two_replace(s[ant], 1);
+				//exchange_nb(s[ant], 1);
+				//two_opt_nb(s[ant], 1);
+				//swap_nb(s[ant], 1);
 				//swap2_nb(s[ant], 1);
 				//move_nb(s[ant], 1);
-				insert_nb(s[ant], 1);
-				exchange_nb(s[ant], 1);
-				two_opt_nb(s[ant], 1);
-				swap_nb(s[ant], 1);
-				//swap2_nb(s[ant], 1);
-				//move_nb(s[ant], 1);
-				insert_nb(s[ant], 1);
-				exchange_nb(s[ant], 1);
+				//insert_nb(s[ant], 1);
+				//exchange_nb(s[ant], 1);
 				//insert_nb(s[ant], 1);
 			}
 		}
@@ -314,7 +317,7 @@ Res Aco::solve(int bestknown)
 	return Res(gb.score, cpuTime, bestknown);
 }
 
-void Ils::construct(Sol& sol)
+void Ils::serial_construct(Sol& sol)
 {
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
@@ -470,6 +473,116 @@ void Ils::construct(Sol& sol)
 	//make end depot unaivailable for other moves
 	sol.available[ins->maxvertices - 1] = false;
 	//sol.check();
+}//end serial construct
+
+void Ils::parallel_construct(Sol& sol)
+{
+	vector<Ins::Vertex*>candidates = ins->v[0].nb[0];//is already sorted on score high to low
+	for (int i = 0; i < candidates.size() - 1; ++i)
+	{
+		//calculate traveltime for candidate under consideration
+		vector<double>traveltime(ins->maxtours,0.0);//traveltime per route
+		vector<bool>feasible(ins->maxtours,false);//feasibility per route
+		int besttour= -1;
+		double besttraveltime = DBL_MAX;
+		int bestbrk = 0;
+		bool succes = false;
+		for (int t = 0; t < ins->maxtours; ++ t)
+		{
+			Sol::Tour& tour = sol.tours[t];
+			double currenttime = tour.deptime.back() + ins->t[t].EDT;
+			Ins::Vertex* last = tour.seq.back();
+			Ins::Vertex* candidate = candidates[i];
+			if ((tour.weight + candidate->weight < ins->t[t].W_max) && (tour.volume + candidate->volume < ins->t[t].V_max))
+			{
+				double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
+				int brk = -1;
+				//check if break is needed
+				if ((tour.breakindex == -1) && ((arrivaltime >= ins->breakstart) || (candidate->LTW[t] - ins->breakdur >= ins->breakstart)))
+				{
+					arrivaltime += ins->breakdur;
+					brk = 1;
+				}
+				else
+				{
+					brk = 0;
+				}
+				//tw checks
+				if (arrivaltime < candidate->LTW[t])
+				{
+					arrivaltime = candidate->LTW[t];//wachten als je te vroeg bent	
+				}
+				if (arrivaltime > candidate->UTW[t])
+				{
+					continue;//stop the calculation
+					feasible[t] = false;
+				}
+				//add service time
+				arrivaltime += candidate->serv;
+				//return to end depot check
+				double enddepottime = ins->arrival_time(candidate->con[ins->maxvertices - 1], arrivaltime);
+				if ((tour.breakindex == -1) && (brk == 0))//no break taken yet and you are not going to break at candidate
+				{
+					enddepottime += ins->breakdur;//take break at end depot
+				}
+				if (enddepottime > ins->t[t].LAT)//enddepot heeft geen service time
+				{
+					feasible[t] = false;
+				}
+				else
+				{
+					succes = true;
+					feasible[t] = true;
+					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
+					if (traveltime[t] < besttraveltime)
+					{
+						besttour = t;
+						besttraveltime = arrivaltime-ins->t[t].EDT;//include the possible break time
+						bestbrk = brk;
+					}
+				}//end else
+			}//end cap constraints
+		}//end for all tours
+		//insert candidate with the lowest traveltime
+		if (succes)
+		{
+			Sol::Tour& tour = sol.tours[besttour];
+			tour.seq.push_back(candidates[i]);
+			tour.deptime.push_back(besttraveltime);
+			sol.available[candidates[i]->index] = false;
+			tour.score += candidates[i]->score;
+			sol.score += candidates[i]->score;
+			tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+			tour.volume += candidates[i]->volume;
+			tour.weight += candidates[i]->weight;
+			tour.action.push_back(bestbrk);
+			if (bestbrk == 1)
+			{
+				tour.breakindex = int(tour.seq.size()) - 1;
+			}
+		}
+	}
+	//add end depot to all routes
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Sol::Tour& tour = sol.tours[t];
+		double currenttime = ins->t[t].EDT + tour.deptime.back();
+		double arrivaltime = ins->arrival_time(tour.seq.back()->con[ins->maxvertices - 1], currenttime);
+		tour.deptime.push_back(arrivaltime-ins->t[t].EDT);
+		tour.seq.push_back(&ins->v[ins->maxvertices - 1]);
+		tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+		if (tour.breakindex == -1)
+		{
+			tour.action.push_back(1);
+			tour.deptime.back() +=ins->breakdur;
+			tour.breakindex = int(tour.seq.size()) - 1;
+		}
+		else
+		{
+			tour.action.push_back(0);
+		}
+	}
+	sol.check();
 }
 
 void Ils::shake(Sol& sol, int post, int cons)
@@ -530,7 +643,6 @@ Ils::Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3):
 	s = Sol(ins);//iter sol
 	iter_nr = 0;
 	iter_score = -1;
-	
 }
 
 Res Ils::solve(int bestknown)
@@ -538,7 +650,8 @@ Res Ils::solve(int bestknown)
 	clock_t start, end;
 	start = clock();
 	s.reset();
-	construct(s);
+	//parallel_construct(s);
+	serial_construct(s);
 	int noimpr = 0;
 	int post = 1;//post -->position to start the removal
 	int cons = 1;//cons -->amount of vertices to be removed
@@ -553,30 +666,14 @@ Res Ils::solve(int bestknown)
 		{
 			shake(s, post, cons);
 		}
-
 		two_opt_nb(s,1);
 		swap_nb(s,1);
 		swap2_nb(s,1);
 		move_nb(s,1);
 		insert_nb(s,1);
 		one_one_replace_nb(s, 1);
-		//cout << "hier" << endl;
-		//exchange_nb(s,1);
-		//cout << "hier" << endl;
-		/*
-		int cont = 1;
-		while (cont >= 1)
-		{
-			cont = 0;
-			cont += two_opt_nb(s, 1);
-			cont += swap_nb(s, 1);
-			cont += swap2_nb(s, 1);
-			cont += move_nb(s, 1);
-			cont += insert_nb(s, 1);
-			cont += replace_nb(s, 1);
-			//cout << "debug here" << endl;
-		}
-		*/
+		two_one_replace_nb(s, 1);
+		one_two_replace(s, 1);
 		if (s.score > gb.score)
 		{
 			gb = s;

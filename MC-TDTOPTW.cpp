@@ -194,7 +194,7 @@ void debug_instance()
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b8.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
 	Ins instance(textfile);
 
 	Ils ils(instance, 10000, 100, 20, 30);
@@ -271,6 +271,6 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 	//solve_dataset(1);
-	debug_ctop();
-	//ctop_gap(1);
+	//debug_ctop();
+	ctop_gap(1);
 }

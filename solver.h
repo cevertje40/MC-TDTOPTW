@@ -55,7 +55,8 @@ private:
 	Sol gb;//global best solution
 	int iter_nr;//nr of best ant of the iteration
 	double iter_score;//score of best ant of the iteration
-	void construct(Sol& sol);
+	void serial_construct(Sol& sol);
+	void parallel_construct(Sol& sol);
 	void shake(Sol& sol, int post, int cons);
 public:
 	Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3);

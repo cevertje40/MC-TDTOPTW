@@ -100,7 +100,7 @@ void Sol::check()
 				arrivaltime = current->LTW[d] - (breakcurrent * ins->breakdur);
 			}
 			arrivaltime += current->serv+breakcurrent*ins->breakdur;
-			//cout<<i+1<<" calc traveltime: " << arrivaltime-t[d].EDT << "stored: " << sol.traveltime[d][i+1] << endl;
+			//cout<<i+1<<" calc traveltime: " << arrivaltime-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
 			currenttime = arrivaltime;
 		}//end for i
 		length = currenttime - ins->t[d].EDT;

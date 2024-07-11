@@ -47,20 +47,34 @@ class Ils : public Moves
 private:
 	
 	int max_it;
-	int ni;//number of non improvement iterations
 	int threshold1;//controls switch to current best when noimpr
 	int threshold2;//controls switch to next random route when noimpr
 	int threshold3;//controls switch to next random route when noimpr
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
-	int iter_nr;//nr of best ant of the iteration
-	double iter_score;//score of best ant of the iteration
 	void serial_construct(Sol& sol);
-	void parallel_construct(Sol& sol);
 	void shake(Sol& sol, int post, int cons);
 public:
 	Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3);
 	Res solve(int bestknown=1);
+};
+
+class Tabu : public Moves
+{
+private:
+	int max_noimpr;
+	int max_tabulist_size;
+	void parallel_construct(Sol& sol);
+	Sol s;//current iteration solution
+	Sol gb;//global best solution
+	vector<vector<Ins::Vertex*>> tabulist;
+
+	//todo implement tabulist class with functions
+
+
+public:
+	Tabu(Ins& ins, int max_noimpr, int tabulist_size);
+	Res solve(int bestknown = 1);
 };
 
 

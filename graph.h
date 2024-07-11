@@ -13,8 +13,6 @@
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/random.hpp>
 #include <boost/random/variate_generator.hpp>
-#include <boost/math/distributions/gamma.hpp>
-#include <boost/math/special_functions/erf.hpp>
 #include <omp.h>
 #include <boost/dynamic_bitset.hpp>
 #include "time.h"

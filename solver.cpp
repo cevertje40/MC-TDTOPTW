@@ -475,116 +475,6 @@ void Ils::serial_construct(Sol& sol)
 	//sol.check();
 }//end serial construct
 
-void Ils::parallel_construct(Sol& sol)
-{
-	vector<Ins::Vertex*>candidates = ins->v[0].nb[0];//is already sorted on score high to low
-	for (int i = 0; i < candidates.size() - 1; ++i)
-	{
-		//calculate traveltime for candidate under consideration
-		vector<double>traveltime(ins->maxtours,0.0);//traveltime per route
-		vector<bool>feasible(ins->maxtours,false);//feasibility per route
-		int besttour= -1;
-		double besttraveltime = DBL_MAX;
-		int bestbrk = 0;
-		bool succes = false;
-		for (int t = 0; t < ins->maxtours; ++ t)
-		{
-			Sol::Tour& tour = sol.tours[t];
-			double currenttime = tour.deptime.back() + ins->t[t].EDT;
-			Ins::Vertex* last = tour.seq.back();
-			Ins::Vertex* candidate = candidates[i];
-			if ((tour.weight + candidate->weight < ins->t[t].W_max) && (tour.volume + candidate->volume < ins->t[t].V_max))
-			{
-				double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
-				int brk = -1;
-				//check if break is needed
-				if ((tour.breakindex == -1) && ((arrivaltime >= ins->breakstart) || (candidate->LTW[t] - ins->breakdur >= ins->breakstart)))
-				{
-					arrivaltime += ins->breakdur;
-					brk = 1;
-				}
-				else
-				{
-					brk = 0;
-				}
-				//tw checks
-				if (arrivaltime < candidate->LTW[t])
-				{
-					arrivaltime = candidate->LTW[t];//wachten als je te vroeg bent	
-				}
-				if (arrivaltime > candidate->UTW[t])
-				{
-					continue;//stop the calculation
-					feasible[t] = false;
-				}
-				//add service time
-				arrivaltime += candidate->serv;
-				//return to end depot check
-				double enddepottime = ins->arrival_time(candidate->con[ins->maxvertices - 1], arrivaltime);
-				if ((tour.breakindex == -1) && (brk == 0))//no break taken yet and you are not going to break at candidate
-				{
-					enddepottime += ins->breakdur;//take break at end depot
-				}
-				if (enddepottime > ins->t[t].LAT)//enddepot heeft geen service time
-				{
-					feasible[t] = false;
-				}
-				else
-				{
-					succes = true;
-					feasible[t] = true;
-					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
-					if (traveltime[t] < besttraveltime)
-					{
-						besttour = t;
-						besttraveltime = arrivaltime-ins->t[t].EDT;//include the possible break time
-						bestbrk = brk;
-					}
-				}//end else
-			}//end cap constraints
-		}//end for all tours
-		//insert candidate with the lowest traveltime
-		if (succes)
-		{
-			Sol::Tour& tour = sol.tours[besttour];
-			tour.seq.push_back(candidates[i]);
-			tour.deptime.push_back(besttraveltime);
-			sol.available[candidates[i]->index] = false;
-			tour.score += candidates[i]->score;
-			sol.score += candidates[i]->score;
-			tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
-			tour.volume += candidates[i]->volume;
-			tour.weight += candidates[i]->weight;
-			tour.action.push_back(bestbrk);
-			if (bestbrk == 1)
-			{
-				tour.breakindex = int(tour.seq.size()) - 1;
-			}
-		}
-	}
-	//add end depot to all routes
-	for (int t = 0; t < ins->maxtours; ++t)
-	{
-		Sol::Tour& tour = sol.tours[t];
-		double currenttime = ins->t[t].EDT + tour.deptime.back();
-		double arrivaltime = ins->arrival_time(tour.seq.back()->con[ins->maxvertices - 1], currenttime);
-		tour.deptime.push_back(arrivaltime-ins->t[t].EDT);
-		tour.seq.push_back(&ins->v[ins->maxvertices - 1]);
-		tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
-		if (tour.breakindex == -1)
-		{
-			tour.action.push_back(1);
-			tour.deptime.back() +=ins->breakdur;
-			tour.breakindex = int(tour.seq.size()) - 1;
-		}
-		else
-		{
-			tour.action.push_back(0);
-		}
-	}
-	sol.check();
-}
-
 void Ils::shake(Sol& sol, int post, int cons)
 {
 	for (int d = 0; d < ins->maxtours; ++d)
@@ -641,8 +531,6 @@ Ils::Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3):
 	max_it = max_sol;
 	gb = Sol(ins);//best sol
 	s = Sol(ins);//iter sol
-	iter_nr = 0;
-	iter_score = -1;
 }
 
 Res Ils::solve(int bestknown)
@@ -719,5 +607,200 @@ Res Ils::solve(int bestknown)
 	gb.check();
 	cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
+	return Res(gb.score, cpuTime, bestknown);
+}
+
+
+Tabu::Tabu(Ins& ins, int max_noimpr, int max_tabulist_size): Moves(ins),max_noimpr(max_noimpr), max_tabulist_size(max_tabulist_size)
+{
+	gb = Sol(ins);//best sol
+	s = Sol(ins);//iter sol
+	tabulist.resize(ins.maxtours,vector<Ins::Vertex*>(max_tabulist_size,NULL));
+}
+
+void Tabu::parallel_construct(Sol& sol)
+{
+	vector<Ins::Vertex*>candidates = ins->v[0].nb[0];//is already sorted on score high to low
+	for (int i = 0; i < candidates.size() - 1; ++i)
+	{
+		//calculate traveltime for candidate under consideration
+		vector<double>traveltime(ins->maxtours, 0.0);//traveltime per route
+		vector<bool>feasible(ins->maxtours, false);//feasibility per route
+		int besttour = -1;
+		double besttraveltime = DBL_MAX;
+		int bestbrk = 0;
+		bool succes = false;
+		for (int t = 0; t < ins->maxtours; ++t)
+		{
+			Sol::Tour& tour = sol.tours[t];
+			double currenttime = tour.deptime.back() + ins->t[t].EDT;
+			Ins::Vertex* last = tour.seq.back();
+			Ins::Vertex* candidate = candidates[i];
+			if ((tour.weight + candidate->weight < ins->t[t].W_max) && (tour.volume + candidate->volume < ins->t[t].V_max))
+			{
+				double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
+				int brk = -1;
+				//check if break is needed
+				if ((tour.breakindex == -1) && ((arrivaltime >= ins->breakstart) || (candidate->LTW[t] - ins->breakdur >= ins->breakstart)))
+				{
+					arrivaltime += ins->breakdur;
+					brk = 1;
+				}
+				else
+				{
+					brk = 0;
+				}
+				//tw checks
+				if (arrivaltime < candidate->LTW[t])
+				{
+					arrivaltime = candidate->LTW[t];//wachten als je te vroeg bent	
+				}
+				if (arrivaltime > candidate->UTW[t])
+				{
+					continue;//stop the calculation
+					feasible[t] = false;
+				}
+				//add service time
+				arrivaltime += candidate->serv;
+				//return to end depot check
+				double enddepottime = ins->arrival_time(candidate->con[ins->maxvertices - 1], arrivaltime);
+				if ((tour.breakindex == -1) && (brk == 0))//no break taken yet and you are not going to break at candidate
+				{
+					enddepottime += ins->breakdur;//take break at end depot
+				}
+				if (enddepottime > ins->t[t].LAT)//enddepot heeft geen service time
+				{
+					feasible[t] = false;
+				}
+				else
+				{
+					succes = true;
+					feasible[t] = true;
+					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
+					if (traveltime[t] < besttraveltime)
+					{
+						besttour = t;
+						besttraveltime = arrivaltime - ins->t[t].EDT;//include the possible break time
+						bestbrk = brk;
+					}
+				}//end else
+			}//end cap constraints
+		}//end for all tours
+		//insert candidate with the lowest traveltime
+		if (succes)
+		{
+			Sol::Tour& tour = sol.tours[besttour];
+			tour.seq.push_back(candidates[i]);
+			tour.deptime.push_back(besttraveltime);
+			sol.available[candidates[i]->index] = false;
+			tour.score += candidates[i]->score;
+			sol.score += candidates[i]->score;
+			tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+			tour.volume += candidates[i]->volume;
+			tour.weight += candidates[i]->weight;
+			tour.action.push_back(bestbrk);
+			if (bestbrk == 1)
+			{
+				tour.breakindex = int(tour.seq.size()) - 1;
+			}
+		}
+	}
+	//add end depot to all routes
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Sol::Tour& tour = sol.tours[t];
+		double currenttime = ins->t[t].EDT + tour.deptime.back();
+		double arrivaltime = ins->arrival_time(tour.seq.back()->con[ins->maxvertices - 1], currenttime);
+		tour.deptime.push_back(arrivaltime - ins->t[t].EDT);
+		tour.seq.push_back(&ins->v[ins->maxvertices - 1]);
+		tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+		if (tour.breakindex == -1)
+		{
+			tour.action.push_back(1);
+			tour.deptime.back() += ins->breakdur;
+			tour.breakindex = int(tour.seq.size()) - 1;
+		}
+		else
+		{
+			tour.action.push_back(0);
+		}
+	}
+	sol.check();
+}
+
+
+Res Tabu::solve(int bestknown)
+{
+	clock_t start, end;
+	start = clock();
+	int noimpr = 0;
+	vector<int> tabuindex(ins->maxtours,0);
+	s.reset();
+	parallel_construct(s);
+	int debug_iter = 0;
+	while (noimpr < max_noimpr)
+	{
+		//select neighborhood structure, for 
+		//build admissable neighborhoods using the selected neighborhoodstructure
+		//boost::heap::priority_queue<One_one_rep_nb> adm_nb= one_one_replace_gen_nb(s);
+		boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s);
+		//select best neighborhood
+		bool tabu = true;
+		while (tabu)
+		{
+			tabu = false;
+			//One_one_rep_nb exec = adm_nb.top();
+			One_two_rep_nb exec = adm_nb.top();
+			for (int u = 0; u < tabulist[exec.tour].size()-1; ++u)
+			{
+				//if (exec.inscand == tabulist[exec.tour][u])
+				if((exec.inscand1== tabulist[exec.tour][u])||(exec.inscand2== tabulist[exec.tour][u]))
+				{
+					tabu = true;
+				}
+			}
+			if (tabu)
+			{//delete if the move is tabu
+				adm_nb.pop();
+			}
+			else
+			{
+				//else execute the move
+				exec.execute(s);
+				//add inserted vertex to tabu list
+				//tabulist[exec.tour][tabuindex[exec.tour]]=exec.inscand;
+				tabulist[exec.tour][tabuindex[exec.tour]] = exec.inscand1;
+				++tabuindex[exec.tour];
+				tabulist[exec.tour][tabuindex[exec.tour]] = exec.inscand2;
+				++tabuindex[exec.tour];
+				//if tabulist is full remove oldes entry
+				if (tabuindex[exec.tour] == max_tabulist_size)
+				{
+					tabuindex[exec.tour] = 0;
+				}
+				//todo you should create two list one for removal one for insertions
+			}
+		}
+		//VND
+		two_opt_nb(s, 1);
+		swap_nb(s, 1);
+		swap2_nb(s, 1);
+		move_nb(s, 1);
+		if (s.score > gb.score)
+		{
+			gb = s;
+			noimpr = 0;
+		}
+		else
+		{
+			++noimpr;
+		}
+		++debug_iter;
+	}//end while smaller than max_noimpr
+	end = clock();
+	double cpuTime;
+	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
+	gb.check();
+	cout << gb << endl;
 	return Res(gb.score, cpuTime, bestknown);
 }

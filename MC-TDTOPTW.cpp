@@ -13,8 +13,6 @@ public:
 	Dataset(string& path, string& filename, int& bestscore) : path(path), filename(filename), bestscore(bestscore) {}
 };
 
-
-
 using namespace std;
 
 void create_dataset()
@@ -197,9 +195,10 @@ void debug_ctop()
 	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
 	Ins instance(textfile);
 
-	Ils ils(instance, 10000, 100, 20, 30);
-	res = ils.solve();
-
+	//Ils ils(instance, 10000, 100, 20, 30);
+	//res = ils.solve();
+	Tabu tabu(instance, 10000, 5);
+	res = tabu.solve();
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
 	cout << res.score << " cpu time: " << res.time << endl;
@@ -271,6 +270,6 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 	//solve_dataset(1);
-	//debug_ctop();
-	ctop_gap(1);
+	debug_ctop();
+	//ctop_gap(1);
 }

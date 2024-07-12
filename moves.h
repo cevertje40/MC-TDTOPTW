@@ -17,7 +17,10 @@ public:
 	}
 	void execute(Sol& sol) 
 	{
-		sol.removevertex(sol.tours[tour], rempos);
+		if (rempos != -1)//replace
+		{
+			sol.removevertex(sol.tours[tour], rempos);
+		}
 		sol.insertvertex(sol.tours[tour], inscand, inspos);
 	}
 };

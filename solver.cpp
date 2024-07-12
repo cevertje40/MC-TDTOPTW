@@ -828,6 +828,10 @@ Res Tabu::solve(int bestknown)
 						tabulist.make_tabu(exec_nb);
 					}
 				}
+				else
+				{
+					cout << "not nb" << endl;
+				}
 				break;
 			}
 			case 2:
@@ -855,6 +859,10 @@ Res Tabu::solve(int bestknown)
 						exec_nb.execute(s);
 						tabulist.make_tabu(exec_nb);
 					}
+				}
+				else
+				{
+					cout << "not nb" << endl;
 				}
 				break;
 			}
@@ -884,9 +892,14 @@ Res Tabu::solve(int bestknown)
 						tabulist.make_tabu(exec_nb);
 					}
 				}
+				else
+				{
+					cout << "not nb" << endl;
+				}
 				break;
 			}
 		}//end switch
+		//s.check();
 		//VND
 		two_opt_nb(s, 1);
 		swap_nb(s, 1);

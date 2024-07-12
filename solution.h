@@ -1,8 +1,6 @@
 #pragma once
 #include "instance.h"
 
-
-
 class Sol
 {
 public:

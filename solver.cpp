@@ -615,7 +615,6 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int max_tabulist_size): Moves(ins),max_noim
 {
 	gb = Sol(ins);//best sol
 	s = Sol(ins);//iter sol
-	tabulist.resize(ins.maxtours,vector<Ins::Vertex*>(max_tabulist_size,NULL));
 }
 
 void Tabu::parallel_construct(Sol& sol)
@@ -728,6 +727,60 @@ void Tabu::parallel_construct(Sol& sol)
 	sol.check();
 }
 
+void Tabu::Tabulist::make_tabu(One_one_rep_nb& exec_nb)
+{
+	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand);
+}
+
+void Tabu::Tabulist::make_tabu(Two_one_rep_nb& exec_nb)
+{
+	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand);
+}
+
+void Tabu::Tabulist::make_tabu(One_two_rep_nb& exec_nb)
+{
+	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand1);
+	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand2);
+}
+
+bool Tabu::Tabulist::is_tabu(One_one_rep_nb exec_nb)
+{
+	bool tabu = false;
+	for (int i = 0; i < tabuvertices[exec_nb.tour].size() - 1; ++i)
+	{
+		if (tabuvertices[exec_nb.tour][i] == exec_nb.inscand)
+		{
+			tabu = true;
+		}
+	}
+	return tabu;
+}
+
+bool Tabu::Tabulist::is_tabu(Two_one_rep_nb exec_nb)
+{
+	bool tabu = false;
+	for (int i = 0; i < tabuvertices[exec_nb.tour].size() - 1; ++i)
+	{
+		if (tabuvertices[exec_nb.tour][i] == exec_nb.inscand)
+		{
+			tabu = true;
+		}
+	}
+	return tabu;
+}
+
+bool Tabu::Tabulist::is_tabu(One_two_rep_nb exec_nb)
+{
+	bool tabu = false;
+	for (int i = 0; i < tabuvertices[exec_nb.tour].size() - 1; ++i)
+	{
+		if ((tabuvertices[exec_nb.tour][i] == exec_nb.inscand1) || (tabuvertices[exec_nb.tour][i] == exec_nb.inscand2))
+		{
+			tabu = true;
+		}
+	}
+	return tabu;
+}
 
 Res Tabu::solve(int bestknown)
 {
@@ -738,49 +791,102 @@ Res Tabu::solve(int bestknown)
 	s.reset();
 	parallel_construct(s);
 	int debug_iter = 0;
+	uniform_int_distribution<> nbpicker(1, 3);
 	while (noimpr < max_noimpr)
 	{
-		//select neighborhood structure, for 
+		//select neighborhood structure at random
+		Tabulist tabulist(ins->maxtours,max_tabulist_size, &ins->v[0]);
+		int pick=nbpicker(engine);
 		//build admissable neighborhoods using the selected neighborhoodstructure
-		//boost::heap::priority_queue<One_one_rep_nb> adm_nb= one_one_replace_gen_nb(s);
-		boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s);
-		//select best neighborhood
-		bool tabu = true;
-		while (tabu)
+		switch (pick)
 		{
-			tabu = false;
-			//One_one_rep_nb exec = adm_nb.top();
-			One_two_rep_nb exec = adm_nb.top();
-			for (int u = 0; u < tabulist[exec.tour].size()-1; ++u)
+			case 1:
 			{
-				//if (exec.inscand == tabulist[exec.tour][u])
-				if((exec.inscand1== tabulist[exec.tour][u])||(exec.inscand2== tabulist[exec.tour][u]))
+				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s);
+				if (adm_nb.size() >= 1)
 				{
-					tabu = true;
+					bool execute = true;
+					//check if the best move is tabu
+					while (tabulist.is_tabu(adm_nb.top()))
+					{
+						//delete move if tabu
+						if (adm_nb.size() > 1)
+						{
+							adm_nb.pop();
+						}
+						else
+						{
+							execute = false;
+							break;
+						}
+					}
+					//execute non tabu move and update tabulist
+					if (execute)
+					{
+						One_one_rep_nb exec_nb = adm_nb.top();
+						exec_nb.execute(s);
+						tabulist.make_tabu(exec_nb);
+					}
 				}
+				break;
 			}
-			if (tabu)
-			{//delete if the move is tabu
-				adm_nb.pop();
-			}
-			else
+			case 2:
 			{
-				//else execute the move
-				exec.execute(s);
-				//add inserted vertex to tabu list
-				//tabulist[exec.tour][tabuindex[exec.tour]]=exec.inscand;
-				tabulist[exec.tour][tabuindex[exec.tour]] = exec.inscand1;
-				++tabuindex[exec.tour];
-				tabulist[exec.tour][tabuindex[exec.tour]] = exec.inscand2;
-				++tabuindex[exec.tour];
-				//if tabulist is full remove oldes entry
-				if (tabuindex[exec.tour] == max_tabulist_size)
+				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s);
+				if (adm_nb.size() >= 1)
 				{
-					tabuindex[exec.tour] = 0;
+					bool execute = true;
+					while (tabulist.is_tabu(adm_nb.top()))
+					{
+						execute = true;
+						if (adm_nb.size() > 1)
+						{
+							adm_nb.pop();
+						}
+						else
+						{
+							execute = false;
+							break;
+						}
+					}
+					if (execute)
+					{
+						Two_one_rep_nb exec_nb = adm_nb.top();
+						exec_nb.execute(s);
+						tabulist.make_tabu(exec_nb);
+					}
 				}
-				//todo you should create two list one for removal one for insertions
+				break;
 			}
-		}
+			case 3:
+			{
+				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s);
+				if (adm_nb.size() >= 1)
+				{
+					bool execute = true;
+					while (tabulist.is_tabu(adm_nb.top()))
+					{
+						execute = true;
+						if (adm_nb.size() > 1)
+						{
+							adm_nb.pop();
+						}
+						else
+						{
+							execute = false;
+							break;
+						}
+					}
+					if (execute)
+					{
+						One_two_rep_nb exec_nb = adm_nb.top();
+						exec_nb.execute(s);
+						tabulist.make_tabu(exec_nb);
+					}
+				}
+				break;
+			}
+		}//end switch
 		//VND
 		two_opt_nb(s, 1);
 		swap_nb(s, 1);
@@ -804,3 +910,5 @@ Res Tabu::solve(int bestknown)
 	cout << gb << endl;
 	return Res(gb.score, cpuTime, bestknown);
 }
+
+

@@ -67,9 +67,22 @@ private:
 	void parallel_construct(Sol& sol);
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
-	vector<vector<Ins::Vertex*>> tabulist;
-
-	//todo implement tabulist class with functions
+	class Tabulist 
+	{
+	public:
+		// use circular buffer with a capacity for max_tabulist_size vertex pointers
+		vector<boost::circular_buffer<Ins::Vertex*>> tabuvertices;
+		Tabulist(int maxtours, int max_tabulist_size,Ins::Vertex* init)
+		{
+			tabuvertices.resize(maxtours,boost::circular_buffer<Ins::Vertex*>(max_tabulist_size,init));
+		}
+		void make_tabu(One_one_rep_nb& nb);
+		void make_tabu(One_two_rep_nb& nb);
+		void make_tabu(Two_one_rep_nb& nb);
+		bool is_tabu(One_one_rep_nb nb);
+		bool is_tabu(One_two_rep_nb nb);
+		bool is_tabu(Two_one_rep_nb nb);
+	};
 
 
 public:

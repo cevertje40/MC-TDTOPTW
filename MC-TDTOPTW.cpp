@@ -197,7 +197,7 @@ void debug_ctop()
 
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
-	Tabu tabu(instance, 10000, 5);
+	Tabu tabu(instance, 10000, 20);
 	res = tabu.solve();
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
@@ -236,8 +236,10 @@ void ctop_gap(int max_rep=5)
 			Ins instance(textfile);
 			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 			//it->result[rep] = acs.solve(it->bestscore);
-			Ils ils(instance, 10000,1000,2,3);
-			it->result[rep] = ils.solve(it->bestscore);
+			//Ils ils(instance, 10000,1000,2,3);
+			//it->result[rep] = ils.solve(it->bestscore);
+			Tabu tabu(instance, 10000, 20);
+			it->result[rep] = tabu.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;
 			cout << "name: " << it->filename << " best score: " << it->bestscore << " ACS score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
@@ -269,7 +271,8 @@ void ctop_gap(int max_rep=5)
 
 int main()
 {
+
 	//solve_dataset(1);
-	debug_ctop();
-	//ctop_gap(1);
+	//debug_ctop();
+	ctop_gap(1);
 }

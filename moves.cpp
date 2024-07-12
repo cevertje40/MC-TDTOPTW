@@ -305,10 +305,10 @@ bool Moves::one_one_replace_nb(Sol& sol, int mode)
 					Ins::Vertex* x = tour->seq[j];//predecessor y
 					Ins::Vertex* z = tour->seq[j + 1];//successor y
 					int breakz = tour->action[j + 1];
-					int nb_size = (int)z->nb[t].size();
+					int nb_size = (int)x->nb[t].size();
 					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
-						Ins::Vertex* y = z->nb[t][i];//potential insertion at position j
+						Ins::Vertex* y = x->nb[t][i];//potential insertion at position j
 						if ((sol.available[y->index] * y->score > r->score) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & score increase
 						{
 							if ((tour->weight + y->weight <= ins->t[t].W_max) && (tour->volume + y->volume <= ins->t[t].V_max))//cap constraint check
@@ -415,10 +415,10 @@ bool Moves::two_one_replace_nb(Sol& sol, int mode)
 							Ins::Vertex* x = tour->seq[j];//predecessor y
 							Ins::Vertex* z = tour->seq[j + 1];//successor y
 							int breakz = tour->action[j + 1];
-							int nb_size = (int)z->nb[t].size();
+							int nb_size = (int)x->nb[t].size();
 							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 							{
-								Ins::Vertex* y = z->nb[t][i];//potential insertion at position j
+								Ins::Vertex* y = x->nb[t][i];//potential insertion at position j
 								if ((sol.available[y->index] * y->score > lostscore) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & score increase
 								{
 									if ((tour->weight + y->weight <= ins->t[t].W_max) && (tour->volume + y->volume <= ins->t[t].V_max))//cap constraint check
@@ -682,7 +682,6 @@ bool Moves::one_two_replace(Sol& sol, int mode)
 boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol)
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
-	double currentbest = -DBL_MAX;
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		int endh = (int)sol.tours[d].seq.size();
@@ -699,11 +698,11 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 				Ins::Vertex* x = tour->seq[j];//predecessor y
 				Ins::Vertex* z = tour->seq[j + 1];//successor y
 				int breakz = tour->action[j + 1];
-				int nb_size = (int)z->nb[d].size();
+				int nb_size = (int)x->nb[d].size();
 				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 				{
-					Ins::Vertex* y = z->nb[d][i];//potential insertion at position j
-					if (((sol.available[y->index] * y->score)-r->score > currentbest) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
+					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 					{
 						if ((tour->weight + y->weight <= ins->t[d].W_max) && (tour->volume + y->volume <= ins->t[d].V_max))//cap constraint check
 						{
@@ -731,10 +730,6 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 							if (shift <= tour->max_shift[j + 1])//check of het punt geinsert kan worden
 							{
 								adm_nb.push(One_one_rep_nb(d,h,j,y,y->score - r->score));
-								//if (y->score-r->score > currentbest)
-								//{
-								//	currentbest = y->score-r->score;//prevent to evaluate further non improving admissable nb
-								//}
 							}
 						}//end cap constraints
 					}//end availability &score check
@@ -744,8 +739,6 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	}//end for all tours
 	return adm_nb;
 }//end one_one_replace_gen_nb(Sol& sol)
-
-
 
 boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol)
 {
@@ -906,8 +899,79 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol)
 {
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
-
-	return boost::heap::priority_queue<Two_one_rep_nb>();
+	for (int d = 0; d < ins->maxtours; ++d)
+	{
+		int end = (int)sol.tours[d].seq.size();
+		for (int g = 1; g < end - 1; ++g)// for all  included regular vertices in sol
+		{
+			int end = (int)sol.tours[d].seq.size();
+			for (int h = 1; h < end - 1; ++h)// for all  inlcuded regular vertices in sol
+			{
+				if (g != h)
+				{
+					//for all existing regular member vertices: remove 1 and revaluate solution
+					Sol solrem = sol;
+					Sol::Tour* tour = &solrem.tours[d];
+					Ins::Vertex* r = tour->seq[g];//to be removed vertex 1
+					Ins::Vertex* s = tour->seq[h];//to be removed vertex 2
+					double lostscore = r->score + s->score;
+					solrem.removevertex(*tour, g);
+					if (g < h)
+					{
+						solrem.removevertex(*tour, h - 1);
+					}
+					else
+					{
+						solrem.removevertex(*tour, h);
+					}
+					int endj = (int)tour->seq.size();
+					for (int j = 0; j < endj - 1; ++j)// for positions in solrem
+					{
+						Ins::Vertex* x = tour->seq[j];//predecessor y
+						Ins::Vertex* z = tour->seq[j + 1];//successor y
+						int breakz = tour->action[j + 1];
+						int nb_size = (int)x->nb[d].size();
+						for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+						{
+							Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+							if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
+							{
+								if ((tour->weight + y->weight <= ins->t[d].W_max) && (tour->volume + y->volume <= ins->t[d].V_max))//cap constraint check
+								{
+									//gather departure time
+									double currenttime = tour->deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
+									//travel time from x to y
+									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+									if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
+									{
+										arrivaltime = y->LTW[d];
+									}
+									if (arrivaltime > y->UTW[d])
+									{
+										continue;//infeasible
+									}
+									arrivaltime += y->serv;
+									//travel time from y to z
+									arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
+									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
+									{
+										arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
+									}
+									arrivaltime += z->serv + breakz * ins->breakdur;
+									double shift = (arrivaltime - ins->t[d].EDT) - tour->deptime[j + 1];//increase in travel time
+									if (shift <= tour->max_shift[j + 1])//check of het punt geinsert kan worden
+									{
+										adm_nb.push(Two_one_rep_nb(d, g, h, j, y, y->score - lostscore));
+									}
+								}//end cap constraints
+							}//end availability &score check
+						}//for all nb
+					}//end for all positions in solrem
+				}//end if g & h are different
+			}//end for all included regular vertices in sol
+		}//end for all included regular vertices in sol
+	}//end for all tours
+	return adm_nb;
 }// end two_one_replace_gen_nb(Sol& sol)
 
 

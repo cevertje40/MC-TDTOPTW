@@ -17,6 +17,7 @@
 #include <boost/dynamic_bitset.hpp>
 #include "time.h"
 #include <boost/heap/priority_queue.hpp>
+#include <boost/circular_buffer.hpp>
 
 
 using namespace std;

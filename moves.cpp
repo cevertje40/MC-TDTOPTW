@@ -692,7 +692,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 		{
 			Ins::Vertex* x = tour->seq[j];//predecessor y
 			Ins::Vertex* z = tour->seq[j + 1];//successor y
-			int breakz = tour->action[j + 1];
+			int breakz = tour->action[j + 1];//break on z
 			int nb_size = (int)x->nb[d].size();
 			for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 			{
@@ -2051,7 +2051,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									int breakb = 0;
 									int breakc = 0;
 									//local evaluation on path d
-									//due to potential traveltime decrease break can come to early
+									//due to potential traveltime decrease break can come too early
 									bool reqbreakd = false;
 									if (tourd->breakindex >= i + 1)//update break if it is currently position at x or after
 									{
@@ -2081,7 +2081,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									}
 									arrivaltime += b->serv;
 									departuretime = arrivaltime;
-									//traveltime from b to y (can be the end depot)
+									//traveltime from b to y (can be on the end depot)
 									arrivaltime = ins->arrival_time(b->con[y->index], departuretime);
 									if ((reqbreakd) && ((max(y->LTW[d] - ins->breakdur,arrivaltime) >= ins->breakstart) || (y->index == ins->maxvertices - 1)))
 									{
@@ -2101,7 +2101,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double diffd = (ins->t[d].EDT+tourd->deptime[i + 2])-arrivaltimey;
 
 									//local evaluation on path e
-									//due to potential traveltime decrease break can come to early
+									//due to potential traveltime decrease break can come too early
 									bool reqbreake = false;
 									if (toure->breakindex >= j + 1)
 									{
@@ -2160,7 +2160,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 										for (int m = i + 3; m < (int) tourd->seq.size(); ++m)
 										{
 											Ins::Vertex* o = tourd->seq[m - 1];
-											Ins::Vertex* p = tourd->seq[m];//can be de end depot
+											Ins::Vertex* p = tourd->seq[m];//can be the end depot
 											int breakp = 0;
 											//travel time from o to p
 											double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
@@ -2251,10 +2251,9 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			{
 				actualdecrease += remember.tours[t].deptime.back()-sol.tours[t].deptime.back();
 			}
-			//sol.check();
+			sol.check();
 			if (abs(bestdecrease - actualdecrease) > 0.01)
 			{
-				
 				cout << "error swap2" << endl;
 			}
 			succes = true;

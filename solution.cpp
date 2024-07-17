@@ -154,7 +154,7 @@ void Sol::check()
 						}
 						else
 						{
-							cout << red << "path" << d << "break wrongly planned at end vertex" << endl;
+							cout << red << "path" << d << " break wrongly planned at end vertex" << endl;
 						}
 					}
 					else
@@ -243,6 +243,73 @@ void Sol::update_traveltime(int tour, int start, int end)//update travel time an
 
 void Sol::update_traveltime_break(int tour, int start, int end)//update travel time and maxshift and potentially reschedule break
 {
+	//evaluate tour without break
+	double currenttime = ins->t[tour].EDT;
+	int earliestbreakindex = tours[tour].seq.size()-1;//default to end depot
+	bool earliestbreaktofind = true;
+	vector<double>waitingtime(tours[tour].seq.size(),0.0);
+	for (int u = 0; u < end - 1; ++u)
+	{
+		//gather departure time and corresponding time slot
+		Ins::Vertex* o = tours[tour].seq[u];
+		Ins::Vertex* p = tours[tour].seq[u + 1];
+		//travel time from van o to p
+		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
+		if ((earliestbreaktofind) && (max(p->LTW[tour] - ins->breakdur, arrivaltime) >= ins->breakstart))//arrival time need to be higher than breakstart not dep-serv
+		{//determine earliest feasible point to insert a break
+			earliestbreakindex = u+1;
+			earliestbreaktofind = false;
+		}
+		if (arrivaltime < p->LTW[tour])
+		{
+			waitingtime[u+1] = p->LTW[tour] - arrivaltime;
+			arrivaltime = p->LTW[tour];
+
+		}
+		arrivaltime += p->serv;
+		tours[tour].deptime[u + 1] = arrivaltime - ins->t[tour].EDT;
+		currenttime = arrivaltime;
+	}//end for
+	//calc max_shift to check where there is room to insert a break
+	calc_maxshift(tours[tour]);
+	//determine if there is enough room to insert the break
+	bool breakindexnotfound = true;
+	for (int u = earliestbreakindex; u <= end-1; ++u)//end depot included
+	{
+		if (tours[tour].max_shift[u]+waitingtime[u] >= ins->breakdur)
+		{
+			tours[tour].action[u] = 1;
+			tours[tour].breakindex = u;
+			tours[tour].deptime[u] += ins->breakdur;
+			breakindexnotfound = false;
+			break;
+		}
+	}
+	if (breakindexnotfound)
+	{//put break on enddepot
+		tours[tour].action.back() = 1;
+	}
+	//update traveltime and max_shift
+	currenttime = tours[tour].deptime[tours[tour].breakindex - 1] + ins->t[tour].EDT;
+	for (int u = tours[tour].breakindex-1; u < end-1; ++u)
+	{
+		//gather departure time and corresponding time slot
+		Ins::Vertex* o = tours[tour].seq[u];
+		Ins::Vertex* p = tours[tour].seq[u + 1];
+		//travel time from van o to p
+		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
+		if (arrivaltime + (tours[tour].action[u + 1] * ins->breakdur) < p->LTW[tour])
+		{
+			arrivaltime = p->LTW[tour] - (tours[tour].action[u + 1] * ins->breakdur);
+		}
+		arrivaltime += p->serv + (tours[tour].action[u + 1] * ins->breakdur);
+		//update max_shift
+		tours[tour].max_shift[u + 1] = (tours[tour].deptime[u + 1] + tours[tour].max_shift[u + 1]) - (arrivaltime - ins->t[tour].EDT);
+		tours[tour].deptime[u + 1] = arrivaltime - ins->t[tour].EDT;
+		currenttime = arrivaltime;
+	}
+	//check();
+	/*
 	bool reqbreak = true;
 	double currenttime = tours[tour].deptime[start] + ins->t[tour].EDT;
 	for (int u = start; u < end - 1; ++u)
@@ -252,7 +319,7 @@ void Sol::update_traveltime_break(int tour, int start, int end)//update travel t
 		Ins::Vertex* p = tours[tour].seq[u + 1];
 		//travel time from van o to p
 		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-		if ((reqbreak) &&(max(p->LTW[tour] - ins->breakdur,arrivaltime) >= ins->breakstart))
+		if ((reqbreak) &&(max(p->LTW[tour] - ins->breakdur,arrivaltime) >= ins->breakstart)&&(arrivaltime+ins->breakdur<p->UTW[tour]))
 		{
 			tours[tour].action[u+1] = 1;
 			tours[tour].breakindex = u+1;
@@ -272,13 +339,14 @@ void Sol::update_traveltime_break(int tour, int start, int end)//update travel t
 		tours[tour].deptime[u + 1] = arrivaltime - ins->t[tour].EDT;
 		currenttime = arrivaltime;
 	}//end for
-	if (reqbreak)
+	if (reqbreak)//set break on end depot
 	{
 		tours[tour].action.back() = 1;
 		tours[tour].deptime.back() += ins->breakdur;
 		tours[tour].breakindex = (int)tours[tour].seq.size() - 1;
 		reqbreak = false;
 	}
+	*/
 }
 
 void Sol::update_maxshift(int tour, int start, int end, double arrivaltime)

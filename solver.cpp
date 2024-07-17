@@ -723,6 +723,7 @@ void Tabu::parallel_construct(Sol& sol)
 		{
 			tour.action.push_back(0);
 		}
+		sol.calc_maxshift(tour);
 	}
 	sol.check();
 }
@@ -825,6 +826,7 @@ Res Tabu::solve(int bestknown)
 					{
 						One_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
+						s.check();
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -857,6 +859,7 @@ Res Tabu::solve(int bestknown)
 					{
 						Two_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
+						s.check();
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -888,7 +891,12 @@ Res Tabu::solve(int bestknown)
 					if (execute)
 					{
 						One_two_rep_nb exec_nb = adm_nb.top();
+						//if (debug_iter == 38)
+						//{
+							//cout << "hier" << endl;
+						//}
 						exec_nb.execute(s);
+						s.check();
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -899,12 +907,13 @@ Res Tabu::solve(int bestknown)
 				break;
 			}
 		}//end switch
-		//s.check();
+		
 		//VND
 		two_opt_nb(s, 1);
 		swap_nb(s, 1);
 		swap2_nb(s, 1);
 		move_nb(s, 1);
+		s.check();
 		if (s.score > gb.score)
 		{
 			gb = s;

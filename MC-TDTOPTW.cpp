@@ -159,7 +159,7 @@ vector<Dataset> read_dataset(string filename)
 	return set;
 }
 
-void solve_dataset(int testruns)
+void solve_dataset(int max_rep = 5)
 {
 	cout << fixed << setprecision(2) << "enter name of dataset" << endl;
 	string filename;
@@ -168,25 +168,65 @@ void solve_dataset(int testruns)
 	{
 		filename = "all.txt";
 	}
+	ofstream output;
+	output.open("output.txt", ios::out);
+	output << "solution methods for the CTOP \n";
+	output << "filename,bestscore,score,cpu,gap\n";
+	output.close();
 	vector<Dataset> set = read_dataset(filename);
-	vector<Res> resdataset;
 	vector<Dataset>::iterator it;
 	for (it = set.begin(); it != set.end(); ++it)
 	{
-		Ins::MCTDTOPTW textfile = { it->path,it->filename };
-		Ins instance(textfile);
-		Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
-		resdataset.push_back(acs.solve());
+		it->result.resize(max_rep);
 	}
+
+	for (int rep = 0; rep < max_rep; ++rep)
+	{
+		//solve the dataset
+		double avggap = 0.0;
+		double avgscore = 0.0;
+		for (it = set.begin(); it != set.end(); ++it)
+		{
+			Ins::MCTDTOPTW textfile = { it->path,it->filename };
+			Ins instance(textfile);
+			//Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
+			//resdataset.push_back(acs.solve());
+			Tabu tabu(instance, 10000, 20);
+			it->result[rep] = tabu.solve(it->bestscore);
+			avggap += it->result[rep].gap;
+			avgscore += it->result[rep].score;
+			cout << "name: " << it->filename << " best score: " << it->bestscore << " ACS score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			output.open("output.txt", ios::out | ios::app);
+			output << it->filename << ";" << it->bestscore << ";" << it->result[rep].score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
+			output.close();
+		}
+	}
+	//calculate results over all replicates
+	double globalgap = 0.0;
+	for (it = set.begin(); it != set.end(); ++it)
+	{
+		double avgscore = 0.0;
+		for (int rep = 0; rep < max_rep; ++rep)
+		{
+			avgscore += it->result[rep].score;
+		}
+		avgscore /= max_rep;
+		double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100;
+		globalgap += avggap;
+	}
+	globalgap /= set.size();
+	cout << "global avg gap is: " << globalgap << endl;
 }
 
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.3.3.3.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.3.3.txt" };
 	Ins instance(textfile);
-	Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
-	resdataset.push_back(acs.solve());
+	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
+	//resdataset.push_back(acs.solve());
+	Tabu tabu(instance, 10000, 20);
+	resdataset.push_back(tabu.solve());
 }
 
 void debug_ctop()
@@ -215,7 +255,7 @@ void ctop_gap(int max_rep=5)
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
-	output << "SACS for the CTOP \n";
+	output << "solution methods for the CTOP \n";
 	output << "filename,bestscore,score,cpu,gap\n";
 	output.close();
 	vector<Dataset> set = read_dataset(filename);
@@ -272,7 +312,8 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 
-	//solve_dataset(1);
+	solve_dataset(1);
+	//debug_instance();
 	//debug_ctop();
-	ctop_gap(1);
+	//ctop_gap(1);
 }

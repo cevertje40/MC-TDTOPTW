@@ -43,6 +43,7 @@ public:
 	void execute(Sol& sol)
 	{
 		sol.removevertex(sol.tours[tour], rempos);
+		//sol.check();
 		sol.insertvertex(sol.tours[tour], inscand1, inspos1);
 		sol.insertvertex(sol.tours[tour], inscand2, inspos2 + 1);
 	}

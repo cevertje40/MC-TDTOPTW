@@ -802,12 +802,12 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s);
+				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
 					//check if the best move is tabu
-					while (tabulist.is_tabu(adm_nb.top()))
+					while (tabulist.is_tabu(adm_nb.top())&&(adm_nb.top().score<gb.score))
 					{
 						//delete move if tabu
 						if (adm_nb.size() > 1)
@@ -828,19 +828,19 @@ Res Tabu::solve(int bestknown)
 						tabulist.make_tabu(exec_nb);
 					}
 				}
-				else
-				{
-					cout << "not nb" << endl;
-				}
+				//else
+				//{
+					//cout << "not nb" << endl;
+				//}
 				break;
 			}
 			case 2:
 			{
-				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s);
+				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
-					while (tabulist.is_tabu(adm_nb.top()))
+					while ((tabulist.is_tabu(adm_nb.top()))&&(adm_nb.top().score < gb.score))
 					{
 						execute = true;
 						if (adm_nb.size() > 1)
@@ -860,19 +860,19 @@ Res Tabu::solve(int bestknown)
 						tabulist.make_tabu(exec_nb);
 					}
 				}
-				else
-				{
-					cout << "not nb" << endl;
-				}
+				//else
+				//{
+					//cout << "not nb" << endl;
+				//}
 				break;
 			}
 			case 3:
 			{
-				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s);
+				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
-					while (tabulist.is_tabu(adm_nb.top()))
+					while ((tabulist.is_tabu(adm_nb.top())) && (adm_nb.top().score < gb.score))
 					{
 						execute = true;
 						if (adm_nb.size() > 1)
@@ -892,10 +892,10 @@ Res Tabu::solve(int bestknown)
 						tabulist.make_tabu(exec_nb);
 					}
 				}
-				else
-				{
-					cout << "not nb" << endl;
-				}
+				//else
+				//{
+					//cout << "not nb" << endl;
+				//}
 				break;
 			}
 		}//end switch
@@ -915,6 +915,7 @@ Res Tabu::solve(int bestknown)
 			++noimpr;
 		}
 		++debug_iter;
+		//cout << debug_iter << endl;
 	}//end while smaller than max_noimpr
 	end = clock();
 	double cpuTime;

@@ -94,9 +94,9 @@ public:
 	bool one_two_replace(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	Ins* ins;
 	//nb generating moves
-	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol);
-	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol);
-	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol);
+	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, int limit);
+	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, int limit);
+	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, int limit);
 	Moves(Ins& ins) :ins(&ins) {}
 };
 

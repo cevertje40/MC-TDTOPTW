@@ -211,7 +211,7 @@ Ins::Ins(CTOP textfile)
 			v[i].volume = v[i].weight;
 			str >> v[i].serv;
 			str >> v[i].score;
-			v[i].serv = 0.0;//set service time equal to for set1-3
+			//v[i].serv = 0.0;//set service time equal to for set1-3
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)

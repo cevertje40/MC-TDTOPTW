@@ -349,7 +349,8 @@ void Tour::update_traveltime_break(int start, int end)//update travel time and m
 
 	if (breakindex == seq.size() - 1)
 	{
-		double arrivaltime;
+		max_shift.back() = (ins->t[index].T_max - deptime.back());
+		double arrivaltime = ins->t[index].LAT - (action.back() * ins->breakdur);
 		if (ins->t[index].EDT + ins->t[index].T_max > ins->breakend + ins->breakdur)
 		{
 			max_shift.back() = (ins->breakend + ins->breakdur) - (deptime.back() + ins->t[index].EDT);
@@ -504,7 +505,7 @@ void Tour::remove_vertex(int position)
 	}
 	else
 	{
-		update_traveltime(position - 1, int(seq.size()));//update travel time for all after deletion
+		update_traveltime(position - 1, int(seq.size()));//update travel time for all vertices after deletion
 	}
 	calc_maxshift();
 }//end remove_vertex tour version

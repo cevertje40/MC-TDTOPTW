@@ -972,7 +972,6 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 		int end = (int)sol.tours[d].seq.size();
 		for (int g = 1; g < end - 1; ++g)// for all  included regular vertices in sol
 		{
-			int end = (int)sol.tours[d].seq.size();
 			for (int h = 1; h < end - 1; ++h)// for all  inlcuded regular vertices in sol
 			{
 				if (g != h)
@@ -982,15 +981,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 					Ins::Vertex* r = tourrem.seq[g];//to be removed vertex 1
 					Ins::Vertex* s = tourrem.seq[h];//to be removed vertex 2
 					int lostscore = r->score + s->score;
-					tourrem.remove_vertex(g);
-					if (g < h)
-					{
-						tourrem.remove_vertex(h - 1);
-					}
-					else
-					{
-						tourrem.remove_vertex(h);
-					}
+					tourrem.remove_vertices(g, h);
 					int endj = (int)tourrem.seq.size();
 					for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
 					{

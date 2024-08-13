@@ -838,6 +838,10 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
+				//if (debug_iter == 706)
+				//{
+				//	cout << "hier" << endl;
+				//}
 				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
@@ -857,6 +861,7 @@ Res Tabu::solve(int bestknown)
 					}
 					if (execute)
 					{
+						
 						Two_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
 						s.check();
@@ -891,10 +896,6 @@ Res Tabu::solve(int bestknown)
 					if (execute)
 					{
 						One_two_rep_nb exec_nb = adm_nb.top();
-						//if (debug_iter == 38)
-						//{
-							//cout << "hier" << endl;
-						//}
 						exec_nb.execute(s);
 						s.check();
 						tabulist.make_tabu(exec_nb);
@@ -913,7 +914,7 @@ Res Tabu::solve(int bestknown)
 		swap_nb(s, 1);
 		swap2_nb(s, 1);
 		move_nb(s, 1);
-		s.check();
+		//s.check();
 		if (s.score > gb.score)
 		{
 			gb = s;

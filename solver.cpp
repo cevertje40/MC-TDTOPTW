@@ -838,10 +838,6 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
-				//if (debug_iter == 706)
-				//{
-				//	cout << "hier" << endl;
-				//}
 				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
@@ -912,6 +908,10 @@ Res Tabu::solve(int bestknown)
 		//VND
 		two_opt_nb(s, 1);
 		swap_nb(s, 1);
+		//if (debug_iter == 768)
+		//{
+		//	cout << "hier" << endl;
+		//}
 		swap2_nb(s, 1);
 		move_nb(s, 1);
 		//s.check();

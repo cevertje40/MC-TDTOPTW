@@ -221,7 +221,7 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.2.3.3.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.3.1.1.txt" };
 	Ins instance(textfile);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
@@ -312,8 +312,8 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 
-	solve_dataset(1);
-	//debug_instance();
+	//solve_dataset(1);
+	debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);
 }

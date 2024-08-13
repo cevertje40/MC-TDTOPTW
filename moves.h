@@ -20,10 +20,8 @@ public:
 		if (rempos != -1)//replace
 		{
 			sol.remove_vertex(sol.tours[tour], rempos);
-			//sol.check();
 		}
 		sol.insert_vertex(sol.tours[tour], inscand, inspos);
-		//sol.check();
 	}
 };
 
@@ -67,7 +65,6 @@ public:
 	void execute(Sol& sol)
 	{
 		sol.remove_vertices(sol.tours[tour],rempos1,rempos2);
-		//sol.check();
 		sol.insert_vertex(sol.tours[tour], inscand, inspos);
 	}
 };

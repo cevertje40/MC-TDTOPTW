@@ -1931,6 +1931,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 {
 	bool improvement = true;
 	bool succes = false;
+	int iter = 0;
 	while (improvement)
 	{
 		improvement = false;
@@ -2092,7 +2093,8 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 		}// end for masterpath d
 		if (improvement)
 		{
-			swap2:
+		swap2:
+			++iter;
 			Sol remember = sol;
 			Ins::Vertex *x = bestd->seq[besti];
 			Ins::Vertex *b = beste->seq[bestj];

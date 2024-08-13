@@ -260,7 +260,7 @@ void Aco::construct(Sol& sol)
 			tour.deptime.back() += ins->breakdur;
 			tour.breakindex = int(tour.seq.size()) - 1;
 		}
-		sol.calc_maxshift(tour);
+		tour.calc_maxshift();
 	}//end for all d
 	//make end depot unaivailable for other moves
 	sol.available[ins->maxvertices - 1] = false;
@@ -468,7 +468,7 @@ void Ils::serial_construct(Sol& sol)
 			tour.deptime.back() += ins->breakdur;
 			tour.breakindex = int(tour.seq.size()) - 1;
 		}
-		sol.calc_maxshift(tour);
+		tour.calc_maxshift();
 	}//end for all d
 	//make end depot unaivailable for other moves
 	sol.available[ins->maxvertices - 1] = false;
@@ -514,14 +514,14 @@ void Ils::shake(Sol& sol, int post, int cons)
 				{
 					tour.action[vv] = 0;
 				}
-				sol.update_traveltime_break(tour.index, post - 1, int(tour.seq.size()));
+				tour.update_traveltime_break(post - 1, int(tour.seq.size()));
 
 			}
 			else
 			{
-				sol.update_traveltime(tour.index, post - 1, int(tour.seq.size()));
+				tour.update_traveltime(post - 1, int(tour.seq.size()));
 			}
-			sol.calc_maxshift(tour);
+			tour.calc_maxshift();
 		}//end if tour is not empty
 	}//end for all tours
 }//end shake
@@ -723,10 +723,10 @@ void Tabu::parallel_construct(Sol& sol)
 		{
 			tour.action.push_back(0);
 		}
-		sol.calc_maxshift(tour);
+		tour.calc_maxshift();
 	}
 	sol.check();
-}
+}//end parallel construct
 
 void Tabu::Tabulist::make_tabu(One_one_rep_nb& exec_nb)
 {

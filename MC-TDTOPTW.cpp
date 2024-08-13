@@ -312,8 +312,8 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 
-	solve_dataset(1);
-	//debug_instance();
+	//solve_dataset(1);
+	debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);
 }

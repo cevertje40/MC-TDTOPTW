@@ -19,9 +19,11 @@ public:
 	{
 		if (rempos != -1)//replace
 		{
-			sol.removevertex(sol.tours[tour], rempos);
+			sol.remove_vertex(sol.tours[tour], rempos);
+			sol.check();
 		}
-		sol.insertvertex(sol.tours[tour], inscand, inspos);
+		sol.insert_vertex(sol.tours[tour], inscand, inspos);
+		sol.check();
 	}
 };
 
@@ -42,10 +44,9 @@ public:
 	}
 	void execute(Sol& sol)
 	{
-		sol.removevertex(sol.tours[tour], rempos);
-		//sol.check();
-		sol.insertvertex(sol.tours[tour], inscand1, inspos1);
-		sol.insertvertex(sol.tours[tour], inscand2, inspos2 + 1);
+		sol.remove_vertex(sol.tours[tour], rempos);
+		sol.insert_vertex(sol.tours[tour], inscand1, inspos1);
+		sol.insert_vertex(sol.tours[tour], inscand2, inspos2 + 1);
 	}
 };
 
@@ -65,16 +66,9 @@ public:
 	}
 	void execute(Sol& sol)
 	{
-		sol.removevertex(sol.tours[tour], rempos1);
-		if (rempos1 < rempos2)
-		{
-			sol.removevertex(sol.tours[tour], rempos2 - 1);
-		}
-		else
-		{
-			sol.removevertex(sol.tours[tour], rempos2);
-		}
-		sol.insertvertex(sol.tours[tour], inscand, inspos);
+		sol.remove_vertices(sol.tours[tour],rempos1,rempos2);
+		sol.check();
+		sol.insert_vertex(sol.tours[tour], inscand, inspos);
 	}
 };
 

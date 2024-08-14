@@ -40,11 +40,13 @@ public:
 	Sol(){}
 	~Sol(){}
 	Sol(Ins& ins);
-	void insert_vertex(Tour &tour,Ins::Vertex* candidate, int position);//update score and availability 
-	void replace_vertex(Tour& tour,Ins::Vertex* candidate, int position);//update score and availability 
-	void remove_vertex(Tour& tour, int position);//update score and availability
-	void remove_vertices(Tour& tour, int position1, int position2);//update score and availability
+	void input_custom();
+	void insert_vertex(Tour &tour, Ins::Vertex* candidate, int position);//update score and availability 
+	void replace_vertex(Tour &tour, Ins::Vertex* candidate, int position);//update score and availability 
+	void remove_vertex(Tour &tour, int position);//update score and availability
+	void remove_vertices(Tour &tour, int position1, int position2);//update score and availability
 	void reset();
-	void check();
+	bool check();
+	bool isavailable(Ins::Vertex* candidate);
 	friend ostream& operator<<(ostream& output, Sol& sol);
 };

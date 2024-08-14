@@ -28,6 +28,55 @@ Sol::Sol(Ins& ins):ins(&ins)
 	available[ins.v[0].index] = false;
 }
 
+void Sol::input_custom()
+{
+	//input vertex indices here replace later with read in from txt file
+	vector<vector<int>> inputv(ins->maxtours);
+	inputv[0] = {30,52,60,24,6,18,14,99};
+	inputv[1] = {80,4,66,88,64,21,11,99};
+	inputv[2] = {41,33,17,38,94,23,99};
+	inputv[3] = {77,85,81,42,71,20,99};
+	vector<vector<int>> inputb(ins->maxtours);
+	inputb[0] = {0,0,0,1,0,0,0,0};
+	inputb[1] = {0,0,0,0,1,0,0,0};
+	inputb[2] = {0,0,0,1,0,0,0,0};
+	inputb[3] = {0,0,0,1,0,0,0};
+	//construct the tours
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Sol::Tour* tour = &tours[t];
+		double currenttime = ins->t[t].EDT;
+		Ins::Vertex* last = tour->seq[0];
+		for (int i = 0; i < inputv[t].size(); ++i)
+		{
+			Ins::Vertex* candidate = &ins->v[inputv[t][i]];
+			tour->seq.push_back(candidate);
+			available[candidate->index] = false;
+			tour->score += candidate->score;
+			score += candidate->score;
+			tour->max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+			tour->volume += candidate->volume;
+			tour->weight += candidate->weight;
+			tour->action.push_back(inputb[t][i]);
+			if (inputb[t][i] == 1)
+			{
+				tour->breakindex = i+1;
+			}
+			//deptime calc
+			double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
+			if (arrivaltime + inputb[t][i] * ins->breakdur < candidate->LTW[t])
+			{
+				arrivaltime = candidate->LTW[t] - (inputb[t][i] * ins->breakdur);
+			}
+			arrivaltime += candidate->serv + (inputb[t][i] * ins->breakdur);
+			tour->deptime.push_back(arrivaltime - ins->t[t].EDT);
+			currenttime = arrivaltime;
+			last = candidate;
+		}//end tour creation
+		tour->calc_maxshift();
+	}//end for all tours
+}//end input custom
+
 ostream& operator<<(ostream& output, Sol& sol)
 {
 	const char sep = ' ';
@@ -54,7 +103,10 @@ ostream& operator<<(ostream& output, Sol& sol)
 		output << left << setw(7) << setfill(sep) << "vol";
 		output << left << setw(7) << setfill(sep) << "wei";
 		output << left << setw(8) << setfill(sep) << "dep";
-		output << left << setw(8) << setfill(sep) << "shift" << "\n";
+		output << left << setw(8) << setfill(sep) << "LTW";
+		output << left << setw(8) << setfill(sep) << "UTW";
+		output << left << setw(8) << setfill(sep) << "shift";
+		output << left << setw(8) << setfill(sep) << "break" << "\n";
 		for (int i = 0; i < end; ++i)
 		{
 			output << left << setw(4) << setfill(sep) << i;
@@ -62,16 +114,20 @@ ostream& operator<<(ostream& output, Sol& sol)
 			output << left << setw(7) << setfill(sep) << sol.tours[d].seq[i]->score;
 			output << left << setw(7) << setfill(sep) << sol.tours[d].seq[i]->volume;
 			output << left << setw(7) << setfill(sep) << sol.tours[d].seq[i]->weight;
-			output << left << setw(8) << setfill(sep) << sol.tours[d].deptime[i] << " [" << sol.tours[d].seq[i]->LTW[d] - sol.ins->t[d].EDT << " ; " << sol.tours[d].seq[i]->UTW[d] - sol.ins->t[d].EDT << "]";
-			output << left << setw(8) << setfill(sep) << sol.tours[d].max_shift[i] << "\n";
+			output << left << setw(8) << setfill(sep) << sol.tours[d].deptime[i];
+			output << left << setw(8) << setfill(sep) << sol.tours[d].seq[i]->LTW[d] - sol.ins->t[d].EDT;
+			output << left << setw(8) << setfill(sep) << sol.tours[d].seq[i]->UTW[d] - sol.ins->t[d].EDT;
+			output << left << setw(8) << setfill(sep) << sol.tours[d].max_shift[i];
+			output << left << setw(8) << setfill(sep) << sol.tours[d].action[i] << "\n";
 		}
 	}
 	output << "total score : " << sol.score;
 	return output;
 }//end output operator
 
-void Sol::check()
+bool Sol::check()
 {
+	bool solok = true;
 	int scorecheck = 0;
 	vector<int> included(ins->maxvertices, 0);
 	for (int d=0;d<ins->maxtours;++d)
@@ -106,25 +162,28 @@ void Sol::check()
 		}//end for i
 		length = currenttime - ins->t[d].EDT;
 		if (abs(length-tours[d].deptime.back())>0.01)
-			cout << red << "tour: " << d << "new calculated length: " << length << " stored length: " << tours[d].deptime.back() << "max length" << ins->t[d].T_max << endl;
+			cout << red << "tour: " << d << " new calculated length: " << length << " stored length: " << tours[d].deptime.back() << "max length" << ins->t[d].T_max << endl;
 		//3. TW check
 		for (int i = 0; i <= end; ++i)//utw van end depot ook checken
 		{
 			Ins::Vertex* current = tours[d].seq[i];
 			int breakcurrent = tours[d].action[i];
-			if (tours[d].deptime[i] + ins->t[d].EDT - tours[d].seq[i]->serv+0.01 < current->LTW[d])//service time zit al in traveltime
-				cout << red << "tour: " << d << "FAILURE!!! LTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
+			if (tours[d].deptime[i] + ins->t[d].EDT - tours[d].seq[i]->serv + 0.01 < current->LTW[d])//service time zit al in traveltime
+			{
+				cout << red << "tour: " << d << " LTW violation for position: " << i << " /vertex index: " << current->index << endl;
+			}
 			if (((tours[d].deptime[i] + ins->t[d].EDT) - tours[d].seq[i]->serv) -0.01> current->UTW[d])
 			{
-				cout << red << "tour: " << d << "FAILURE!!! UTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
+				cout << red << "tour: " << d << " UTW violation for position: " << i << " /vertex index: " << current->index << endl;
+				solok = false;
 			}
 		}//end for i
 		//4. weight check
 		if (abs(weightcheck-tours[d].weight)>0.01)
-			cout << red << "tour: " << d << "new calculated weight" << weightcheck << "stored weight: " << tours[d].weight << "max: " << ins->t[d].W_max << endl;
+			cout << red << "tour: " << d << " new calculated weight" << weightcheck << " stored weight: " << tours[d].weight << " max: " << ins->t[d].W_max << endl;
 		//5. volume check
 		if (abs(volumecheck-tours[d].volume)>0.01)
-			cout << yellow << "tour: " << d << "new calculated volume" << volumecheck << "stored volume " << tours[d].volume << "max: " << ins->t[d].V_max << endl;
+			cout << yellow << "tour: " << d << " new calculated volume: " << volumecheck << " stored volume: " << tours[d].volume << " max: " << ins->t[d].V_max << endl;
 		//6. break timing check
 		bool breakcheck = false;
 		int amountbreaks = 0;
@@ -134,7 +193,7 @@ void Sol::check()
 			{
 				if (tours[d].breakindex != i)
 				{
-					cout << red << "tour: " << d << "breakindex and sol action don't match" << endl;
+					cout << red << "tour: " << d << " breakindex and sol action don't match" << endl;
 				}
 				++amountbreaks;
 				Ins::Vertex* vert = tours[d].seq[i];
@@ -163,11 +222,11 @@ void Sol::check()
 
 						if ((ins->t[d].EDT + tours[d].deptime[i] - tours[d].seq[i]->serv) - (ins->breakdur) < ins->breakstart)
 						{
-							cout << red << "tour: " << d << "break too early" << endl;
+							cout << red << "tour: " << d << " break too early" << endl;
 						}
 						else
 						{
-							cout << red << "tour: " << d << "break too late" << endl;
+							cout << red << "tour: " << d << " break too late" << endl;
 						}
 					}
 				}
@@ -180,7 +239,7 @@ void Sol::check()
 		}
 		else
 		{
-			cout << red << "tour: " << d << "amount of breaks not ok" << amountbreaks << endl;
+			cout << red << "tour: " << d << " amount of breaks not ok" << amountbreaks << endl;
 		}
 		//8. path should start and end at the respective depots
 		if ((tours[d].seq[0] == &ins->v[0]) && (tours[d].seq.back() == &ins->v[ins->maxvertices - 1]))
@@ -189,7 +248,7 @@ void Sol::check()
 		}
 		else
 		{
-			cout << red << "tour: " << d << "start and end vertex not ok" << endl;
+			cout << red << "tour: " << d << " start and end vertex not ok" << endl;
 		}
 		// 9.max_shift check
 		vector<double> max_shiftcheck(tours[d].max_shift.size(), 0);
@@ -237,7 +296,7 @@ void Sol::check()
 		{
 			if (abs(tours[d].max_shift[i]-max_shiftcheck[i])>0.01)
 			{
-				cout << red << "tour: " << d << "error in max_shift for position: " << i << endl;
+				cout << red << "tour: " << d << " error in max_shift for position: " << i << endl;
 			}
 		}
 	}//end for all tours
@@ -247,7 +306,7 @@ void Sol::check()
 	{
 		if (included[i] > 1)//regular vertex included more than once
 		{
-			cout << red << "FAILURE!!! inclusion check fails for vertex:" << i << endl;
+			cout << red << "included more than one, vertex:" << i << endl;
 		}
 		if (included[i] == 1)
 		{
@@ -268,6 +327,19 @@ void Sol::check()
 	if (scorecheck != score)
 	{
 		cout << red << "score of best solution should be: " << scorecheck << " stored score is: " << score << endl;
+	}
+	return solok;
+}
+
+bool Sol::isavailable(Ins::Vertex* candidate)
+{
+	if (available[candidate->index])
+	{
+		return true;
+	}
+	else
+	{
+		return false;
 	}
 }
 
@@ -559,9 +631,9 @@ void Tour::replace_vertex(Ins::Vertex* candidate, int position)
 	score += candidate->score - old->score;// update score of the new solution
 	if (reqbreak)
 	{
-		update_traveltime_break(position - 1, int(seq.size()));
+		update_traveltime_break(position - 1, int(seq.size()));//update travel time and max_shift for complete tour
 		//if you reposition the break, maxshift has to be recalculated
-		calc_maxshift();
+		//calc_maxshift();
 	}
 	else
 	{

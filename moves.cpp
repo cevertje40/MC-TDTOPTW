@@ -683,7 +683,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	int bestscore = -INT_MAX;
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
-		//INSERT PART
+		//1- INSERT PART
 		Sol::Tour& tour = sol.tours[d];
 		int endj = (int)tour.seq.size();
 		for (int j = 0; j < endj - 1; ++j)// for positions in the tour
@@ -735,7 +735,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 				}//end availability
 			}//for all nb
 		}//end for all positions in sol
-		//REPLACE PART
+		//1- REPLACE PART
 		int endh = (int)sol.tours[d].seq.size();
 		for (int h = 1; h < endh - 1; ++h)// for all  included regular vertices
 		{
@@ -744,7 +744,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 			Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
 			tourrem.remove_vertex(h);
 			int endj = (int)tourrem.seq.size();
-			for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
+			for (int j = 0; j < endj - 1; ++j)// for all positions in tourrem
 			{
 				Ins::Vertex* x = tourrem.seq[j];//predecessor y
 				Ins::Vertex* z = tourrem.seq[j + 1];//successor y
@@ -808,7 +808,6 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 		for (int h = 1; h < endh - 1; ++h)// for all included regular vertices in sol
 		{
 			//for all existing regular member vertices: remove 1 and revaluate solution
-			
 			Sol::Tour tourrem = sol.tours[d];
 			Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
 			tourrem.remove_vertex(h);
@@ -824,11 +823,10 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 						Ins::Vertex* b = &ins->v[j];//candidate 2
 						if ((sol.available[a->index]) && (sol.available[b->index]))
 						{//availability
-							
-								if ((tourrem.weight + a->weight + b->weight <= ins->t[d].W_max) && (tourrem.volume + a->volume + b->volume <= ins->t[d].V_max))//cap constraint check
-								{//capacity constraints
-									candidatelist.push_back(pair<Ins::Vertex*, Ins::Vertex*>(a, b));
-								}
+							if ((tourrem.weight + a->weight + b->weight <= ins->t[d].W_max) && (tourrem.volume + a->volume + b->volume <= ins->t[d].V_max))//cap constraint check
+							{//capacity constraints
+								candidatelist.push_back(pair<Ins::Vertex*, Ins::Vertex*>(a, b));
+							}
 						}
 					}
 				}
@@ -1634,6 +1632,10 @@ bool Moves::swap_nb(Sol& sol, int mode)
 				Sol remember = sol;
 				tour.swap_vertices(besti, bestj);
 				double actualdecrease = remember.tours[d].deptime.back() - tour.deptime.back();
+				//if (!sol.check())
+				//{
+				//	cout << "error in swap" << endl;
+				//}
 				if (abs(bestdelta - actualdecrease) > 0.01)
 				{
 					cout << "error swap" << endl;
@@ -1736,6 +1738,10 @@ bool Moves::two_opt_nb(Sol& sol,int mode)
 				Sol remember = sol;
 				tour.opt_vertices(besti,bestj);
 				double actualdecrease = remember.tours[d].deptime.back() - tour.deptime.back();
+				//if (!sol.check())
+				//{
+				//	cout << "error in two opt" << endl;
+				//}
 				if (abs(bestdelta - actualdecrease) > 0.01)
 				{
 					cout << "error 2opt" << endl;
@@ -1920,7 +1926,10 @@ bool Moves::move_nb(Sol& sol,int mode)//move vertex x from tour d to tour e in o
 				//cout << "break pulled" << endl;
 				pull_break(sol, beste->index);
 			}
-			//sol.check();
+			//if (!sol.check())
+			//{
+			//	cout << "error in move_nb" << endl;
+			//}
 			succes = false;
 		}//end if improvement
 	}//end while improvement
@@ -1931,7 +1940,6 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 {
 	bool improvement = true;
 	bool succes = false;
-	int iter = 0;
 	while (improvement)
 	{
 		improvement = false;
@@ -2058,29 +2066,31 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double arrivaltimec =arrivaltime + c->serv;
 									double diffe = (ins->t[e].EDT+toure->deptime[j + 2]) - arrivaltimec;
 									double localdecreasetotal = diffd + diffe;
-									//local improvement check: check if potential increase is allowed and whether there is an overall travel time gain
+									//local improvement check: check if potential increase is allowed in the case of fixed break position and whether there is an overall travel time gain
 									if ((-diffd<= tourd->max_shift[i + 2]) && (-diffe <= toure->max_shift[j + 2]) && (localdecreasetotal > bestdecrease))
 									{
 										//check enddepot time on path d
 										Tour temptourd = *tourd;
 										temptourd.replace_vertex(b,i+1);
-										double globaldecreasetotal = tourd->deptime.back() - temptourd.deptime.back();
 										//check enddepot time on path e
 										Tour temptoure = *toure;
 										temptoure.replace_vertex(x,j+1);
-										globaldecreasetotal += toure->deptime.back() - temptoure.deptime.back();
-										//global improvement check
-										if (globaldecreasetotal > bestdecrease)
-										{
-											bestdecrease = globaldecreasetotal;
-											beste = toure;
-											bestj = j+1;
-											bestd = tourd;
-											besti = i+1;
-											improvement = true;
-											if (mode == 0)
+										if ((temptourd.deptime.back() <= ins->t[d].T_max) && (temptoure.deptime.back() <= ins->t[e].T_max))
+										{//break repositioning can lengthen a tour and turn it infeasible
+											double globaldecreasetotal = (tourd->deptime.back() - temptourd.deptime.back())+(toure->deptime.back() - temptoure.deptime.back());
+											//global improvement check
+											if (globaldecreasetotal > bestdecrease)
 											{
-												goto swap2;
+												bestdecrease = globaldecreasetotal;
+												beste = toure;
+												bestj = j + 1;
+												bestd = tourd;
+												besti = i + 1;
+												improvement = true;
+												if (mode == 0)
+												{
+													goto swap2;
+												}
 											}
 										}
 									}//end local check
@@ -2094,7 +2104,6 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 		if (improvement)
 		{
 		swap2:
-			++iter;
 			Sol remember = sol;
 			Ins::Vertex *x = bestd->seq[besti];
 			Ins::Vertex *b = beste->seq[bestj];
@@ -2106,7 +2115,10 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			{
 				actualdecrease += remember.tours[t].deptime.back()-sol.tours[t].deptime.back();
 			}
-			sol.check();
+			//if (!sol.check())
+			//{
+				//cout << "error in swap2" << endl;
+			//}
 			if (abs(bestdecrease - actualdecrease) > 0.01)
 			{
 				cout << "error swap2" << endl;

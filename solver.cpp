@@ -826,7 +826,10 @@ Res Tabu::solve(int bestknown)
 					{
 						One_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						s.check();
+						if(!s.check())
+						{
+							cout << "error in one_one" << endl;
+						}
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -857,10 +860,12 @@ Res Tabu::solve(int bestknown)
 					}
 					if (execute)
 					{
-						
 						Two_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						s.check();
+						if (!s.check())
+						{
+							cout << "error in two_one" << endl;
+						}
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -893,7 +898,10 @@ Res Tabu::solve(int bestknown)
 					{
 						One_two_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						s.check();
+						if (!s.check())
+						{
+							cout << "error in one_two" << endl;
+						}
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -907,14 +915,25 @@ Res Tabu::solve(int bestknown)
 		
 		//VND
 		two_opt_nb(s, 1);
+		if (!s.check())
+		{
+			cout << "error in vnd1" << endl;
+		}
 		swap_nb(s, 1);
-		//if (debug_iter == 768)
-		//{
-		//	cout << "hier" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in vnd2" << endl;
+		}
 		swap2_nb(s, 1);
+		if (!s.check())
+		{
+			cout << "error in vnd3" << endl;
+		}
 		move_nb(s, 1);
-		//s.check();
+		if (!s.check())
+		{
+			cout << "error in vnd4" << endl;
+		}
 		if (s.score > gb.score)
 		{
 			gb = s;

@@ -343,8 +343,9 @@ bool Sol::isavailable(Ins::Vertex* candidate)
 	}
 }
 
-void Tour::update_traveltime(int start, int end)//update travel time and max_shift but don't update break
+void Tour::update(int start, int end)//keep break fixed and update travel time and max_shift
 {
+	//update after start
 	double currenttime = deptime[start] + ins->t[index].EDT;
 	for (int u = start; u < end-1; ++u)
 	{
@@ -365,9 +366,10 @@ void Tour::update_traveltime(int start, int end)//update travel time and max_shi
 	}//end for
 }
 
-void Tour::update_traveltime_break(int start, int end)//update travel time and maxshift and potentially reschedule break
+void Tour::update_break()//potentially reposition break and update travel time and maxshift
 {
 	//evaluate tour without break
+	int end = (int) seq.size();
 	for (int vv = 0; vv < action.size(); ++vv)
 	{
 		action[vv] = 0;
@@ -556,9 +558,9 @@ void Tour::insert_vertex(Ins::Vertex* candidate, int position)
 		breakindex += 1;//due to insertion of 1 vertex the index needs to be incremented with 1
 	}
 	max_shift.insert(max_shift.begin() + position + 1, 0);
-	update_traveltime(position, int(seq.size()));//update travel time and maxshift for all positions after insertion
+	update(position, int(seq.size()));//update travel time and maxshift for all positions after insertion
 	double arrivaltime = (deptime[position + 2] + ins->t[index].EDT + max_shift[position + 2]) - (seq[position + 2]->serv + action[position + 2] * ins->breakdur);//service time eraftrekken
-	update_maxshift(0, position + 1, arrivaltime);//update maxshift for all positions before insertions
+	update_maxshift(0, position + 1, arrivaltime);//update maxshift for all positions before insertion
 }
 
 void Tour::remove_vertex(int position)
@@ -567,10 +569,6 @@ void Tour::remove_vertex(int position)
 	if (position <= breakindex)
 	{
 		reqbreak = true;
-		for (int vv = 0; vv < seq.size(); ++vv)
-		{
-			action[vv] = 0;
-		}
 	}
 	Ins::Vertex* candidate = seq[position];
 	seq.erase(seq.begin() + position);//insert point y after x
@@ -582,13 +580,13 @@ void Tour::remove_vertex(int position)
 	weight -= candidate->weight;
 	if (reqbreak)
 	{
-		update_traveltime_break(position - 1, int(seq.size()));
+		update_break();
 	}
 	else
 	{
-		update_traveltime(position - 1, int(seq.size()));//update travel time for all vertices after deletion
+		update(position - 1, int(seq.size()));//update travel time for all vertices after deletion
+		calc_maxshift();
 	}
-	calc_maxshift();
 }//end remove_vertex tour version
 
 void Tour::remove_vertices(int position1, int position2)
@@ -613,7 +611,7 @@ void Tour::remove_vertices(int position1, int position2)
 	deptime.erase(deptime.begin() + position2);//insert temporary value
 	max_shift.erase(max_shift.begin() + position2);
 	action.erase(action.begin() + position2);//insert regular visit action change later when necessary
-	update_traveltime_break(position1 - 1, int(seq.size()));
+	update_break();
 }
 
 void Tour::replace_vertex(Ins::Vertex* candidate, int position)
@@ -631,13 +629,11 @@ void Tour::replace_vertex(Ins::Vertex* candidate, int position)
 	score += candidate->score - old->score;// update score of the new solution
 	if (reqbreak)
 	{
-		update_traveltime_break(position - 1, int(seq.size()));//update travel time and max_shift for complete tour
-		//if you reposition the break, maxshift has to be recalculated
-		//calc_maxshift();
+		update_break();//update travel time and max_shift for complete tour
 	}
 	else
 	{
-		update_traveltime(position - 1, int(seq.size()));//update travel time and maxshift for all positions after replacement
+		update(position - 1, int(seq.size()));//update travel time and maxshift for all positions after replacement
 		double arrivaltime = (deptime[position + 1] + ins->t[index].EDT + max_shift[position + 1]) - (seq[position + 1]->serv + action[position + 1] * ins->breakdur);//service time eraftrekken
 		update_maxshift(0, position, arrivaltime);//update maxshift for all positions before replacement
 	}
@@ -660,13 +656,14 @@ void Tour::opt_vertices(int i, int j)
 	}
 	if (reqbreak)
 	{
-		update_traveltime_break(i - 1, int(seq.size()));
+		update_break();
 	}
 	else
 	{
-		update_traveltime(i - 1, int(seq.size()));
+		update(i - 1, int(seq.size()));
+		calc_maxshift();
 	}
-	calc_maxshift();
+	
 }
 
 void Tour::swap_vertices(int i, int j)
@@ -681,13 +678,13 @@ void Tour::swap_vertices(int i, int j)
 	}
 	if (reqbreak)
 	{///break comes after i so might need to be replaced
-		update_traveltime_break(i - 1, int(seq.size()));
+		update_break();
 	}
 	else
 	{
-		update_traveltime(i - 1, int(seq.size()));
+		update(i - 1, int(seq.size()));
+		calc_maxshift();
 	}
-	calc_maxshift();
 }
 
 

@@ -510,18 +510,13 @@ void Ils::shake(Sol& sol, int post, int cons)
 			}
 			if (breakupdate)
 			{
-				for (int vv = 0; vv < tour.seq.size(); ++vv)
-				{
-					tour.action[vv] = 0;
-				}
-				tour.update_traveltime_break(post - 1, int(tour.seq.size()));
-
+				tour.update_break();
 			}
 			else
 			{
-				tour.update_traveltime(post - 1, int(tour.seq.size()));
+				tour.update(post - 1, int(tour.seq.size()));
 			}
-			tour.calc_maxshift();
+			//tour.calc_maxshift();
 		}//end if tour is not empty
 	}//end for all tours
 }//end shake

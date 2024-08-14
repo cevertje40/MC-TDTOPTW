@@ -14,9 +14,9 @@ class Tour
 	double weight;//weight per tour
 	double volume;//volume per tour
 	int breakindex;//position of break in tour
-	void update_traveltime(int start, int end);
-	void update_traveltime_break(int start, int end);
-	void update_maxshift(int start, int end, double arrivaltime);//partial update within a tour
+	void update(int start, int end);//keep break fixed and update time and maxshift for positions after start
+	void update_break();//complete update of the tour with potential break repositioning
+	void update_maxshift(int start, int end, double arrivaltime);//update maxshift for positions before end
 	void calc_maxshift();//for specific tour of solution
 	void insert_vertex(Ins::Vertex* candidate,int position);
 	void remove_vertex(int position);

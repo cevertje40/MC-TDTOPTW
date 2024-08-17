@@ -28,26 +28,54 @@ Sol::Sol(Ins& ins):ins(&ins)
 	available[ins.v[0].index] = false;
 }
 
-void Sol::input_custom()
+void Sol::read_from_file()
 {
-	//input vertex indices here replace later with read in from txt file
 	vector<vector<int>> inputv(ins->maxtours);
-	inputv[0] = {30,52,60,24,6,18,14,99};
-	inputv[1] = {80,4,66,88,64,21,11,99};
-	inputv[2] = {41,33,17,38,94,23,99};
-	inputv[3] = {77,85,81,42,71,20,99};
 	vector<vector<int>> inputb(ins->maxtours);
-	inputb[0] = {0,0,0,1,0,0,0,0};
-	inputb[1] = {0,0,0,0,1,0,0,0};
-	inputb[2] = {0,0,0,1,0,0,0,0};
-	inputb[3] = {0,0,0,1,0,0,0};
+	ifstream ifs;
+	ifs.open("debug_sol.txt", ifstream::in);
+	if (ifs.is_open())
+	{
+		for (int t = 0; t < ins->maxtours; ++t)
+		{
+			int seqsize;
+			string line;
+			//read in number of vertices in tour
+			getline(ifs, line);
+			stringstream str(line);
+			str >> seqsize;
+			//read in vertex indices
+			getline(ifs, line);
+			str = stringstream(line);
+			for (int i = 0; i < seqsize; ++i)
+			{
+				int index;
+				str >> index;
+				inputv[t].push_back(index);
+			}
+			//read in vertex action
+			getline(ifs, line);
+			str = stringstream(line);
+			for (int i = 0; i < seqsize; ++i)
+			{
+				int action;
+				str >> action;
+				inputb[t].push_back(action);
+			}
+		}
+		ifs.close();
+	}
+	else
+	{
+		printf("\ninput error in filenames file");
+	}
 	//construct the tours
 	for (int t = 0; t < ins->maxtours; ++t)
 	{
 		Sol::Tour* tour = &tours[t];
 		double currenttime = ins->t[t].EDT;
 		Ins::Vertex* last = tour->seq[0];
-		for (int i = 0; i < inputv[t].size(); ++i)
+		for (int i = 1; i < inputv[t].size(); ++i)
 		{
 			Ins::Vertex* candidate = &ins->v[inputv[t][i]];
 			tour->seq.push_back(candidate);
@@ -76,6 +104,28 @@ void Sol::input_custom()
 		tour->calc_maxshift();
 	}//end for all tours
 }//end input custom
+
+void Sol::write_to_file()
+{
+	ofstream output;
+	output.open("debug_sol_test.txt", ios::out);
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Sol::Tour* tour = &tours[t];
+		output << tour->seq.size()<<"\n";
+		for (int i = 0; i < tour->seq.size();++i)
+		{
+			output<<tour->seq[i]->index << " ";
+		}
+		output << "\n";
+		for (int i = 0; i < tour->seq.size(); ++i)
+		{
+			output << tour->action[i] << " ";
+		}
+		output << "\n";
+	}
+	output.close();
+}
 
 ostream& operator<<(ostream& output, Sol& sol)
 {
@@ -329,18 +379,6 @@ bool Sol::check()
 		cout << red << "score of best solution should be: " << scorecheck << " stored score is: " << score << endl;
 	}
 	return solok;
-}
-
-bool Sol::isavailable(Ins::Vertex* candidate)
-{
-	if (available[candidate->index])
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
 }
 
 void Tour::update(int start, int end)//keep break fixed and update travel time and max_shift

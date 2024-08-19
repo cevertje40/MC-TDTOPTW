@@ -785,9 +785,9 @@ Res Tabu::solve(int bestknown)
 	int noimpr = 0;
 	vector<int> tabuindex(ins->maxtours,0);
 	s.reset();
-	s.read_from_file();
-	s.write_to_file();
-	//parallel_construct(s);
+	//s.read_from_file();
+	//s.write_to_file();
+	parallel_construct(s);
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1, 3);
 	while (noimpr < max_noimpr)

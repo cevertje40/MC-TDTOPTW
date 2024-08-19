@@ -84,7 +84,6 @@ private:
 		bool is_tabu(Two_one_rep_nb nb);
 	};
 
-
 public:
 	Tabu(Ins& ins, int max_noimpr, int tabulist_size);
 	Res solve(int bestknown = 1);

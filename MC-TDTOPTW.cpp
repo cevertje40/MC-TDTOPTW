@@ -251,7 +251,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set5.txt";
+		filename = "set6.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -282,7 +282,7 @@ void ctop_gap(int max_rep=5)
 			it->result[rep] = tabu.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;
-			cout << "name: " << it->filename << " best score: " << it->bestscore << " ACS score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " best score: " << it->bestscore<<" " << tabu.name << " score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
 			output << it->filename << ";" << it->bestscore << ";" << it->result[rep].score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();

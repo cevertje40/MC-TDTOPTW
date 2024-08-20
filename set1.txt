@@ -8,4 +8,4 @@ b6.txt	3048
 b7.txt	1287
 b8.txt	1710
 b9.txt	2159
-b10.txt	3066
+b10.txt	2969

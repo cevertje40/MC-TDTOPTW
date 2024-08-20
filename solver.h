@@ -40,6 +40,7 @@ public:
 	void update_global_best();
 	void pheromone_update();
 	Res solve(int bestknown=1);
+	string name = "ACO";
 };
 
 class Ils : public Moves
@@ -57,6 +58,7 @@ private:
 public:
 	Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3);
 	Res solve(int bestknown=1);
+	string name = "ILS";
 };
 
 class Tabu : public Moves
@@ -87,6 +89,7 @@ private:
 public:
 	Tabu(Ins& ins, int max_noimpr, int tabulist_size);
 	Res solve(int bestknown = 1);
+	string name = "Tabu";
 };
 
 

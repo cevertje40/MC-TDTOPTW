@@ -3,7 +3,7 @@ b1.txt	536
 b2.txt	403
 b3.txt	377
 b4.txt	536
-b5.txt	547
+b5.txt	548
 b6.txt	556
 b7.txt	513
 b8.txt	534
@@ -13,12 +13,12 @@ b11.txt	762
 b12.txt	565
 b13.txt	548
 b14.txt	762
-b15.txt	796
-b16.txt	815
+b15.txt	797
+b16.txt	816
 b17.txt	727
 b18.txt	770
-b19.txt	801
-b20.txt	821
+b19.txt	802
+b20.txt	822
 b21.txt	950
 b22.txt	683
 b23.txt	707

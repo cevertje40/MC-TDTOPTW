@@ -24,7 +24,7 @@ class Tour
 	void replace_vertex(Ins::Vertex* candidate, int position);
 	void opt_vertices(int i, int j);//assumption i < j
 	void swap_vertices(int i, int j);//assumption i < j
-	void check();
+	bool check();
 };
 
 

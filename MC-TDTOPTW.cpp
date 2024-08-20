@@ -314,6 +314,6 @@ int main()
 
 	//solve_dataset(1);
 	//debug_instance();
-	debug_ctop();
-	//ctop_gap(1);
+	//debug_ctop();
+	ctop_gap(1);
 }

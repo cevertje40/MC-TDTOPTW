@@ -1,2 +1,6 @@
 solution methods for the CTOP 
 filename,bestscore,score,cpu,gap
+b1.txt;133;133;17.834;0
+b2.txt;121;109;2.708;9.91736
+b3.txt;126;125;6.43;0.793651
+b4.txt;133;132;19.146;0.75188

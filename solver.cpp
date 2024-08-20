@@ -812,8 +812,8 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,max_tabulist_size);
-				//boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb_omp(s,max_tabulist_size);
+				//boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,max_tabulist_size);
+				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb_omp(s,max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
@@ -853,8 +853,8 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
-				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
-				//boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb_omp(s, max_tabulist_size);
+				//boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
+				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb_omp(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
@@ -890,12 +890,8 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
-				if (debug_iter == 127)
-				{
-					cout << "debug now" << endl;
-				}
-				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s, max_tabulist_size);
-				//boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb_omp(s, max_tabulist_size);
+				//boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s, max_tabulist_size);
+				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb_omp(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 				

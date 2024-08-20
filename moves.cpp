@@ -1008,71 +1008,43 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 							{
 								one = true;
 								pos1 = j;
-								//check if second vertex can be inserted
-								for (int k = 0; k < endj - 1; ++k)// for positions in tourrem
+								//execute the insertion for a new tour based on tourrem
+								Sol::Tour tourremins = tourrem;
+								tourremins.insert_vertex(y, j);
+								int endk = (int)tourremins.seq.size();
+								//check if second vertex can be inserted in this new tour
+								for (int k = 0; k < endk - 1; ++k)// for positions in tourremins
 								{
-									if (j != k)
+									Ins::Vertex* x = tourremins.seq[k];//predecessor y
+									Ins::Vertex* z = tourremins.seq[k + 1];//successor y
+									int breakz = tourremins.action[k + 1];
+									Ins::Vertex* y = candidatelist[c].second;//potential insertion at position j
+									//gather departure time
+									double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
+									//travel time from x to y
+									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+									if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
 									{
-										Ins::Vertex* x = tourrem.seq[k];//predecessor y
-										Ins::Vertex* z = tourrem.seq[k + 1];//successor y
-										int breakz = tourrem.action[k + 1];
-										Ins::Vertex* y = candidatelist[c].second;//potential insertion at position j
-										//gather departure time
-										double currenttime = tourrem.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
-										//travel time from x to y
-										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-										if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-										{
-											arrivaltime = y->LTW[d];
-										}
-										if (arrivaltime > y->UTW[d])
-										{
-											continue;//infeasible
-										}
-										arrivaltime += y->serv;
-										//travel time from y to z
-										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-										{
-											arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-										}
-										arrivaltime += z->serv + breakz * ins->breakdur;
-										double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[k + 1];//increase in travel time
-										if (shift <= tourrem.max_shift[k + 1])//check of het punt geinsert kan worden
-										{
-											one = true;
-											pos2 = k;
-										}//end if shift
+										arrivaltime = y->LTW[d];
 									}
-									else
-									{//special case were second vertex is inserted after first vertex on position j
-										currenttime = arrivaltimey;
-										x = y;
-										y = candidatelist[c].second;
-										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-										if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-										{
-											arrivaltime = y->LTW[d];
-										}
-										if (arrivaltime > y->UTW[d])
-										{
-											continue;//infeasible
-										}
-										arrivaltime += y->serv;
-										//travel time from y to z
-										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-										{
-											arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-										}
-										arrivaltime += z->serv + breakz * ins->breakdur;
-										double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-										if (shift <= tourrem.max_shift[k + 1])//check of het punt geinsert kan worden
-										{
-											two = true;
-											pos2 = k;
-										}//end if shift
+									if (arrivaltime > y->UTW[d])
+									{
+										continue;//infeasible
 									}
+									arrivaltime += y->serv;
+									//travel time from y to z
+									arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
+									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
+									{
+										arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
+									}
+									arrivaltime += z->serv + breakz * ins->breakdur;
+									double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
+									if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
+									{
+										one = true;
+										pos2 = k;
+									}//end if shift
 									if ((one) && (two))
 									{
 										adm_nb.push(One_two_rep_nb(d, h, pos1, pos2, candidatelist[c].first, candidatelist[c].second, (candidatelist[c].first->score + candidatelist[c].second->score) - r->score));
@@ -1090,7 +1062,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 		}//end for all included regular vertices in sol
 	}//end for all tours
 	return adm_nb;
-}// end one_two_replace_gen_nb_omp
+}// end one_two_replace_gen_nb
 
 
 boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb_omp(Sol& sol, int limit)
@@ -1174,71 +1146,43 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb_omp(So
 								{
 									one = true;
 									pos1 = j;
-									//check if second vertex can be inserted
-									for (int k = 0; k < endj - 1; ++k)// for positions in tourrem
+									//execute the insertion for a new tour based on tourrem
+									Sol::Tour tourremins = tourrem;
+									tourremins.insert_vertex(y, j);
+									int endk = (int)tourremins.seq.size();
+									//check if second vertex can be inserted in this new tour
+									for (int k = 0; k < endk - 1; ++k)// for positions in tourremins
 									{
-										if (j != k)
+										Ins::Vertex* x = tourremins.seq[k];//predecessor y
+										Ins::Vertex* z = tourremins.seq[k + 1];//successor y
+										int breakz = tourremins.action[k + 1];
+										Ins::Vertex* y = candidatelist[c].second;//potential insertion at position j
+										//gather departure time
+										double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
+										//travel time from x to y
+										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+										if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
 										{
-											Ins::Vertex* x = tourrem.seq[k];//predecessor y
-											Ins::Vertex* z = tourrem.seq[k + 1];//successor y
-											int breakz = tourrem.action[k + 1];
-											Ins::Vertex* y = candidatelist[c].second;//potential insertion at position j
-											//gather departure time
-											double currenttime = tourrem.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
-											//travel time from x to y
-											double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-											if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-											{
-												arrivaltime = y->LTW[d];
-											}
-											if (arrivaltime > y->UTW[d])
-											{
-												continue;//infeasible
-											}
-											arrivaltime += y->serv;
-											//travel time from y to z
-											arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-											if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-											{
-												arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-											}
-											arrivaltime += z->serv + breakz * ins->breakdur;
-											double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[k + 1];//increase in travel time
-											if (shift <= tourrem.max_shift[k + 1])//check of het punt geinsert kan worden
-											{
-												one = true;
-												pos2 = k;
-											}//end if shift
+											arrivaltime = y->LTW[d];
 										}
-										else
-										{//special case were second vertex is inserted after first vertex on position j
-											currenttime = arrivaltimey;
-											x = y;
-											y = candidatelist[c].second;
-											double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-											if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-											{
-												arrivaltime = y->LTW[d];
-											}
-											if (arrivaltime > y->UTW[d])
-											{
-												continue;//infeasible
-											}
-											arrivaltime += y->serv;
-											//travel time from y to z
-											arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-											if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-											{
-												arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-											}
-											arrivaltime += z->serv + breakz * ins->breakdur;
-											double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-											if (shift <= tourrem.max_shift[k + 1])//check of het punt geinsert kan worden
-											{
-												two = true;
-												pos2 = k;
-											}//end if shift
+										if (arrivaltime > y->UTW[d])
+										{
+											continue;//infeasible
 										}
+										arrivaltime += y->serv;
+										//travel time from y to z
+										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
+										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
+										{
+											arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
+										}
+										arrivaltime += z->serv + breakz * ins->breakdur;
+										double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
+										if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
+										{
+											one = true;
+											pos2 = k;
+										}//end if shift
 										if ((one) && (two))
 										{
 											#pragma omp critical

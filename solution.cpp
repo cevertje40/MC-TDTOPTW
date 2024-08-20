@@ -183,7 +183,10 @@ bool Sol::check()
 	vector<int> included(ins->maxvertices, 0);
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
-		tours[d].check();
+		if (!tours[d].check())
+		{
+			solok = false;
+		}
 		for (int i = 0; i < tours[d].seq.size(); ++i)
 		{
 			++included[tours[d].seq[i]->index];
@@ -196,12 +199,14 @@ bool Sol::check()
 		if (included[i] > 1)//regular vertex included more than once
 		{
 			cout << red << "included more than one, vertex:" << i << endl;
+			solok = false;
 		}
 		if (included[i] == 1)
 		{
 			if (available[i] == true)
 			{
 				cout << red << "error in availability bitset for vertex: " << i << endl;
+				solok = false;
 			}
 		}
 		if (included[i] == 0)
@@ -209,6 +214,7 @@ bool Sol::check()
 			if (available[i] == false)
 			{
 				cout << red << "error in availability bitset for vertex: " << i << endl;
+				solok = false;
 			}
 		}
 	}
@@ -216,6 +222,7 @@ bool Sol::check()
 	if (scorecheck != score)
 	{
 		cout << red << "score of best solution should be: " << scorecheck << " stored score is: " << score << endl;
+		solok = false;
 	}
 	return solok;
 }

@@ -74,7 +74,7 @@ class Moves
 public:
 	bool insert_nb(Sol& sol,int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool exchange_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
-	void pull_break(Sol& sol, int tour);
+	void pull_break(Sol& sol, int tour);//tries to pull the break forwards
 	void reschedule_breaks(Sol& sol);
 	bool exchange2_nb(Sol& sol);
 	bool swap_nb(Sol& sol, int mode=1);//mode: 0 first improvement, 1 best improvement
@@ -89,6 +89,9 @@ public:
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, int limit);
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, int limit);
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, int limit);
+	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb_omp(Sol& sol, int limit);//using omp
+	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb_omp(Sol& sol, int limit);//using omp
+	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb_omp(Sol& sol, int limit);//using omp
 	Moves(Ins& ins) :ins(&ins) {}
 };
 

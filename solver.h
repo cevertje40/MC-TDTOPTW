@@ -84,6 +84,7 @@ private:
 		bool is_tabu(One_one_rep_nb nb);
 		bool is_tabu(One_two_rep_nb nb);
 		bool is_tabu(Two_one_rep_nb nb);
+		void display_content();
 	};
 
 public:

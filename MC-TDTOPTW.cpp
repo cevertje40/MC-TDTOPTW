@@ -221,7 +221,7 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.3.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
 	Ins instance(textfile);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
@@ -232,7 +232,7 @@ void debug_instance()
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b81.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
 	Ins instance(textfile);
 
 	//Ils ils(instance, 10000, 100, 20, 30);
@@ -251,7 +251,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set6.txt";
+		filename = "set2.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -278,7 +278,7 @@ void ctop_gap(int max_rep=5)
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,1000,2,3);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Tabu tabu(instance, 1000, 20);
+			Tabu tabu(instance, 10000, 20);
 			it->result[rep] = tabu.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;
@@ -314,6 +314,6 @@ int main()
 
 	//solve_dataset(1);
 	//debug_instance();
-	//debug_ctop();
-	ctop_gap(1);
+	debug_ctop();
+	//ctop_gap(1);
 }

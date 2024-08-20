@@ -742,7 +742,7 @@ void Tabu::Tabulist::make_tabu(One_two_rep_nb& exec_nb)
 bool Tabu::Tabulist::is_tabu(One_one_rep_nb exec_nb)
 {
 	bool tabu = false;
-	for (int i = 0; i < tabuvertices[exec_nb.tour].size() - 1; ++i)
+	for (int i = 0; i < tabuvertices[exec_nb.tour].size(); ++i)
 	{
 		if (tabuvertices[exec_nb.tour][i] == exec_nb.inscand)
 		{
@@ -755,7 +755,7 @@ bool Tabu::Tabulist::is_tabu(One_one_rep_nb exec_nb)
 bool Tabu::Tabulist::is_tabu(Two_one_rep_nb exec_nb)
 {
 	bool tabu = false;
-	for (int i = 0; i < tabuvertices[exec_nb.tour].size() - 1; ++i)
+	for (int i = 0; i < tabuvertices[exec_nb.tour].size(); ++i)
 	{
 		if (tabuvertices[exec_nb.tour][i] == exec_nb.inscand)
 		{
@@ -765,10 +765,21 @@ bool Tabu::Tabulist::is_tabu(Two_one_rep_nb exec_nb)
 	return tabu;
 }
 
+void Tabu::Tabulist::display_content()
+{
+	for (int t = 0; t < tabuvertices.size(); ++t)
+	{
+		for (int i = 0; i < tabuvertices[t].size(); ++i)
+		{
+			cout<<i+1<<" : " << tabuvertices[t][i]->index << " : " << endl;
+		}
+	}
+}
+
 bool Tabu::Tabulist::is_tabu(One_two_rep_nb exec_nb)
 {
 	bool tabu = false;
-	for (int i = 0; i < tabuvertices[exec_nb.tour].size() - 1; ++i)
+	for (int i = 0; i < tabuvertices[exec_nb.tour].size(); ++i)
 	{
 		if ((tabuvertices[exec_nb.tour][i] == exec_nb.inscand1) || (tabuvertices[exec_nb.tour][i] == exec_nb.inscand2))
 		{
@@ -790,17 +801,19 @@ Res Tabu::solve(int bestknown)
 	parallel_construct(s);
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1, 3);
+	Tabulist tabulist(ins->maxtours, max_tabulist_size, &ins->v[0]);
 	while (noimpr < max_noimpr)
 	{
 		//select neighborhood structure at random
-		Tabulist tabulist(ins->maxtours,max_tabulist_size, &ins->v[0]);
 		int pick=nbpicker(engine);
+		//int pick = 1;
 		//build admissable neighborhoods using the selected neighborhoodstructure
 		switch (pick)
 		{
 			case 1:
 			{
 				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,max_tabulist_size);
+				//boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb_omp(s,max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
@@ -823,11 +836,13 @@ Res Tabu::solve(int bestknown)
 					{
 						One_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						//if(!s.check())
-						//{
-							//cout << "error in one_one" << endl;
-						//}
+						if(!s.check())
+						{
+							cout << "error in one_one" << endl;
+						}
 						tabulist.make_tabu(exec_nb);
+						//tabulist.display_content();
+						//cout << "hier" << endl;
 					}
 				}
 				//else
@@ -839,6 +854,7 @@ Res Tabu::solve(int bestknown)
 			case 2:
 			{
 				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
+				//boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb_omp(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
@@ -859,10 +875,10 @@ Res Tabu::solve(int bestknown)
 					{
 						Two_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						//if (!s.check())
-						//{
+						if (!s.check())
+						{
 							//cout << "error in two_one" << endl;
-						//}
+						}
 						tabulist.make_tabu(exec_nb);
 					}
 				}
@@ -874,9 +890,15 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
+				if (debug_iter == 127)
+				{
+					cout << "debug now" << endl;
+				}
 				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s, max_tabulist_size);
+				//boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb_omp(s, max_tabulist_size);
 				if (adm_nb.size() >= 1)
 				{
+				
 					bool execute = true;
 					while ((tabulist.is_tabu(adm_nb.top())) && (adm_nb.top().score < gb.score))
 					{
@@ -895,10 +917,10 @@ Res Tabu::solve(int bestknown)
 					{
 						One_two_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						//if (!s.check())
-						//{
-						//	cout << "error in one_two" << endl;
-						//}
+						if (!s.check())
+						{
+							cout << "error in one_two" << endl;
+						}
 						tabulist.make_tabu(exec_nb);
 					}
 				}

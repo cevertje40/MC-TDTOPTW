@@ -723,72 +723,6 @@ void Tabu::parallel_construct(Sol& sol)
 	//sol.check();
 }//end parallel construct
 
-void Tabu::Tabulist::make_tabu(One_one_rep_nb& exec_nb)
-{
-	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand);
-}
-
-void Tabu::Tabulist::make_tabu(Two_one_rep_nb& exec_nb)
-{
-	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand);
-}
-
-void Tabu::Tabulist::make_tabu(One_two_rep_nb& exec_nb)
-{
-	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand1);
-	tabuvertices[exec_nb.tour].push_back(exec_nb.inscand2);
-}
-
-bool Tabu::Tabulist::is_tabu(One_one_rep_nb exec_nb)
-{
-	bool tabu = false;
-	for (int i = 0; i < tabuvertices[exec_nb.tour].size(); ++i)
-	{
-		if (tabuvertices[exec_nb.tour][i] == exec_nb.inscand)
-		{
-			tabu = true;
-		}
-	}
-	return tabu;
-}
-
-bool Tabu::Tabulist::is_tabu(Two_one_rep_nb exec_nb)
-{
-	bool tabu = false;
-	for (int i = 0; i < tabuvertices[exec_nb.tour].size(); ++i)
-	{
-		if (tabuvertices[exec_nb.tour][i] == exec_nb.inscand)
-		{
-			tabu = true;
-		}
-	}
-	return tabu;
-}
-
-void Tabu::Tabulist::display_content()
-{
-	for (int t = 0; t < tabuvertices.size(); ++t)
-	{
-		for (int i = 0; i < tabuvertices[t].size(); ++i)
-		{
-			cout<<i+1<<" : " << tabuvertices[t][i]->index << " : " << endl;
-		}
-	}
-}
-
-bool Tabu::Tabulist::is_tabu(One_two_rep_nb exec_nb)
-{
-	bool tabu = false;
-	for (int i = 0; i < tabuvertices[exec_nb.tour].size(); ++i)
-	{
-		if ((tabuvertices[exec_nb.tour][i] == exec_nb.inscand1) || (tabuvertices[exec_nb.tour][i] == exec_nb.inscand2))
-		{
-			tabu = true;
-		}
-	}
-	return tabu;
-}
-
 Res Tabu::solve(int bestknown)
 {
 	clock_t start, end;
@@ -801,7 +735,7 @@ Res Tabu::solve(int bestknown)
 	parallel_construct(s);
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1, 3);
-	Tabulist tabulist(ins->maxtours, max_tabulist_size, &ins->v[0]);
+	TabuList tabulist(max_tabulist_size);
 	while (noimpr < max_noimpr)
 	{
 		//select neighborhood structure at random
@@ -812,13 +746,12 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				//boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,max_tabulist_size);
-				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb_omp(s,max_tabulist_size);
+				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,50);
 				if (adm_nb.size() >= 1)
 				{
-					bool execute = true;
-					//check if the best move is tabu
-					while (tabulist.is_tabu(adm_nb.top())&&(adm_nb.top().score<gb.score))
+					bool execute = true;//execute if it improves global best score
+					//check if the best move is tabu in case of a non-improving move
+					while (tabulist.isTabu(adm_nb.top().move, adm_nb.top().tour)&&(s.score+adm_nb.top().score < gb.score))
 					{
 						//delete move if tabu
 						if (adm_nb.size() > 1)
@@ -826,9 +759,9 @@ Res Tabu::solve(int bestknown)
 							adm_nb.pop();
 						}
 						else
-						{
+						{//nb set is empty
 							execute = false;
-							cout << "one one nb is empty" << endl;
+							//cout << "one one nb is empty" << endl;
 							break;
 						}
 					}
@@ -841,8 +774,8 @@ Res Tabu::solve(int bestknown)
 						//{
 						//	cout << "error in one_one" << endl;
 						//}
-						//tabulist.make_tabu(exec_nb);
-						//tabulist.display_content();
+						tabulist.addTabuMove(exec_nb.move,exec_nb.tour);
+						//tabulist.printTabuList();
 						//cout << "hier" << endl;
 					}
 				}
@@ -854,12 +787,11 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
-				//boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s, max_tabulist_size);
-				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb_omp(s, max_tabulist_size);
+				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s,50);
 				if (adm_nb.size() >= 1)
 				{
 					bool execute = true;
-					while ((tabulist.is_tabu(adm_nb.top()))&&(adm_nb.top().score < gb.score))
+					while ((tabulist.isTabu(adm_nb.top().move, adm_nb.top().tour))&&(s.score+adm_nb.top().score < gb.score ))
 					{
 						execute = true;
 						if (adm_nb.size() > 1)
@@ -868,7 +800,7 @@ Res Tabu::solve(int bestknown)
 						}
 						else
 						{
-							cout << "two one nb is empty" << endl;
+							//cout << "two one nb is empty" << endl;
 							execute = false;
 							break;
 						}
@@ -881,7 +813,9 @@ Res Tabu::solve(int bestknown)
 						//{
 							//cout << "error in two_one" << endl;
 						//}
-						//tabulist.make_tabu(exec_nb);
+						tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
+						//tabulist.printTabuList();
+						//cout << "hier" << endl;
 					}
 				}
 				//else
@@ -892,13 +826,12 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
-				//boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s, max_tabulist_size);
-				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb_omp(s, max_tabulist_size);
+				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s,50);
 				if (adm_nb.size() >= 1)
 				{
 				
 					bool execute = true;
-					while ((tabulist.is_tabu(adm_nb.top())) && (adm_nb.top().score < gb.score))
+					while ((tabulist.isTabu(adm_nb.top().move, adm_nb.top().tour)) && (s.score+adm_nb.top().score < gb.score ))
 					{
 						execute = true;
 						if (adm_nb.size() > 1)
@@ -907,7 +840,7 @@ Res Tabu::solve(int bestknown)
 						}
 						else
 						{
-							cout << "one two nb is empty" << endl;
+							//cout << "one two nb is empty" << endl;
 							execute = false;
 							break;
 						}
@@ -920,7 +853,9 @@ Res Tabu::solve(int bestknown)
 						{
 							cout << "error in one_two" << endl;
 						}
-						//tabulist.make_tabu(exec_nb);
+						tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
+						//tabulist.printTabuList();
+						//cout << "hier" << endl;
 					}
 				}
 				//else

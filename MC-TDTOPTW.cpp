@@ -232,12 +232,12 @@ void debug_instance()
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b14.txt"};
 	Ins instance(textfile);
 
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
-	Tabu tabu(instance, 10000, 20);
+	Tabu tabu(instance, 10000, 30);
 	res = tabu.solve(531);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
@@ -278,7 +278,7 @@ void ctop_gap(int max_rep=5)
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,1000,2,3);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Tabu tabu(instance, 10000, 20);
+			Tabu tabu(instance, 10000,5);
 			it->result[rep] = tabu.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;

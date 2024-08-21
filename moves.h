@@ -5,12 +5,13 @@
 class One_one_rep_nb
 {
 public:
+	pair<vector<Ins::Vertex*>,vector<Ins::Vertex*>>move;
 	int tour;
 	int rempos;
 	int inspos;
 	Ins::Vertex* inscand;
 	double score;
-	One_one_rep_nb(int tour, int rempos, int inspos, Ins::Vertex* inscand, double score) :tour(tour), rempos(rempos), inspos(inspos), inscand(inscand), score(score) {}
+	One_one_rep_nb(int tour, int rempos, int inspos, Ins::Vertex* inscand, double score,pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move) :tour(tour), rempos(rempos), inspos(inspos), inscand(inscand), score(score), move(move){}
 	friend bool operator< (const One_one_rep_nb& x, const One_one_rep_nb& y)
 	{
 		return x.score < y.score;
@@ -29,6 +30,7 @@ public:
 class One_two_rep_nb
 {
 public:
+	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;
 	int tour;
 	int rempos;
 	int inspos1;
@@ -36,7 +38,7 @@ public:
 	Ins::Vertex* inscand1;
 	Ins::Vertex* inscand2;
 	double score;
-	One_two_rep_nb(int tour, int rempos, int inspos1, int inspos2, Ins::Vertex* inscand1, Ins::Vertex* inscand2, double score) :tour(tour), rempos(rempos), inspos1(inspos1), inspos2(inspos2), inscand1(inscand1), inscand2(inscand2), score(score) {}
+	One_two_rep_nb(int tour, int rempos, int inspos1, int inspos2, Ins::Vertex* inscand1, Ins::Vertex* inscand2, double score, pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move) :tour(tour), rempos(rempos), inspos1(inspos1), inspos2(inspos2), inscand1(inscand1), inscand2(inscand2), score(score),move(move) {}
 	friend bool operator< (const One_two_rep_nb& x, const One_two_rep_nb& y)
 	{
 		return x.score < y.score;
@@ -52,13 +54,14 @@ public:
 class Two_one_rep_nb
 {
 public:
+	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;
 	int tour;
 	int rempos1;
 	int rempos2;
 	int inspos;
 	Ins::Vertex* inscand;
 	double score;
-	Two_one_rep_nb(int tour, int rempos1, int rempos2, int inspos, Ins::Vertex* inscand, double score) :tour(tour), rempos1(rempos1), rempos2(rempos2), inspos(inspos), inscand(inscand), score(score) {}
+	Two_one_rep_nb(int tour, int rempos1, int rempos2, int inspos, Ins::Vertex* inscand, double score, pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move) :tour(tour), rempos1(rempos1), rempos2(rempos2), inspos(inspos), inscand(inscand), score(score),move(move) {}
 	friend bool operator< (const Two_one_rep_nb& x, const Two_one_rep_nb& y)
 	{
 		return x.score < y.score;
@@ -90,9 +93,6 @@ public:
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, int limit);
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, int limit);
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, int limit);
-	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb_omp(Sol& sol, int limit);//using omp
-	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb_omp(Sol& sol, int limit);//using omp
-	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb_omp(Sol& sol, int limit);//using omp
 	Moves(Ins& ins) :ins(&ins) {}
 };
 

@@ -21,6 +21,7 @@ public:
 		{
 			sol.remove_vertex(sol.tours[tour], rempos);
 		}
+		//otherwise insert move
 		sol.insert_vertex(sol.tours[tour], inscand, inspos);
 	}
 };

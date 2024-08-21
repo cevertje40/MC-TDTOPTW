@@ -828,6 +828,7 @@ Res Tabu::solve(int bestknown)
 						else
 						{
 							execute = false;
+							cout << "one one nb is empty" << endl;
 							break;
 						}
 					}
@@ -836,11 +837,11 @@ Res Tabu::solve(int bestknown)
 					{
 						One_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						if(!s.check())
-						{
-							cout << "error in one_one" << endl;
-						}
-						tabulist.make_tabu(exec_nb);
+						//if(!s.check())
+						//{
+						//	cout << "error in one_one" << endl;
+						//}
+						//tabulist.make_tabu(exec_nb);
 						//tabulist.display_content();
 						//cout << "hier" << endl;
 					}
@@ -867,6 +868,7 @@ Res Tabu::solve(int bestknown)
 						}
 						else
 						{
+							cout << "two one nb is empty" << endl;
 							execute = false;
 							break;
 						}
@@ -875,11 +877,11 @@ Res Tabu::solve(int bestknown)
 					{
 						Two_one_rep_nb exec_nb = adm_nb.top();
 						exec_nb.execute(s);
-						if (!s.check())
-						{
+						//if (!s.check())
+						//{
 							//cout << "error in two_one" << endl;
-						}
-						tabulist.make_tabu(exec_nb);
+						//}
+						//tabulist.make_tabu(exec_nb);
 					}
 				}
 				//else
@@ -905,6 +907,7 @@ Res Tabu::solve(int bestknown)
 						}
 						else
 						{
+							cout << "one two nb is empty" << endl;
 							execute = false;
 							break;
 						}
@@ -917,7 +920,8 @@ Res Tabu::solve(int bestknown)
 						{
 							cout << "error in one_two" << endl;
 						}
-						tabulist.make_tabu(exec_nb);
+						cout << "hier" << endl;
+						//tabulist.make_tabu(exec_nb);
 					}
 				}
 				//else

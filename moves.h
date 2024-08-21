@@ -44,7 +44,7 @@ public:
 	{
 		sol.remove_vertex(sol.tours[tour], rempos);
 		sol.insert_vertex(sol.tours[tour], inscand1, inspos1);
-		sol.insert_vertex(sol.tours[tour], inscand2, inspos2 + 1);
+		sol.insert_vertex(sol.tours[tour], inscand2, inspos2);
 	}
 };
 

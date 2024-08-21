@@ -920,7 +920,6 @@ Res Tabu::solve(int bestknown)
 						{
 							cout << "error in one_two" << endl;
 						}
-						cout << "hier" << endl;
 						//tabulist.make_tabu(exec_nb);
 					}
 				}

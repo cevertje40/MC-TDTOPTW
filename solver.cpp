@@ -723,6 +723,38 @@ void Tabu::parallel_construct(Sol& sol)
 	//sol.check();
 }//end parallel construct
 
+template<typename MoveType>
+void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, TabuList& tabulist) 
+{
+	if (nb.size() > 1)
+	{
+		bool execute = true;
+		while ((tabulist.isTabu(nb.top().move, nb.top().tour)) && (s.score + nb.top().score < gb.score))
+		{
+			if (nb.size() > 1)
+			{
+				nb.pop();
+			}
+			else
+			{
+				//cout << "Neighborhood is empty" << endl;
+				execute = false;
+				break;
+			}
+		}
+		if (execute)
+		{
+			auto exec_nb = nb.top();
+			exec_nb.execute(s);
+			if (!s.check()) {
+				cout << "Error in move execution" << endl;
+			}
+			tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
+		}
+	}
+}
+
+
 Res Tabu::solve(int bestknown)
 {
 	clock_t start, end;
@@ -740,128 +772,25 @@ Res Tabu::solve(int bestknown)
 	{
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
-		//int pick = 1;
 		//build admissable neighborhoods using the selected neighborhoodstructure
 		switch (pick)
 		{
 			case 1:
 			{
-				boost::heap::priority_queue<One_one_rep_nb> adm_nb = one_one_replace_gen_nb(s,50);
-				if (adm_nb.size() >= 1)
-				{
-					bool execute = true;//execute if it improves global best score
-					//check if the best move is tabu in case of a non-improving move
-					while (tabulist.isTabu(adm_nb.top().move, adm_nb.top().tour)&&(s.score+adm_nb.top().score < gb.score))
-					{
-						//delete move if tabu
-						if (adm_nb.size() > 1)
-						{
-							adm_nb.pop();
-						}
-						else
-						{//nb set is empty
-							execute = false;
-							//cout << "one one nb is empty" << endl;
-							break;
-						}
-					}
-					//execute non tabu move and update tabulist
-					if (execute)
-					{
-						One_one_rep_nb exec_nb = adm_nb.top();
-						exec_nb.execute(s);
-						//if(!s.check())
-						//{
-						//	cout << "error in one_one" << endl;
-						//}
-						tabulist.addTabuMove(exec_nb.move,exec_nb.tour);
-						//tabulist.printTabuList();
-						//cout << "hier" << endl;
-					}
-				}
-				//else
-				//{
-					//cout << "not nb" << endl;
-				//}
+				auto nb = one_one_replace_gen_nb(s,50);
+				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 2:
 			{
-				boost::heap::priority_queue<Two_one_rep_nb> adm_nb = two_one_replace_gen_nb(s,50);
-				if (adm_nb.size() >= 1)
-				{
-					bool execute = true;
-					while ((tabulist.isTabu(adm_nb.top().move, adm_nb.top().tour))&&(s.score+adm_nb.top().score < gb.score ))
-					{
-						execute = true;
-						if (adm_nb.size() > 1)
-						{
-							adm_nb.pop();
-						}
-						else
-						{
-							//cout << "two one nb is empty" << endl;
-							execute = false;
-							break;
-						}
-					}
-					if (execute)
-					{
-						Two_one_rep_nb exec_nb = adm_nb.top();
-						exec_nb.execute(s);
-						//if (!s.check())
-						//{
-							//cout << "error in two_one" << endl;
-						//}
-						tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
-						//tabulist.printTabuList();
-						//cout << "hier" << endl;
-					}
-				}
-				//else
-				//{
-					//cout << "not nb" << endl;
-				//}
+				auto nb = two_one_replace_gen_nb(s,50);
+				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 3:
 			{
-				boost::heap::priority_queue<One_two_rep_nb> adm_nb = one_two_replace_gen_nb(s,50);
-				if (adm_nb.size() >= 1)
-				{
-				
-					bool execute = true;
-					while ((tabulist.isTabu(adm_nb.top().move, adm_nb.top().tour)) && (s.score+adm_nb.top().score < gb.score ))
-					{
-						execute = true;
-						if (adm_nb.size() > 1)
-						{
-							adm_nb.pop();
-						}
-						else
-						{
-							//cout << "one two nb is empty" << endl;
-							execute = false;
-							break;
-						}
-					}
-					if (execute)
-					{
-						One_two_rep_nb exec_nb = adm_nb.top();
-						exec_nb.execute(s);
-						if (!s.check())
-						{
-							cout << "error in one_two" << endl;
-						}
-						tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
-						//tabulist.printTabuList();
-						//cout << "hier" << endl;
-					}
-				}
-				//else
-				//{
-					//cout << "not nb" << endl;
-				//}
+				auto nb = one_two_replace_gen_nb(s, 50);
+				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 		}//end switch

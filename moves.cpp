@@ -676,6 +676,153 @@ bool Moves::one_two_replace(Sol& sol, int mode)
 	return succes;
 }//end one_two_replace_nb
 
+boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb_new(Sol& sol, int limit)
+{
+	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
+	/*
+	vector<One_one_rep_nb> global_moves;
+	int best_score = -INT_MAX;
+	#pragma omp parallel
+	{//start parallel session
+		vector<One_one_rep_nb> local_moves;
+		#pragma omp for reduction(max:best_score)
+		for (int d = 0; d < ins->maxtours; ++d)
+		{
+			//1- INSERT PART
+			Sol::Tour& tour = sol.tours[d];
+			int endj = (int)tour.seq.size();
+			for (int j = 0; j < endj - 1; ++j)// for all positions in the tour
+			{
+				Ins::Vertex* x = tour.seq[j];//predecessor y
+				Ins::Vertex* z = tour.seq[j + 1];//successor y
+				int breakz = tour.action[j + 1];//break on z
+				int nb_size = (int)x->nb[d].size();
+				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+				{
+					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
+					{
+						if ((y->score > best_score) || (local_moves.size() < limit))
+						{
+							if ((tour.weight + y->weight <= ins->t[d].W_max) && (tour.volume + y->volume <= ins->t[d].V_max))//cap constraint check
+							{
+								//gather departure time
+								double currenttime = tour.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
+								//travel time from x to y
+								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+								if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
+								{
+									arrivaltime = y->LTW[d];
+								}
+								if (arrivaltime > y->UTW[d])
+								{
+									continue;//infeasible
+								}
+								arrivaltime += y->serv;
+								//travel time from y to z
+								arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
+								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
+								{
+									arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
+								}
+								arrivaltime += z->serv + breakz * ins->breakdur;
+								double shift = (arrivaltime - ins->t[d].EDT) - tour.deptime[j + 1];//increase in travel time
+								if (shift <= tour.max_shift[j + 1])//check of het punt geinsert kan worden
+								{
+									local_moves.emplace_back(One_one_rep_nb(d, -1, j, y, y->score, { {},{y} }));
+									if (y->score > best_score)
+									{
+										best_score = y->score;
+									}
+								}
+							}//end cap constraints
+						}//end score or heap min limit
+					}//end availability
+				}//for all nb
+			}//end for all positions in sol
+			//1- REPLACE PART
+			int endh = (int)sol.tours[d].seq.size();
+			for (int h = 1; h < endh - 1; ++h)// for all  included regular vertices
+			{
+				//with replacing: for all existing regular member vertices: remove 1 and revaluate solution
+				Tour tourrem = sol.tours[d];
+				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
+				tourrem.remove_vertex(h);
+				int endj = (int)tourrem.seq.size();
+				for (int j = 0; j < endj - 1; ++j)// for all positions in tourrem
+				{
+					Ins::Vertex* x = tourrem.seq[j];//predecessor y
+					Ins::Vertex* z = tourrem.seq[j + 1];//successor y
+					int breakz = tourrem.action[j + 1];
+					int nb_size = (int)x->nb[d].size();
+					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+					{
+						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
+						{
+							if ((y->score - r->score > best_score) || (local_moves.size() < limit))
+							{
+								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
+								{
+									//gather departure time
+									double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
+									//travel time from x to y
+									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
+									if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
+									{
+										arrivaltime = y->LTW[d];
+									}
+									if (arrivaltime > y->UTW[d])
+									{
+										continue;//infeasible
+									}
+									arrivaltime += y->serv;
+									//travel time from y to z
+									arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
+									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
+									{
+										arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
+									}
+									arrivaltime += z->serv + breakz * ins->breakdur;
+									double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
+									if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
+									{
+										local_moves.emplace_back(One_one_rep_nb(d, h, j, y, y->score - r->score, { {r},{y} }));
+										if (y->score - r->score > best_score)
+										{
+											best_score = y->score - r->score;
+										}
+									}
+								}//end cap constraints
+							}//end if score increasing
+						}//end availability 
+					}//for all nb
+				}//end for all positions in tourrem
+			}//end for all included regular vertices in sol
+			#pragma omp critical
+			{
+				global_moves.insert(global_moves.end(), local_moves.begin(), local_moves.end());
+			}
+		}//end for all tours
+	}//end omp parallel
+
+	 // Sort the moves globally based on score
+	sort(global_moves.begin(), global_moves.end(), [](const One_one_rep_nb& a, const One_one_rep_nb& b) 
+	{
+	return a.score > b.score; // Assuming higher scores are better
+	});
+
+	// Convert to a priority queue if necessary
+	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
+	for (const auto& move : global_moves) 
+	{
+		adm_nb.push(move);
+	}
+	return adm_nb;
+	*/
+	return adm_nb;
+}
+
 boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, int limit)
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
@@ -688,7 +835,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 			//1- INSERT PART
 			Sol::Tour& tour = sol.tours[d];
 			int endj = (int)tour.seq.size();
-			for (int j = 0; j < endj - 1; ++j)// for positions in the tour
+			for (int j = 0; j < endj - 1; ++j)// for all positions in the tour
 			{
 				Ins::Vertex* x = tour.seq[j];//predecessor y
 				Ins::Vertex* z = tour.seq[j + 1];//successor y
@@ -805,7 +952,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 		}//end for all tours
 	}//end omp parallel
 	return adm_nb;
-}//end one_one_replace_gen_nb_omp
+}
 
 boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, int limit)
 {
@@ -823,131 +970,111 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 				Sol::Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
 				tourrem.remove_vertex(h);
-				//make candidate list
-				vector<pair<Ins::Vertex*, Ins::Vertex*>> candidatelist;
-				for (int i = 1; i < ins->maxvertices - 1; ++i)//for all regular vertices
+				int endj = (int)tourrem.seq.size();
+				for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
 				{
-					for (int j = 1; j < ins->maxvertices - 1; ++j)//for all regular vertices
+					Ins::Vertex* x1 = tourrem.seq[j];//predecessor y
+					Ins::Vertex* z1 = tourrem.seq[j + 1];//successor y
+					int breakz1 = tourrem.action[j + 1];
+					int nb_size = (int)x1->nb[d].size();
+					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
-						if (i != j)
+						Ins::Vertex* y1 = x1->nb[d][i];//potential insertion at position j
+						if ((sol.available[y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
 						{
-							Ins::Vertex* a = &ins->v[i];//candidate 1
-							Ins::Vertex* b = &ins->v[j];//candidate 2
-							if ((sol.available[a->index]) && (sol.available[b->index]))
-							{//availability
-								if ((tourrem.weight + a->weight + b->weight <= ins->t[d].W_max) && (tourrem.volume + a->volume + b->volume <= ins->t[d].V_max))//cap constraint check
-								{//capacity constraints
-									candidatelist.push_back(pair<Ins::Vertex*, Ins::Vertex*>(a, b));
-								}
-							}
-						}
-					}
-				}
-				int candidatelistsize = (int)candidatelist.size();
-				if (candidatelistsize > 0)
-				{
-					//check if both vertices can be inserted in the solution
-					for (int c = 0; c < candidatelistsize - 1; ++c)//for all neighbours of the included vertex (non-enddepot)
-					{
-						if (((candidatelist[c].first->score + candidatelist[c].second->score) - r->score > bestscore) || (adm_nb.size() < limit))
-						{
-							int endj = (int)tourrem.seq.size();
-							int pos1 = -1;
-							int pos2 = -1;
-							bool one = false;
-							bool two = false;
-							for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
+							if ((tourrem.weight + y1->weight <= ins->t[d].W_max) && (tourrem.volume + y1->volume <= ins->t[d].V_max))//cap constraint check
 							{
-								Ins::Vertex* x = tourrem.seq[j];//predecessor y
-								Ins::Vertex* z = tourrem.seq[j + 1];//successor y
-								int breakz = tourrem.action[j + 1];
-								Ins::Vertex* y = candidatelist[c].first;//potential insertion at position j
 								//gather departure time
 								double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-								//travel time from x to y
-								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-								if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
+								//travel time from x1 to y1
+								double arrivaltime = ins->arrival_time(x1->con[y1->index], currenttime);
+								if (arrivaltime < y1->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
 								{
-									arrivaltime = y->LTW[d];
+									arrivaltime = y1->LTW[d];
 								}
-								if (arrivaltime > y->UTW[d])
+								if (arrivaltime > y1->UTW[d])
 								{
 									continue;//infeasible
 								}
-								arrivaltime += y->serv;
+								arrivaltime += y1->serv;
 								double arrivaltimey = arrivaltime;
-								//travel time from y to z
-								arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
+								//travel time from y1 to z
+								arrivaltime = ins->arrival_time(y1->con[z1->index], arrivaltime);
+								if (arrivaltime + breakz1 * (ins->breakdur) < z1->LTW[d])
 								{
-									arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
+									arrivaltime = z1->LTW[d] - (breakz1 * ins->breakdur);
 								}
-								arrivaltime += z->serv + breakz * ins->breakdur;
+								arrivaltime += z1->serv + breakz1 * ins->breakdur;
 								double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
 								if (shift <= tourrem.max_shift[j + 1])//check if first vertex can be inserted
 								{
-									one = true;
-									
-									//execute the insertion for a new tour based on tourrem
+									//execute the first insertion
 									Sol::Tour tourremins = tourrem;
-									tourremins.insert_vertex(y, j);
+									tourremins.insert_vertex(y1, j);
 									int endk = (int)tourremins.seq.size();
 									//check if second vertex can be inserted in this new tour
-									for (int k = 0; k < endk - 1; ++k)// for positions in tourremins
+									for (int k = 0; k < endk - 1; ++k)// for all positions in tourremins
 									{
-										x = tourremins.seq[k];//predecessor y
-										z = tourremins.seq[k + 1];//successor y
-										int breakz = tourremins.action[k + 1];
-										y = candidatelist[c].second;//potential insertion at position k
-										//gather departure time
-										double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
-										//travel time from x to y
-										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-										if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
+										Ins::Vertex* x2 = tourremins.seq[k];//predecessor y2
+										Ins::Vertex* z2 = tourremins.seq[k + 1];//successor y2
+										int breakz2 = tourremins.action[k + 1];
+										int nb_size = (int)x2->nb[d].size();
+										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
-											arrivaltime = y->LTW[d];
-										}
-										if (arrivaltime > y->UTW[d])
-										{
-											continue;//infeasible
-										}
-										arrivaltime += y->serv;
-										//travel time from y to z
-										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-										{
-											arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-										}
-										arrivaltime += z->serv + breakz * ins->breakdur;
-										double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
-										if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
-										{
-											two = true;
-											pos1 = j;
-											pos2 = k;
-										}//end if shift
-										if ((one) && (two))
-										{
-											#pragma omp critical
+											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
+											if ((y1->score + y2->score) - r->score > bestscore)
 											{
-												adm_nb.push(One_two_rep_nb(d, h, pos1, pos2, candidatelist[c].first, candidatelist[c].second, (candidatelist[c].first->score + candidatelist[c].second->score) - r->score,{{r},{candidatelist[c].first,candidatelist[c].second}}));
-												if ((candidatelist[c].first->score + candidatelist[c].second->score) - r->score > bestscore)
+												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index])&&(y2!=y1))//availability & nb check & two insertions need to be different vertices
 												{
-													bestscore = (candidatelist[c].first->score + candidatelist[c].second->score) - r->score;
-												}
-											}
-										}//end if both vertices can be inserted
-									}//end for all positions in tourrem 2
+													if ((tourremins.weight + y2->weight <= ins->t[d].W_max) && (tourremins.volume + y2->volume <= ins->t[d].V_max))//cap constraint check
+													{
+														//gather departure time
+														double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
+														//travel time from x to y2
+														double arrivaltime = ins->arrival_time(x2->con[y2->index], currenttime);
+														if (arrivaltime < y2->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
+														{
+															arrivaltime = y2->LTW[d];
+														}
+														if (arrivaltime > y2->UTW[d])
+														{
+															continue;//infeasible
+														}
+														arrivaltime += y2->serv;
+														//travel time from y2 to z
+														arrivaltime = ins->arrival_time(y2->con[z2->index], arrivaltime);
+														if (arrivaltime + breakz2 * (ins->breakdur) < z2->LTW[d])
+														{
+															arrivaltime = z2->LTW[d] - (breakz2 * ins->breakdur);
+														}
+														arrivaltime += z2->serv + breakz2 * ins->breakdur;
+														double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
+														if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
+														{
+															#pragma omp critical
+															{
+																adm_nb.push(One_two_rep_nb(d,h,j,k,y1,y2,(y1->score + y2->score) - r->score,{{r},{y1,y2}}));
+																if ((y1->score + y2->score) - r->score > bestscore)
+																{
+																	bestscore = (y1->score + y2->score) - r->score;
+																}
+															}
+														}//end shift 2
+													}//end cap check 2
+												}//end availability 2
+											}//end score check
+										}//end all nb2
+									}//end for all positions in tourremins
 								}//end if shift succes first insertion
-							}//end for all positions in tourrem 1
-						}//end score & nb limit check
-					}//end for all pairs
-				}//end if candidate list is not empty
-			}//end for all included regular vertices in sol
+							}//end cap check 1
+						}//end availability check 1
+					}//end for all nb1
+				}//end for all positions in tourrem 1
+			}//end for all included regular vertices in tour
 		}//end for all tours
 	}//end omp parallel
 	return adm_nb;
-}
+}//end one_two_replace_gen_nb_new
 
 boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, int limit)
 {
@@ -1030,7 +1157,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 		}//end for all tours
 	}//end pragma parallel
 	return adm_nb;
-}// end two_one_replace_gen_nb_omp
+}// end two_one_replace_gen_nb
 
 void Moves::pull_break(Sol& sol, int t)
 {

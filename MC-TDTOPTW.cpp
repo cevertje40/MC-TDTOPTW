@@ -232,12 +232,12 @@ void debug_instance()
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b14.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b80.txt"};
+	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
 	Ins instance(textfile);
-
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
-	Tabu tabu(instance, 10000, 30);
+	Tabu tabu(instance, 1000,5);
 	res = tabu.solve(531);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
@@ -251,7 +251,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set2.txt";
+		filename = "set6.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);

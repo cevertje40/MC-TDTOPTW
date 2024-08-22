@@ -63,6 +63,71 @@ public:
 
 using Move = std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>;
 
+class TabuList
+{
+private:
+	boost::circular_buffer<tuple<Move, int>> buffer;
+public:
+	// Constructor specifying the size of the circular buffer
+	TabuList(int capacity) : buffer(capacity) {}
+	// Check if a move is tabu
+	bool isTabu(const Move& move, int tourindex)
+	{
+		for (const auto& entry : buffer) 
+		{
+			const auto& tabuMove = get<0>(entry);
+			int tabuTourID = get<1>(entry);
+			if (tabuTourID == tourindex)
+			{
+				// Check if any vertex in the current move's out vector matches the tabu out vector
+				if (any_of(move.first.begin(), move.first.end(), [&](Ins::Vertex* v)
+					{
+						return std::find(tabuMove.first.begin(), tabuMove.first.end(), v) != tabuMove.first.end();
+					}))
+				{
+					return true;
+				}
+				// Check if any vertex in the current move's in vector matches the tabu in vector
+				if (any_of(move.second.begin(), move.second.end(), [&](Ins::Vertex* v)
+					{
+						return std::find(tabuMove.second.begin(), tabuMove.second.end(), v) != tabuMove.second.end();
+					}))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	// Add a move to the tabu list
+	void addTabuMove(const Move& move, int tourindex) 
+	{
+		buffer.push_back(make_tuple(move, tourindex));
+	}
+
+	// Print the current contents of the tabu list
+	void printTabuList() const
+	{
+		std::cout << "Current Tabu List:\n";
+		for (const auto& entry : buffer) {
+			const auto& move = std::get<0>(entry);
+			int tour_id = std::get<1>(entry);
+
+			std::cout << "Tour " << tour_id << ": Remove {";
+			for (Ins::Vertex* v : move.first) {
+				std::cout << v->index << " ";
+			}
+			std::cout << "} Insert {";
+			for (Ins::Vertex* v : move.second) {
+				std::cout << v->index << " ";
+			}
+			std::cout << "}\n";
+		}
+	}
+};
+
+
 class Tabu : public Moves
 {
 private:
@@ -71,68 +136,7 @@ private:
 	void parallel_construct(Sol& sol);
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
-	class TabuList 
-	{
-	private:
-		boost::circular_buffer<tuple<Move,int>> buffer;
-
-	public:
-		// Constructor specifying the size of the circular buffer
-		TabuList(int capacity) : buffer(capacity) {}
-		// Check if a move is tabu
-		bool isTabu(const Move& move, int tourindex)
-		{
-			for (const auto& entry : buffer) {
-				const auto& tabuMove = std::get<0>(entry);
-				int tabuTourID = std::get<1>(entry);
-				if (tabuTourID == tourindex) 
-				{
-					// Check if any vertex in the current move's out vector matches the tabu out vector
-					if (std::any_of(move.first.begin(), move.first.end(), [&](Ins::Vertex* v) 
-					{
-						return std::find(tabuMove.first.begin(), tabuMove.first.end(), v) != tabuMove.first.end();
-					})) 
-					{
-						return true;
-					}
-					// Check if any vertex in the current move's in vector matches the tabu in vector
-					if (std::any_of(move.second.begin(), move.second.end(), [&](Ins::Vertex* v) 
-					{
-						return std::find(tabuMove.second.begin(), tabuMove.second.end(), v) != tabuMove.second.end();
-					})) 
-					{
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-
-		// Add a move to the tabu list
-		void addTabuMove(const Move& move, int tourindex) {
-			buffer.push_back(std::make_tuple(move, tourindex));
-		}
-
-		// Print the current contents of the tabu list
-		void printTabuList() const
-		{
-			std::cout << "Current Tabu List:\n";
-			for (const auto& entry : buffer) {
-				const auto& move = std::get<0>(entry);
-				int tour_id = std::get<1>(entry);
-
-				std::cout << "Tour " << tour_id << ": Remove {";
-				for (Ins::Vertex* v : move.first) {
-					std::cout << v->index << " ";
-				}
-				std::cout << "} Insert {";
-				for (Ins::Vertex* v : move.second) {
-					std::cout << v->index << " ";
-				}
-				std::cout << "}\n";
-			}
-		}
-	};
+	
 
 public:
 	Tabu(Ins& ins, int max_noimpr, int tabulist_size);

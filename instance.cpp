@@ -211,7 +211,7 @@ Ins::Ins(CTOP textfile)
 			v[i].volume = v[i].weight;
 			str >> v[i].serv;
 			str >> v[i].score;
-			v[i].serv = 0.0;//set service time equal to for set1-3
+			//v[i].serv = 0.0;//set service time equal to for set1-3
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)
@@ -289,7 +289,8 @@ Ins::Ins(CTOP textfile)
 			}
 		}
 		//read or construct neigbourhood
-		read_neighbourhood(textfile.path, textfile.name);
+		//read_neighbourhood(textfile.path, textfile.name);
+		create_neighbourhood(textfile.path, textfile.name, 50);
 	}
 	else
 	{
@@ -532,7 +533,7 @@ void Ins::read_neighbourhood(string path,string name)
 	else
 	{
 		cout << "can not find neighborhood file" << endl;
-		create_neighbourhood(path,name,500);
+		create_neighbourhood(path,name,50);
 	}
 }
 

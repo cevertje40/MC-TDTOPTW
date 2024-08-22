@@ -304,7 +304,7 @@ Res Aco::solve(int bestknown)
 				//insert_nb(s[ant], 1);
 			}
 		}
-		//cout << iter << endl;
+		cout << iter << endl;
 		update_global_best();//best solution is stored
 		pheromone_update();// iteration best solution its arcs are augmented
 	}

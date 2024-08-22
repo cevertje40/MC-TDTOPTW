@@ -274,15 +274,15 @@ void ctop_gap(int max_rep=5)
 		{
 			Ins::CTOP textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
-			//it->result[rep] = acs.solve(it->bestscore);
+			Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
+			it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,1000,2,3);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Tabu tabu(instance, 10000,5);
-			it->result[rep] = tabu.solve(it->bestscore);
+			//Tabu tabu(instance, 10000,5);
+			//it->result[rep] = tabu.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;
-			cout << "name: " << it->filename << " best score: " << it->bestscore<<" " << tabu.name << " score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " best score: " << it->bestscore<<" " << acs.name << " score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
 			output << it->filename << ";" << it->bestscore << ";" << it->result[rep].score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
@@ -312,8 +312,8 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 
-	//solve_dataset(1);
+	solve_dataset(1);
 	//debug_instance();
 	//debug_ctop();
-	ctop_gap(1);
+	//ctop_gap(1);
 }

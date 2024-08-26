@@ -304,7 +304,7 @@ Res Aco::solve(int bestknown)
 				//insert_nb(s[ant], 1);
 			}
 		}
-		cout << iter << endl;
+		//cout << iter << endl;
 		update_global_best();//best solution is stored
 		pheromone_update();// iteration best solution its arcs are augmented
 	}
@@ -746,9 +746,10 @@ void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, Tab
 		{
 			auto exec_nb = nb.top();
 			exec_nb.execute(s);
-			if (!s.check()) {
-				cout << "Error in move execution" << endl;
-			}
+			//if (!s.check()) 
+			// {
+			//	cout << "Error in move execution" << endl;
+			//}
 			tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
 		}
 	}
@@ -768,28 +769,44 @@ Res Tabu::solve(int bestknown)
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1, 3);
 	TabuList tabulist(max_tabulist_size);
+	ratiofunctions.push_back(&Moves::score);
+	ratiofunctions.push_back(&Moves::score_tt);
+	ratiofunctions.push_back(&Moves::score_v);
+	double alpha = 0.9;
+	double beta = 0.05;
+	double gamma = 0.05;
 	while (noimpr < max_noimpr)
 	{
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
+		//int pick = 1;
+		//double alpha= rand() / (double)RAND_MAX;
+		//double beta = rand() / (double)RAND_MAX;
+		//double gamma= rand() / (double)RAND_MAX;
+		vector<ScoreFunctionPointer> out;
+		sample(ratiofunctions.begin(),ratiofunctions.end(),back_inserter(out),1,engine);
 		//build admissable neighborhoods using the selected neighborhoodstructure
 		switch (pick)
 		{
 			case 1:
 			{
-				auto nb = one_one_replace_gen_nb(s,50);
+				
+				//auto nb = one_one_replace_gen_nb(s,50);
+				//auto nb = one_one_replace_gen_nb(s, 50,alpha, beta, gamma, &Moves::weighted_ratio);
+				auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
+				//tabulist.printTabuList();
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 2:
 			{
-				auto nb = two_one_replace_gen_nb(s,50);
+				auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 3:
 			{
-				auto nb = one_two_replace_gen_nb(s, 50);
+				auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
@@ -806,7 +823,7 @@ Res Tabu::solve(int bestknown)
 		//{
 		//	cout << "error in vnd2" << endl;
 		//}
-		//swap2_nb(s, 1);
+		swap2_nb(s, 1);
 		//if (!s.check())
 		//{
 			//cout << "error in vnd3" << endl;

@@ -127,7 +127,6 @@ public:
 	}
 };
 
-
 class Tabu : public Moves
 {
 private:
@@ -139,9 +138,27 @@ private:
 	
 
 public:
+	typedef double (Moves::* ScoreFunctionPointer)(double, double, double, double, double, double, double);
+	vector<ScoreFunctionPointer>ratiofunctions;
+	
 	Tabu(Ins& ins, int max_noimpr, int tabulist_size);
 	Res solve(int bestknown = 1);
 	string name = "Tabu";
 };
+
+class HALNS : public Moves
+{
+	int max_it;//maximum number of iterations
+	int T_init;//controls switch to current best when noimpr
+	Sol s;//current iteration solution
+	Sol gb;//global best solution
+	void remove(Sol& sol, int criteria,int amount);//todo
+	void insert(Sol& sol, int criteria);//todo
+public:
+	HALNS(Ins& ins, int max_it, int T_init);
+	Res solve(int bestknown = 1);
+	string name = "HALNS";
+};
+
 
 

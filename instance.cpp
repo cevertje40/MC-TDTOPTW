@@ -199,6 +199,7 @@ Ins::Ins(CTOP textfile)
 		getline(ifs, line);//tenth line is empty
 		getline(ifs, line);//eleventh line is text
 		//regular vertices creation
+		maxscore = 0;
 		for (int i = 1; i < maxvertices - 1; ++i)//read maxvertices-2 amount regular vertices
 		{
 			v[i].id = i;
@@ -211,6 +212,7 @@ Ins::Ins(CTOP textfile)
 			v[i].volume = v[i].weight;
 			str >> v[i].serv;
 			str >> v[i].score;
+			maxscore += v[i].score;
 			//v[i].serv = 0.0;//set service time equal to for set1-3
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);

@@ -87,7 +87,6 @@ Ins::Ins(MCTDTOPTW textfile)
 	ifs.open(textfile.path + textfile.name, ifstream::in);
 	if (ifs.is_open())
 	{
-
 		string line;
 		getline(ifs, line);
 		stringstream str(line);//first line

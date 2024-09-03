@@ -792,7 +792,6 @@ Res Tabu::solve(int bestknown)
 			{
 				
 				//auto nb = one_one_replace_gen_nb(s,50);
-				//auto nb = one_one_replace_gen_nb(s, 50,alpha, beta, gamma, &Moves::weighted_ratio);
 				auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				//tabulist.printTabuList();
 				executeMove(nb,s,gb,tabulist);
@@ -849,6 +848,7 @@ Res Tabu::solve(int bestknown)
 	double cpuTime;
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
+	gb.write_to_cplex();
 	cout << gb << endl;
 	return Res(gb.score, cpuTime, bestknown);
 }

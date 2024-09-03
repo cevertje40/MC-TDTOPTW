@@ -48,5 +48,6 @@ public:
 	bool check();
 	void read_from_file();
 	void write_to_file();
+	void write_to_cplex();
 	friend ostream& operator<<(ostream& output, Sol& sol);
 };

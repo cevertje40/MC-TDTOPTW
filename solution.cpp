@@ -127,6 +127,43 @@ void Sol::write_to_file()
 	output.close();
 }
 
+void Sol::write_to_cplex()
+{
+	ofstream output;
+	string name = "sol_" + to_string(ins->maxvertices)+ ".txt";
+	output.open(name, ios::out);
+	output << score << "\n";
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Sol::Tour* tour = &tours[t];
+		output << tour->seq.size()<<" ";
+		for (int i = 0; i < tour->seq.size(); ++i)
+		{
+			output << tour->seq[i]->index << " ";
+		}
+		output << "\n";
+		for (int i = 0; i < tour->seq.size(); ++i)
+		{
+			output << time_periods[0] + tour->deptime[i] << " ";
+		}
+		output << "\n";
+		for (int i = 0; i < tour->seq.size(); ++i)
+		{
+			output << ins->find_t(time_periods[0] + tour->deptime[i])<<" ";
+		}
+		output << "\n";
+		for (int i = 0; i < tour->seq.size(); ++i)
+		{
+			if (tour->action[i] == 1)
+			{
+				output << tour->seq[i]->index << endl;
+			}
+		}
+		output << "\n";
+	}
+	output.close();
+}
+
 ostream& operator<<(ostream& output, Sol& sol)
 {
 	const char sep = ' ';

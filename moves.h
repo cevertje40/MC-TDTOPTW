@@ -79,6 +79,7 @@ public:
 class Moves
 {
 public:
+	//local search moves
 	bool insert_nb(Sol& sol,int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool exchange_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	void pull_break(Sol& sol, int tour);//tries to pull the break forwards
@@ -92,24 +93,20 @@ public:
 	bool two_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool one_two_replace(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	Ins* ins;
-	//nb generating moves
-	
+	//evaluation criteria for nb generators
 	double score(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);
 	double score_tt(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);
 	double score_w(double tt, double score, double weight, double volume, double alpha, double beta, double gammaa);
 	double score_v(double tt, double score, double weight, double volume, double alpha, double beta, double gammaa);
 	double weighted_ratio(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);
-
-	
-
-
+	//nb generators
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, int limit, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, int limit, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, int limit, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
-
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, int limit);
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, int limit);
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, int limit);
+	//constructor
 	Moves(Ins& ins) :ins(&ins) {}
 };
 

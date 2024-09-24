@@ -423,45 +423,39 @@ void Tour::update_maxshift(int start, int end, double arrivaltime)
 
 void Tour::calc_maxshift()
 {
-	int size = (int) seq.size();
-	double departuretime = 0;
+	// Initialize max_shift for the end depot
+	int size = (int)seq.size();
+	double departuretime = 0.0;
 	max_shift.back() = (ins->t[index].T_max - deptime.back());
+	// Calculate arrival time, adjusting for break duration if necessary
 	double arrivaltime = ins->t[index].LAT - (action.back() * ins->breakdur);//if you break at the end depot subtract breakduration
-	if (action.back() == 1)//break op enddepot
+	// Adjust max_shift and arrivalTime if there's a break at the end depot
+	if ((action.back() == 1)&&(ins->t[index].LAT > ins->breakend + ins->breakdur))
 	{
-		if (ins->t[index].EDT+ins->t[index].T_max > ins->breakend + ins->breakdur)
-		{
-			//cout<<"path: "<<d<< " bij calc maxshift break op enddepot verhindert een maxshift: " << endl;
-			max_shift.back() = (ins->breakend + ins->breakdur) - (deptime.back() + ins->t[index].EDT);
-			arrivaltime = ins->breakend;//zoals hieronder service of enkel break in dit geval ervan aftrekken
-		}
+		max_shift.back() = (ins->breakend + ins->breakdur) - (deptime.back() + ins->t[index].EDT);
+		arrivaltime = ins->breakend;//remove breakduration
 	}
-	Ins::Vertex* y;
-	Ins::Vertex* z;
-	for (int i = 0; i < size - 2; ++i)// depots don't count
+	// Iterate backward through the sequence (excluding depots)
+	for (int i = size-2; i >0; --i)
 	{
-		//define the 2 elements
-		y = seq[size - (i + 2)];
-		int breaki = action[size - (i + 2)];
-		z = seq[size - (i + 1)];
+		// Calculate the departure time
+		Ins::Vertex* y = seq[i];
+		int breaki = action[i];
+		Ins::Vertex* z = seq[i+1];
 		departuretime = ins->departure_time(y->con[z->index], arrivaltime);
-		//TW check on departuretime 
+		// Time window check on departure time
 		if (departuretime > y->UTW[index] + y->serv)
 		{
 			departuretime = y->UTW[index] + y->serv;
 		}
-		//break may limit the maximum allowable shift
-		if (breaki == 1)
+		// Adjust departure time if a break is scheduled
+		if ((breaki == 1)&&(departuretime > ins->breakend + ins->breakdur))
 		{
-			if (departuretime > ins->breakend + ins->breakdur)
-			{
-				//cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
-				departuretime = ins->breakend + ins->breakdur;
-			}
+			departuretime = ins->breakend + ins->breakdur;
 		}
-		//store result
-		max_shift[size - (i + 2)] = departuretime - (deptime[size - (i + 2)] + ins->t[index].EDT);
-		//reset variable for the calculation of next point
+		// Store the maximum shift result
+		max_shift[i] = departuretime - (deptime[i] + ins->t[index].EDT);
+		// Update arrivalTime for the next iteration
 		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
 	}// end for i
 }//end calc_max_shift
@@ -753,10 +747,10 @@ bool Tour::check()
 	double arrivaltime = ins->t[index].LAT - (action.back() * ins->breakdur);//if you break at the end depot subtract breakduration
 	if (action.back() == 1)//break op enddepot
 	{
-		if (ins->t[index].EDT + ins->t[index].T_max > ins->breakend + ins->breakdur)
+		if (ins->t[index].LAT > ins->breakend + ins->breakdur)
 		{
 			//cout<<"path: "<<d<< " bij calc maxshift break op enddepot verhindert een maxshift: " << endl;
-			max_shiftcheck.back() = (ins->breakend + ins->breakdur) - (deptime.back() + ins->t[index].EDT);
+			max_shiftcheck.back() = (ins->breakend + ins->breakdur) - (ins->t[index].EDT+deptime.back());
 			arrivaltime = ins->breakend;//zoals hieronder service of enkel break in dit geval ervan aftrekken
 		}
 	}

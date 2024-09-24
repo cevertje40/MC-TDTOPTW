@@ -614,7 +614,7 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int max_tabulist_size): Moves(ins),max_noim
 
 void Tabu::parallel_construct(Sol& sol)
 {
-	vector<Ins::Vertex*>candidates = ins->v[0].nb[0];//is already sorted on score high to low
+	vector<Ins::Vertex*>candidates = ins->v[0].nb[0];//only use candidates that can be reached from the start depot, this list is already sorted on score high to low
 	for (int i = 0; i < candidates.size() - 1; ++i)
 	{
 		//calculate traveltime for candidate under consideration
@@ -671,7 +671,7 @@ void Tabu::parallel_construct(Sol& sol)
 					succes = true;
 					feasible[t] = true;
 					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
-					if (traveltime[t] < besttraveltime)
+					if (traveltime[t] < besttraveltime)//candidates are already sorted from high score to low score
 					{
 						besttour = t;
 						besttraveltime = arrivaltime - ins->t[t].EDT;//include the possible break time
@@ -680,7 +680,7 @@ void Tabu::parallel_construct(Sol& sol)
 				}//end else
 			}//end cap constraints
 		}//end for all tours
-		//insert candidate with the lowest traveltime
+		//insert candidate with highest score in a route with the lowest traveltime increase
 		if (succes)
 		{
 			Sol::Tour& tour = sol.tours[besttour];
@@ -790,7 +790,6 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				
 				//auto nb = one_one_replace_gen_nb(s,50);
 				auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				//tabulist.printTabuList();

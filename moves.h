@@ -5,7 +5,7 @@
 class One_one_rep_nb
 {
 public:
-	pair<vector<Ins::Vertex*>,vector<Ins::Vertex*>>move;
+	pair<vector<Ins::Vertex*>,vector<Ins::Vertex*>>move;//out, in
 	int tour;
 	int rempos;//removal index
 	int inspos;//insert index
@@ -31,7 +31,7 @@ public:
 class One_two_rep_nb
 {
 public:
-	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;
+	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;//out, in
 	int tour;
 	int rempos;
 	int inspos1;
@@ -56,7 +56,7 @@ public:
 class Two_one_rep_nb
 {
 public:
-	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;
+	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;//out, in
 	int tour;
 	int rempos1;
 	int rempos2;
@@ -75,9 +75,6 @@ public:
 		sol.insert_vertex(sol.tours[tour], inscand, inspos);
 	}
 };
-
-
-
 
 class Moves
 {

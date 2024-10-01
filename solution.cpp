@@ -186,26 +186,26 @@ ostream& operator<<(ostream& output, Sol& sol)
 		output << left << setw(4) << setfill(sep) << "d" << d << "\n";
 		output << left << setw(4) << setfill(sep) << "i";
 		output << left << setw(4) << setfill(sep) << "vi";
-		output << left << setw(7) << setfill(sep) << "sco";
+		output << left << setw(4) << setfill(sep) << "sco";
 		output << left << setw(7) << setfill(sep) << "vol";
 		output << left << setw(7) << setfill(sep) << "wei";
 		output << left << setw(8) << setfill(sep) << "dep";
 		output << left << setw(8) << setfill(sep) << "LTW";
 		output << left << setw(8) << setfill(sep) << "UTW";
 		output << left << setw(8) << setfill(sep) << "shift";
-		output << left << setw(8) << setfill(sep) << "break" << "\n";
+		output << left << setw(4) << setfill(sep) << "break" << "\n";
 		for (int i = 0; i < end; ++i)
 		{
 			output << left << setw(4) << setfill(sep) << i;
 			output << left << setw(4) << setfill(sep) << sol.tours[d].seq[i]->index;
-			output << left << setw(7) << setfill(sep) << sol.tours[d].seq[i]->score;
+			output << left << setw(4) << setfill(sep) << sol.tours[d].seq[i]->score;
 			output << left << setw(7) << setfill(sep) << sol.tours[d].seq[i]->volume;
 			output << left << setw(7) << setfill(sep) << sol.tours[d].seq[i]->weight;
 			output << left << setw(8) << setfill(sep) << sol.tours[d].deptime[i];
 			output << left << setw(8) << setfill(sep) << sol.tours[d].seq[i]->LTW[d] - sol.ins->t[d].EDT;
 			output << left << setw(8) << setfill(sep) << sol.tours[d].seq[i]->UTW[d] - sol.ins->t[d].EDT;
 			output << left << setw(8) << setfill(sep) << sol.tours[d].max_shift[i];
-			output << left << setw(8) << setfill(sep) << sol.tours[d].action[i] << "\n";
+			output << left << setw(4) << setfill(sep) << sol.tours[d].action[i] << "\n";
 		}
 	}
 	output << "total score : " << sol.score;

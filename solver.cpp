@@ -286,14 +286,14 @@ Res Aco::solve(int bestknown)
 			{
 				s[ant].reset();
 				construct(s[ant]);
-				two_opt_nb(s[ant], 1);
+				//two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				swap2_nb(s[ant], 1);
-				move_nb(s[ant], 1);
+				//swap2_nb(s[ant], 1);
+				//move_nb(s[ant], 1);
 				insert_nb(s[ant], 1);
 				one_one_replace_nb(s[ant], 1);
-				two_one_replace_nb(s[ant], 1);
-				one_two_replace(s[ant], 1);
+				//two_one_replace_nb(s[ant], 1);
+				//one_two_replace(s[ant], 1);
 				//exchange_nb(s[ant], 1);
 				//two_opt_nb(s[ant], 1);
 				//swap_nb(s[ant], 1);
@@ -555,8 +555,8 @@ Res Ils::solve(int bestknown)
 		move_nb(s,1);
 		insert_nb(s,1);
 		one_one_replace_nb(s, 1);
-		two_one_replace_nb(s, 1);
-		one_two_replace(s, 1);
+		//two_one_replace_nb(s, 1);
+		//one_two_replace(s, 1);
 		if (s.score > gb.score)
 		{
 			gb = s;
@@ -798,12 +798,14 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
+				//auto nb = two_one_replace_gen_nb(s, 50);
 				auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 3:
 			{
+				//auto nb = one_two_replace_gen_nb(s, 50);
 				auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				executeMove(nb,s,gb,tabulist);
 				break;

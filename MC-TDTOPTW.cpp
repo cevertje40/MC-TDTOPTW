@@ -189,13 +189,15 @@ void solve_dataset(int max_rep = 5)
 		{
 			Ins::MCTDTOPTW textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			//Aco acs(instance, 1, 3, 0.01, 20, 100, 0.25, 0.05);
-			//resdataset.push_back(acs.solve());
-			Tabu tabu(instance, 10000, 20);
+			//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
+			//it->result[rep]=acs.solve(it->bestscore);
+			Tabu tabu(instance, 10000,5);
 			it->result[rep] = tabu.solve(it->bestscore);
+			//Ils ils(instance, 10000, 100, 20, 30);
+			//it->result[rep] = ils.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].score;
-			cout << "name: " << it->filename << " best score: " << it->bestscore << " ACS score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " best score: " << it->bestscore << " score: " << it->result[rep].score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
 			output << it->filename << ";" << it->bestscore << ";" << it->result[rep].score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
@@ -203,17 +205,23 @@ void solve_dataset(int max_rep = 5)
 	}
 	//calculate results over all replicates
 	double globalgap = 0.0;
+	output.open("output.txt", ios::out | ios::app);
 	for (it = set.begin(); it != set.end(); ++it)
 	{
 		double avgscore = 0.0;
+		double avgcpu = 0.0;
 		for (int rep = 0; rep < max_rep; ++rep)
 		{
 			avgscore += it->result[rep].score;
+			avgcpu += it->result[rep].time;
 		}
 		avgscore /= max_rep;
+		avgcpu /= max_rep;
+		output<<it->filename << avgscore <<";"<<avgcpu << "\n";
 		double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100;
 		globalgap += avggap;
 	}
+	output.close();
 	globalgap /= set.size();
 	cout << "global avg gap is: " << globalgap << endl;
 }
@@ -221,7 +229,7 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.1.txt" };
 	Ins instance(textfile);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
@@ -312,8 +320,8 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 
-	//solve_dataset(1);
-	debug_instance();
+	solve_dataset();
+	//debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);
 }

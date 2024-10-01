@@ -141,7 +141,7 @@ Ins::Ins(MCTDTOPTW textfile)
 	read_time_dependent_traveltime();
 	//create or read neighborhood
 	read_neighbourhood(textfile.path,textfile.name);
-
+	//create_neighbourhood(textfile.path, textfile.name, 50);
 }
 
 Ins::Ins(CTOP textfile)

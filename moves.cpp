@@ -2089,13 +2089,13 @@ bool Moves::move_nb(Sol& sol,int mode)//move vertex x from tour d to tour e in o
 							{
 								if ((toure->weight + x->weight <= ins->t[e].W_max) && (toure->volume + x->volume <= ins->t[e].V_max))
 								{
-									//local evaluation on path e
+									//local evaluation on path e, break remains unchanged
 									double ttab = (toure->deptime[j + 1] - (b->serv + toure->action[j + 1] * ins->breakdur)) - toure->deptime[j];
 									//calculate axb
 									double departuretime = ins->t[e].EDT + toure->deptime[j];
 									//traveltime a to x
 									double arrivaltime = ins->arrival_time(a->con[x->index], departuretime);
-									if (arrivaltime < x->LTW[e])//je mag niet breaken op x want er is al een break op de e route
+									if (arrivaltime < x->LTW[e])
 									{
 										arrivaltime = x->LTW[e];
 									}

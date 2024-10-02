@@ -189,10 +189,10 @@ void solve_dataset(int max_rep = 5)
 		{
 			Ins::MCTDTOPTW textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
-			//it->result[rep]=acs.solve(it->bestscore);
-			Tabu tabu(instance, 10000,5);
-			it->result[rep] = tabu.solve(it->bestscore);
+			Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
+			it->result[rep]=acs.solve(it->bestscore);
+			//Tabu tabu(instance, 10000,5);
+			//it->result[rep] = tabu.solve(it->bestscore);
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
 			avggap += it->result[rep].gap;
@@ -217,7 +217,7 @@ void solve_dataset(int max_rep = 5)
 		}
 		avgscore /= max_rep;
 		avgcpu /= max_rep;
-		output<<it->filename << avgscore <<";"<<avgcpu << "\n";
+		output<<it->filename<<";" << avgscore << ";" << avgcpu << "\n";
 		double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100;
 		globalgap += avggap;
 	}
@@ -319,8 +319,7 @@ void ctop_gap(int max_rep=5)
 
 int main()
 {
-
-	solve_dataset();
+	solve_dataset(1);
 	//debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);

@@ -16,7 +16,8 @@ Aco::Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_
 			tau[i][j] = 1.0;
 			if (i != j)
 			{
-				double consumption = ((ins.v[i].con[j]->determin / ins.t[0].T_max) + (ins.v[j].weight / ins.t[0].W_max) + (ins.v[j].volume / ins.t[0].V_max)) / 3;
+				//double consumption = ins.v[i].con[j]->determin / ins.t[0].T_max;
+				double consumption = (((ins.v[i].con[j]->determin+ins.v[j].serv) / ins.t[0].T_max) + (ins.v[j].weight / ins.t[0].W_max) + (ins.v[j].volume / ins.t[0].V_max)) / 3;
 				eta[i][j] = max(0.001,ins.v[j].score) / consumption;
 			}
 			else
@@ -288,8 +289,8 @@ Res Aco::solve(int bestknown)
 				construct(s[ant]);
 				//two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				//swap2_nb(s[ant], 1);
-				//move_nb(s[ant], 1);
+				swap2_nb(s[ant], 1);
+				move_nb(s[ant], 1);
 				insert_nb(s[ant], 1);
 				one_one_replace_nb(s[ant], 1);
 				//two_one_replace_nb(s[ant], 1);

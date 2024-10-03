@@ -229,7 +229,7 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
 	Ins instance(textfile);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
@@ -319,8 +319,14 @@ void ctop_gap(int max_rep=5)
 
 int main()
 {
-	solve_dataset(1);
-	//debug_instance();
+
+	Graph bemobile(425479, 519915);
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
+	Ins instance(textfile);
+	instance.construct_time_independent_traveltime(bemobile);
+	
+	//solve_dataset(1);
+	debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);
 }

@@ -303,12 +303,22 @@ void Ins::construct_time_independent_traveltime(Graph& graph)
 {
 	clock_t start, end;
 	start = clock();
+	vector<int>mapper(maxvertices, 0);
 	vector<int> targets;
 	vector<vector<double>> dump;
 	for (int i = 0; i < maxvertices; ++i)
 	{
-		targets.push_back(v[i].id-1);//todo only push back unique beindex
-		dump.push_back(vector<double>());
+		if (std::find(targets.begin(), targets.end(), v[i].id - 1) == targets.end())//unique beindex
+		{
+			targets.push_back(v[i].id - 1);
+			mapper[i] = targets.size() - 1;
+			dump.push_back(vector<double>());
+		}
+		else//non unique beindex
+		{
+			mapper[i] = targets.size() - 1;
+		}
+		
 	}
 	cout << "construct time independent travel time" << endl;
 	#pragma omp parallel num_threads(12)
@@ -337,7 +347,7 @@ void Ins::construct_time_independent_traveltime(Graph& graph)
 		{
 			for (int j = 0; j < maxvertices; ++j)
 			{
-				fprintf(fp, "%lf;", dump[i][j]);//output in miliseconds
+				fprintf(fp, "%lf;", dump[i][mapper[j]]);//output in miliseconds
 			}
 			fprintf(fp, "\n");
 		}

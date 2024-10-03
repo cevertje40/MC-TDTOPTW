@@ -615,7 +615,15 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int max_tabulist_size): Moves(ins),max_noim
 
 void Tabu::parallel_construct(Sol& sol)
 {
-	vector<Ins::Vertex*>candidates = ins->v[0].nb[0];//only use candidates that can be reached from the start depot, this list is already sorted on score high to low
+	//only use candidates that you can reach from the stard depot and still return to the end depot
+	vector<Ins::Vertex*>candidates;
+	for (int i = 1; i < ins->maxvertices-1; ++i)
+	{
+		if (ins->v[0].con[i]->determin+ins->v[i].serv+ins->v[i].con[ins->maxvertices-1]->determin <= ins->t[0].T_max)
+		{
+			candidates.push_back(&ins->v[i]);
+		}
+	}
 	for (int i = 0; i < candidates.size() - 1; ++i)
 	{
 		//calculate traveltime for candidate under consideration
@@ -739,6 +747,9 @@ void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, Tab
 			else
 			{
 				//cout << "Neighborhood is empty" << endl;
+				tabulist.printTabuList();
+				//add this tabu move to escape infinite loop
+				//tabulist.addTabuMove(nb.top().move, nb.top().tour);
 				execute = false;
 				break;
 			}
@@ -791,23 +802,23 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				//auto nb = one_one_replace_gen_nb(s,50);
-				auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
+				auto nb = one_one_replace_gen_nb(s,5000);
+				//auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				//tabulist.printTabuList();
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 2:
 			{
-				//auto nb = two_one_replace_gen_nb(s, 50);
-				auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
+				auto nb = two_one_replace_gen_nb(s, 5000);
+				//auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
 			case 3:
 			{
-				//auto nb = one_two_replace_gen_nb(s, 50);
-				auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
+				auto nb = one_two_replace_gen_nb(s, 5000);
+				//auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				executeMove(nb,s,gb,tabulist);
 				break;
 			}
@@ -834,6 +845,8 @@ Res Tabu::solve(int bestknown)
 		//{
 			//cout << "error in vnd4" << endl;
 		//}
+		cout<<"iter: "<<debug_iter<<" s score: " << s.score << endl;
+		s.check();
 		if (s.score > gb.score)
 		{
 			gb = s;

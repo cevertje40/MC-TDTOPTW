@@ -32,8 +32,7 @@ void Ins::read_time_independent_traveltime()
 	{
 		cout << red << "could not open time-independent travel time file" << endl;
 	}
-
-}
+}//end read time independent
 
 void Ins::read_time_dependent_traveltime()
 {
@@ -77,12 +76,11 @@ void Ins::read_time_dependent_traveltime()
 	{
 		cout << red << "could not open time-dependent travel time file" << endl;
 	}
-}
+}//end read time dependent travel time
 
 Ins::Ins(MCTDTOPTW textfile)
 {
 	//read in vertex and tour information from txt file and populate v and t objects
-	FILE* file = NULL;
 	ifstream ifs;
 	ifs.open(textfile.path + textfile.name, ifstream::in);
 	if (ifs.is_open())
@@ -136,17 +134,10 @@ Ins::Ins(MCTDTOPTW textfile)
 	{
 		cout << " can not open MC-TDTOPTW instance file" << endl;
 	}
-	//read in travel time information
-	read_time_independent_traveltime();
-	read_time_dependent_traveltime();
-	//create or read neighborhood
-	//read_neighbourhood(textfile.path,textfile.name);
-	create_neighbourhood(textfile.path, textfile.name,50);
 }
 
 Ins::Ins(CTOP textfile)
 {
-	FILE* file = NULL;
 	ifstream ifs;
 	string filepath = textfile.path + textfile.name;
 	ifs.open(filepath, ifstream::in);
@@ -212,7 +203,7 @@ Ins::Ins(CTOP textfile)
 			str >> v[i].serv;
 			str >> v[i].score;
 			maxscore += v[i].score;
-			//v[i].serv = 0.0;//set service time equal to for set1-3
+			v[i].serv = 0.0;//set service time equal to for set1-3
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)
@@ -289,9 +280,6 @@ Ins::Ins(CTOP textfile)
 				v[i].con[j] = &c[counter];
 			}
 		}
-		//read or construct neigbourhood
-		//read_neighbourhood(textfile.path, textfile.name);
-		create_neighbourhood(textfile.path, textfile.name, 50);
 	}
 	else
 	{
@@ -304,21 +292,21 @@ void Ins::construct_time_independent_traveltime(Graph& graph)
 	clock_t start, end;
 	start = clock();
 	vector<int>mapper(maxvertices, 0);
-	vector<int> targets;
+	vector<int>destinations;
 	vector<vector<double>> dump;
 	for (int i = 0; i < maxvertices; ++i)
 	{
-		if (std::find(targets.begin(), targets.end(), v[i].id - 1) == targets.end())//unique beindex
+		if (find(destinations.begin(),destinations.end(), v[i].id - 1) == destinations.end())//unique beindex
 		{
-			targets.push_back(v[i].id - 1);
-			mapper[i] = targets.size() - 1;
-			dump.push_back(vector<double>());
+			destinations.push_back(v[i].id - 1);//only add unique beindices to target list
+			mapper[i] = int(destinations.size()) - 1;
 		}
-		else//non unique beindex
+		else//non-unique beindex
 		{
-			mapper[i] = targets.size() - 1;
+			//map this vertex to the first occurence in the desination vector
+			mapper[i] = int(find(destinations.begin(), destinations.end(), v[i].id - 1)-destinations.begin());
 		}
-		
+		dump.push_back(vector<double>());//1 target array per vertex
 	}
 	cout << "construct time independent travel time" << endl;
 	#pragma omp parallel num_threads(12)
@@ -327,36 +315,27 @@ void Ins::construct_time_independent_traveltime(Graph& graph)
 		for (int i = 0; i < maxvertices; ++i)
 		{
 			int thread = omp_get_thread_num();
-			dump[i] = graph.dijkstra_independent_to_all_threaded(v[i].id-1, targets, thread);
+			dump[i] = graph.dijkstra_independent_to_all_threaded(v[i].id-1,destinations, thread);//return traveltime to all unique targets
 		}
 	}
 	end = clock();
 	double time = difftime(end, start) / CLOCKS_PER_SEC;
-
+	cout << endl << "writing time independent travel times to output file after: " << time << " seconds" << endl;
 	//write to txt
+	ofstream output;
 	FILE* fp = NULL;
-	char filepath[125] = "..\\..\\datasets\\MCTDTOPTW\\";
-	char filename[15];
-	sprintf_s(filename, sizeof(filename), "titt%d.TXT", maxvertices);
-	strcat_s(filepath, filename);
-	fopen_s(&fp, filepath, "w");   // open for writing 
-	if (fp != NULL)
+	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	string filename = "titt" + to_string(maxvertices) + ".TXT";
+	output.open(filepath+filename, ios::out);
+	for (int i = 0; i < maxvertices; ++i)
 	{
-		cout << endl << "writing time independent travel times to output file after: " << time << " seconds" << endl;
-		for (int i = 0; i < maxvertices; ++i)
+		for (int j = 0; j < maxvertices; ++j)
 		{
-			for (int j = 0; j < maxvertices; ++j)
-			{
-				fprintf(fp, "%lf;", dump[i][mapper[j]]);//output in miliseconds
-			}
-			fprintf(fp, "\n");
+			output << dump[i][mapper[j]] << ";";//convert j index to mapped target index
 		}
-		fclose(fp);    // close the file before ending program 
+		output << "\n";
 	}
-	else
-	{
-		cout << red << "error writing time-independent travel times to output file" << endl;
-	}
+	output.close();
 }//end construct time independent traveltime
 
 void Ins::construct_time_dependent_traveltime(Graph& graph)
@@ -365,58 +344,55 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 	cout << "Constructing time-dependent travel time" << endl;
 	clock_t start, end;
 	start = clock();
-	//niet in parallele zone push backen
-	dump.resize(maxvertices);
+	dump.resize(maxvertices);//no push back in parallel zone
+	vector<int>mapper(maxvertices, 0);
+	vector<int>destinations;
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		if (find(destinations.begin(), destinations.end(), v[i].id - 1) == destinations.end())//unique beindex
+		{
+			destinations.push_back(v[i].id - 1);
+			mapper[i] = int(destinations.size()) - 1;
+		}
+		else//non-unique beindex
+		{
+			//map this vertex to the first occurence in the desination vector
+			mapper[i] = int(find(destinations.begin(), destinations.end(), v[i].id - 1) - destinations.begin());
+		}
+	}
 	//start parallel session
 	#pragma omp parallel num_threads(12)
 	{
-	#pragma omp for nowait
+		#pragma omp for nowait
 		for (int i = 0; i < maxvertices; ++i)
 		{
 			int thread = omp_get_thread_num();
-			//obtain neighbours
-			vector<int> destinations;
-			for (int j = 0; j < maxvertices; ++j)
-			{
-				destinations.push_back(v[j].id-1);//non neighbours will get infinity
-			}
-			//define feasible departure time zone
 			dump[i].resize(maxtimeslots);
 			for (int t = 0; t < maxtimeslots; ++t)
 			{
-				dump[i][t] = graph.dijkstra_dependent_to_all_threaded(v[i].id-1, destinations,time_periods[t],thread);//j
+				dump[i][t] = graph.dijkstra_dependent_to_all_threaded(v[i].id-1,destinations,time_periods[t],thread);
 			}// for all timeslots
 		}//for all vertices
 	}//end pragma parallel
 	end = clock();
 	double time = difftime(end, start) / CLOCKS_PER_SEC;
-
-	FILE* file = NULL;
-	char filepath[125] = "..\\..\\datasets\\MCTDTOPTW\\";
-	char storagename[50];
-	sprintf_s(storagename, sizeof(storagename), "tt%d.TXT", maxvertices);
-	strcat_s(filepath, storagename);
-	fopen_s(&file, filepath, "w");   // open for writing
-	if (file != NULL)
+	cout << endl << "writing time-dependent traveltime to output file after: " << time << " seconds" << endl;
+	ofstream output;
+	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	string filename = "tt" + to_string(maxvertices) + ".TXT";
+	output.open(filepath + filename, ios::out);
+	for (int i = 0; i < maxvertices; ++i)
 	{
-		cout << endl << "writing time-dependent traveltime to output file after: " << time << " seconds" << endl;
-		for (int i = 0; i < maxvertices; ++i)
+		for (int j = 0; j < maxvertices; ++j)
 		{
-			for (int j = 0; j < maxvertices; ++j)
+			for (int t = 0; t <maxtimeslots; ++t)
 			{
-				for (int t = 0; t <maxtimeslots; ++t)
-				{
-					fprintf(file, "%lf;", dump[i][t][j]);
-				}
-				fprintf(file, "\n");
+				output << dump[i][t][mapper[j]] << ";";
 			}
+			output << "\n";
 		}
-		fclose(file);    // close the file before ending program 
 	}
-	else
-	{
-		cout << red << "error writing time-dependent traveltime to output file" << endl;
-	}
+	output.close(); 
 }
 
 void Ins::create_neighbourhood(string path, string name, int amnt_nb)
@@ -438,7 +414,7 @@ void Ins::create_neighbourhood(string path, string name, int amnt_nb)
 					{
 						if (v[i].LTW[d] + v[i].serv + v[i].con[j]->determin <= v[j].UTW[d])
 						{
-							score.push_back((v[i].con[j]->determin + v[j].serv + v[j].weight + v[j].volume) / v[j].score);
+							score.push_back(max(1.0,v[i].con[j]->determin + v[j].serv) / v[j].score);
 							v[i].nb[d].push_back(&v[j]);
 						}
 					}

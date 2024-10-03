@@ -189,6 +189,9 @@ void solve_dataset(int max_rep = 5)
 		{
 			Ins::MCTDTOPTW textfile = { it->path,it->filename };
 			Ins instance(textfile);
+			instance.read_time_independent_traveltime();
+			instance.read_time_dependent_traveltime();
+			instance.create_neighbourhood(textfile.path, textfile.name, 50);
 			Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			it->result[rep]=acs.solve(it->bestscore);
 			//Tabu tabu(instance, 10000,5);
@@ -229,11 +232,14 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"162.1.1.1.txt" };
 	Ins instance(textfile);
-	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
+	instance.read_time_independent_traveltime();
+	instance.read_time_dependent_traveltime();
+	instance.create_neighbourhood(textfile.path, textfile.name,50);
+	//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
-	Tabu tabu(instance, 10000, 20);
+	Tabu tabu(instance, 10000,5);
 	resdataset.push_back(tabu.solve());
 }
 
@@ -243,6 +249,9 @@ void debug_ctop()
 	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b80.txt"};
 	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
 	Ins instance(textfile);
+	instance.read_time_independent_traveltime();
+	instance.read_time_dependent_traveltime();
+	instance.create_neighbourhood(textfile.path, textfile.name,200);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
 	Tabu tabu(instance, 10000,5);
@@ -259,7 +268,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set5.txt";
+		filename = "set2.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -282,6 +291,7 @@ void ctop_gap(int max_rep=5)
 		{
 			Ins::CTOP textfile = { it->path,it->filename };
 			Ins instance(textfile);
+			instance.create_neighbourhood(textfile.path, textfile.name, 50);
 			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,100,2,3);
@@ -320,11 +330,11 @@ void ctop_gap(int max_rep=5)
 int main()
 {
 
-	Graph bemobile(425479, 519915);
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
-	Ins instance(textfile);
-	instance.construct_time_independent_traveltime(bemobile);
-	
+	//Graph bemobile(425479, 519915);
+	//Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"162.1.1.1.txt" };
+	//Ins instance(textfile);
+	//instance.construct_time_independent_traveltime(bemobile);
+	//instance.construct_time_dependent_traveltime(bemobile);
 	//solve_dataset(1);
 	debug_instance();
 	//debug_ctop();

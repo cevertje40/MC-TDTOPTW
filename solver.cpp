@@ -733,11 +733,12 @@ void Tabu::parallel_construct(Sol& sol)
 }//end parallel construct
 
 template<typename MoveType>
-void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, TabuList& tabulist) 
+bool executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, TabuList& tabulist) 
 {
+	bool execute=false;
 	if (nb.size() > 1)
 	{
-		bool execute = true;
+		execute = true;
 		while ((tabulist.isTabu(nb.top().move, nb.top().tour)) && (s.score + nb.top().score < gb.score))
 		{
 			if (nb.size() > 1)
@@ -747,7 +748,7 @@ void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, Tab
 			else
 			{
 				//cout << "Neighborhood is empty" << endl;
-				tabulist.printTabuList();
+				//tabulist.printTabuList();
 				//add this tabu move to escape infinite loop
 				//tabulist.addTabuMove(nb.top().move, nb.top().tour);
 				execute = false;
@@ -765,6 +766,7 @@ void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, Tab
 			tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
 		}
 	}
+	return execute;
 }
 
 
@@ -803,23 +805,51 @@ Res Tabu::solve(int bestknown)
 			case 1:
 			{
 				auto nb = one_one_replace_gen_nb(s,5000);
+				int nbsize = nb.size();
 				//auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				//tabulist.printTabuList();
-				executeMove(nb,s,gb,tabulist);
+				if (!executeMove(nb, s, gb, tabulist))
+				{
+					uniform_int_distribution<std::mt19937::result_type> disttour(0,ins->maxtours-1);
+					int randtour = disttour(engine);
+					uniform_int_distribution<std::mt19937::result_type> distvertex(1,s.tours[randtour].seq.size()-2);
+					int randvertexindex = distvertex(engine);
+					s.remove_vertex(s.tours[randtour], randvertexindex);
+					//cout << "debug now" << endl;
+				}
+
 				break;
 			}
 			case 2:
 			{
 				auto nb = two_one_replace_gen_nb(s, 5000);
+				int nbsize = nb.size();
 				//auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
-				executeMove(nb,s,gb,tabulist);
+				if (!executeMove(nb, s, gb, tabulist))
+				{
+					uniform_int_distribution<std::mt19937::result_type> disttour(0, ins->maxtours - 1);
+					int randtour = disttour(engine);
+					uniform_int_distribution<std::mt19937::result_type> distvertex(1, s.tours[randtour].seq.size() - 2);
+					int randvertexindex = distvertex(engine);
+					s.remove_vertex(s.tours[randtour],randvertexindex);
+					//cout << "debug now" << endl;
+				}
 				break;
 			}
 			case 3:
 			{
 				auto nb = one_two_replace_gen_nb(s, 5000);
+				int nbsize = nb.size();
 				//auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
-				executeMove(nb,s,gb,tabulist);
+				if (!executeMove(nb, s, gb, tabulist))
+				{
+					uniform_int_distribution<std::mt19937::result_type> disttour(0, ins->maxtours - 1);
+					int randtour = disttour(engine);
+					uniform_int_distribution<std::mt19937::result_type> distvertex(1, s.tours[randtour].seq.size() - 2);
+					int randvertexindex = distvertex(engine);
+					s.remove_vertex(s.tours[randtour],randvertexindex);
+					//cout << "debug now" << endl;
+				}
 				break;
 			}
 		}//end switch
@@ -845,8 +875,12 @@ Res Tabu::solve(int bestknown)
 		//{
 			//cout << "error in vnd4" << endl;
 		//}
-		cout<<"iter: "<<debug_iter<<" s score: " << s.score << endl;
-		s.check();
+		//cout<<"iter: "<<debug_iter<<" s score: " << s.score << endl;
+		//if (debug_iter==900)
+		//{
+			//s.check_availability();
+			//cout << "debug hier" << endl;
+		//}
 		if (s.score > gb.score)
 		{
 			gb = s;

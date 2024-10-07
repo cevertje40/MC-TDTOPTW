@@ -164,6 +164,17 @@ void Sol::write_to_cplex()
 	output.close();
 }
 
+void Sol::check_availability()
+{
+	for (int i = 0;i < ins->maxvertices;++i)
+	{
+		if (available[i])
+		{
+			cout << "i: " << i << "still available" << endl;
+		}
+	}
+}
+
 ostream& operator<<(ostream& output, Sol& sol)
 {
 	const char sep = ' ';

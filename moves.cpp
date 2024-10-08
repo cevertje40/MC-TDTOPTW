@@ -1004,7 +1004,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, int limit)
+boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
 	int bestscore = -INT_MAX;
@@ -1025,9 +1025,15 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 				{
 					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+					// Tabu check for y in the current tour (tour index = d)
+					if ((tabulist.isTabu(y->index, d))&&(sol.score+y->score<=globalbest))
+					{
+						//cout << "tabu list stopped move" << endl;
+						continue; // skip if y is tabu for this tour
+					}
 					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 					{
-						if ((y->score > bestscore) || (adm_nb.size() < limit))
+						if (y->score > bestscore)
 						{
 							if ((tour.weight + y->weight <= ins->t[d].W_max) && (tour.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 							{
@@ -1086,9 +1092,14 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
 						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+						if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - r->score) <= globalbest))
+						{
+							//cout << "tabu list stopped move" << endl;
+							continue; // skip if y is tabu for this tour
+						}
 						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 						{
-							if ((y->score - r->score > bestscore) || (adm_nb.size() < limit))
+							if (y->score - r->score > bestscore)
 							{
 								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 								{
@@ -1135,7 +1146,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, int limit)
+boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
 {
 	int bestscore = -INT_MAX;
 	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
@@ -1203,7 +1214,12 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
 											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
-											if (((y1->score + y2->score) - r->score > bestscore) || (adm_nb.size() < limit))
+											if ((tabulist.isTabu(r->index, d))||(tabulist.isTabu(y1->index, d))||(tabulist.isTabu(y2->index, d)) && (sol.score + (y1->score+y2->score - r->score) <= globalbest))
+											{
+												//cout << "tabu list stopped move" << endl;
+												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
+											}
+											if (((y1->score + y2->score) - r->score > bestscore))
 											{
 												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index])&&(y2!=y1))//availability & nb check & two insertions need to be different vertices
 												{
@@ -1257,7 +1273,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 	return adm_nb;
 }//end one_two_replace_gen_nb_new
 
-boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, int limit)
+boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
 {
 	int bestscore = -INT_MAX;
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
@@ -1289,9 +1305,16 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 							{
 								Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+
+								if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - lostscore) <= globalbest))
+								{
+									//cout << "tabu list stopped move" << endl;
+									continue; // skip if y is tabu for this tour and the combination does not improve globalbest
+								}
+
 								if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
 								{
-									if ((y->score - lostscore > bestscore) || (adm_nb.size() < limit))
+									if ((y->score - lostscore > bestscore))
 									{
 										if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 										{

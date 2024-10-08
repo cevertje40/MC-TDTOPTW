@@ -152,6 +152,7 @@
     <ClInclude Include="moves.h" />
     <ClInclude Include="solution.h" />
     <ClInclude Include="solver.h" />
+    <ClInclude Include="tabuvector.h" />
     <ClInclude Include="time.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

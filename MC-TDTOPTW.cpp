@@ -191,11 +191,11 @@ void solve_dataset(int max_rep = 5)
 			Ins instance(textfile);
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
-			instance.create_neighbourhood(textfile.path, textfile.name, 50);
-			Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
-			it->result[rep]=acs.solve(it->bestscore);
-			//Tabu tabu(instance, 10000,5);
-			//it->result[rep] = tabu.solve(it->bestscore);
+			instance.create_neighbourhood(textfile.path, textfile.name,50);
+			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
+			//it->result[rep]=acs.solve(it->bestscore);
+			Tabu tabu(instance, 10000,5);
+			it->result[rep] = tabu.solve(it->bestscore);
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
 			avggap += it->result[rep].gap;
@@ -232,7 +232,7 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"50.1.2.3.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
@@ -335,8 +335,8 @@ int main()
 	//Ins instance(textfile);
 	//instance.construct_time_independent_traveltime(bemobile);
 	//instance.construct_time_dependent_traveltime(bemobile);
-	//solve_dataset(1);
-	debug_instance();
+	solve_dataset(1);
+	//debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);
 }

@@ -56,5 +56,8 @@
     <ClInclude Include="moves.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="tabuvector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

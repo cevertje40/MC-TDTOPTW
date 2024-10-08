@@ -733,40 +733,22 @@ void Tabu::parallel_construct(Sol& sol)
 }//end parallel construct
 
 template<typename MoveType>
-bool executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, Sol& gb, TabuList& tabulist) 
+void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& tabulist) 
 {
-	bool execute=false;
-	if (nb.size() > 1)
+	if (nb.size() >= 1)
 	{
-		execute = true;
-		while ((tabulist.isTabu(nb.top().move, nb.top().tour)) && (s.score + nb.top().score < gb.score))
+		auto exec_nb = nb.top();
+		exec_nb.execute(s);
+		for (int i = 0; i < exec_nb.move.first.size(); ++i)
 		{
-			if (nb.size() > 1)
-			{
-				nb.pop();
-			}
-			else
-			{
-				//cout << "Neighborhood is empty" << endl;
-				//tabulist.printTabuList();
-				//add this tabu move to escape infinite loop
-				//tabulist.addTabuMove(nb.top().move, nb.top().tour);
-				execute = false;
-				break;
-			}
+			tabulist.addTabu(exec_nb.move.first[i]->index,exec_nb.tour);
 		}
-		if (execute)
+		for (int i = 0; i < exec_nb.move.second.size(); ++i)
 		{
-			auto exec_nb = nb.top();
-			exec_nb.execute(s);
-			//if (!s.check()) 
-			// {
-			//	cout << "Error in move execution" << endl;
-			//}
-			tabulist.addTabuMove(exec_nb.move, exec_nb.tour);
+			tabulist.addTabu(exec_nb.move.second[i]->index,exec_nb.tour);
 		}
+		tabulist.nextIteration();
 	}
-	return execute;
 }
 
 
@@ -775,14 +757,13 @@ Res Tabu::solve(int bestknown)
 	clock_t start, end;
 	start = clock();
 	int noimpr = 0;
-	vector<int> tabuindex(ins->maxtours,0);
 	s.reset();
 	//s.read_from_file();
 	//s.write_to_file();
 	parallel_construct(s);
 	int debug_iter = 0;
-	uniform_int_distribution<> nbpicker(1, 3);
-	TabuList tabulist(max_tabulist_size);
+	uniform_int_distribution<> nbpicker(1,3);
+	TabuVector tabulist(ins->maxvertices,2);
 	ratiofunctions.push_back(&Moves::score);
 	ratiofunctions.push_back(&Moves::score_tt);
 	ratiofunctions.push_back(&Moves::score_v);
@@ -804,52 +785,24 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				auto nb = one_one_replace_gen_nb(s,5000);
-				int nbsize = nb.size();
+				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				//tabulist.printTabuList();
-				if (!executeMove(nb, s, gb, tabulist))
-				{
-					uniform_int_distribution<std::mt19937::result_type> disttour(0,ins->maxtours-1);
-					int randtour = disttour(engine);
-					uniform_int_distribution<std::mt19937::result_type> distvertex(1,s.tours[randtour].seq.size()-2);
-					int randvertexindex = distvertex(engine);
-					s.remove_vertex(s.tours[randtour], randvertexindex);
-					//cout << "debug now" << endl;
-				}
-
+				executeMove(nb, s, tabulist);
 				break;
 			}
 			case 2:
 			{
-				auto nb = two_one_replace_gen_nb(s, 5000);
-				int nbsize = nb.size();
+				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
-				if (!executeMove(nb, s, gb, tabulist))
-				{
-					uniform_int_distribution<std::mt19937::result_type> disttour(0, ins->maxtours - 1);
-					int randtour = disttour(engine);
-					uniform_int_distribution<std::mt19937::result_type> distvertex(1, s.tours[randtour].seq.size() - 2);
-					int randvertexindex = distvertex(engine);
-					s.remove_vertex(s.tours[randtour],randvertexindex);
-					//cout << "debug now" << endl;
-				}
+				executeMove(nb, s, tabulist);
 				break;
 			}
 			case 3:
 			{
-				auto nb = one_two_replace_gen_nb(s, 5000);
-				int nbsize = nb.size();
+				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
-				if (!executeMove(nb, s, gb, tabulist))
-				{
-					uniform_int_distribution<std::mt19937::result_type> disttour(0, ins->maxtours - 1);
-					int randtour = disttour(engine);
-					uniform_int_distribution<std::mt19937::result_type> distvertex(1, s.tours[randtour].seq.size() - 2);
-					int randvertexindex = distvertex(engine);
-					s.remove_vertex(s.tours[randtour],randvertexindex);
-					//cout << "debug now" << endl;
-				}
+				executeMove(nb, s, tabulist);
 				break;
 			}
 		}//end switch

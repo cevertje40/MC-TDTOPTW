@@ -607,10 +607,39 @@ Res Ils::solve(int bestknown)
 }
 
 
-Tabu::Tabu(Ins& ins, int max_noimpr, int max_tabulist_size): Moves(ins),max_noimpr(max_noimpr), max_tabulist_size(max_tabulist_size)
+Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it): Moves(ins),max_noimpr(max_noimpr), nb_tabu_it(nb_tabu_it)
 {
 	gb = Sol(ins);//best sol
 	s = Sol(ins);//iter sol
+}
+
+void Tabu::perturbe(Sol& sol)
+{
+	for (int d = 0; d < ins->maxtours; ++d)
+	{
+		//find most consuming vertex
+		int targetvertex = -1;
+		int end = (int) sol.tours[d].seq.size();
+		double maxratio= -DBL_MAX;
+		for (int i = 1; i < end-1; ++i)
+		{
+			Ins::Vertex* a = sol.tours[d].seq[i - 1];
+			Ins::Vertex* b = sol.tours[d].seq[i];
+			double usedtraveltime = (sol.tours[d].deptime[i]-b->serv) - sol.tours[d].deptime[i - 1];//includes waiting time
+			double mintraveltime = a->con[b->index]->determin;
+			double ratio = usedtraveltime / mintraveltime;
+			if (ratio > maxratio)
+			{
+				targetvertex = i;
+				maxratio = ratio;
+			}
+		}
+		//delete most consuming verter
+		if (targetvertex != -1)
+		{
+			sol.remove_vertex(sol.tours[d], targetvertex);
+		}
+	}
 }
 
 void Tabu::parallel_construct(Sol& sol)
@@ -763,18 +792,21 @@ Res Tabu::solve(int bestknown)
 	parallel_construct(s);
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1,3);
-	TabuVector tabulist(ins->maxvertices,2);
+	TabuVector tabulist(ins->maxvertices,nb_tabu_it);
 	ratiofunctions.push_back(&Moves::score);
 	ratiofunctions.push_back(&Moves::score_tt);
 	ratiofunctions.push_back(&Moves::score_v);
 	double alpha = 0.9;
 	double beta = 0.05;
 	double gamma = 0.05;
+	int nonb1 = 0;
+	int nonb2 = 0;
+	int nonb3 = 0;
 	while (noimpr < max_noimpr)
 	{
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
-		//int pick = 1;
+		//int pick = 2;
 		//double alpha= rand() / (double)RAND_MAX;
 		//double beta = rand() / (double)RAND_MAX;
 		//double gamma= rand() / (double)RAND_MAX;
@@ -788,6 +820,11 @@ Res Tabu::solve(int bestknown)
 				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
 				//tabulist.printTabuList();
+				if (nb.size() == 0)
+				{
+					perturbe(s);
+					++nonb1;
+				}
 				executeMove(nb, s, tabulist);
 				break;
 			}
@@ -795,6 +832,11 @@ Res Tabu::solve(int bestknown)
 			{
 				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
+				if (nb.size() == 0)
+				{
+					perturbe(s);
+					++nonb2;
+				}
 				executeMove(nb, s, tabulist);
 				break;
 			}
@@ -802,6 +844,11 @@ Res Tabu::solve(int bestknown)
 			{
 				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
+				if (nb.size() == 0)
+				{
+					perturbe(s);
+					++nonb3;
+				}
 				executeMove(nb, s, tabulist);
 				break;
 			}
@@ -851,6 +898,7 @@ Res Tabu::solve(int bestknown)
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
 	gb.write_to_cplex();
+	cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
 	cout << gb << endl;
 	return Res(gb.score, cpuTime, bestknown);
 }

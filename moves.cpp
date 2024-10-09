@@ -1308,7 +1308,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 
 								if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - lostscore) <= globalbest))
 								{
-									//cout << "tabu list stopped move" << endl;
+									//cout << "vertices are tabu" << endl;
 									continue; // skip if y is tabu for this tour and the combination does not improve globalbest
 								}
 

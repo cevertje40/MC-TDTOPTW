@@ -67,7 +67,7 @@ class Tabu : public Moves
 {
 private:
 	int max_noimpr;
-	int max_tabulist_size;
+	int nb_tabu_it;
 	void parallel_construct(Sol& sol);
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
@@ -77,7 +77,8 @@ public:
 	typedef double (Moves::* ScoreFunctionPointer)(double, double, double, double, double, double, double);
 	vector<ScoreFunctionPointer>ratiofunctions;
 	
-	Tabu(Ins& ins, int max_noimpr, int tabulist_size);
+	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it);
+	void perturbe(Sol& sol);
 	Res solve(int bestknown = 1);
 	string name = "Tabu";
 };

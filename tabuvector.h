@@ -3,65 +3,43 @@
 #include <vector>
 #include <iostream>
 using namespace std;
-class TabuVector
-{
+class TabuVector {
 private:
-	// For each tour, we maintain a vector of tabu tenures for each vertex
-	unordered_map<int,vector<int>> tabu_vectors; // key = tour index, value = tabu vector for that tour
-	int tabu_duration;  // Duration for which a vertex remains tabu
-	int current_iteration;  // Keeps track of the current iteration of the search
-	int num_vertices;  // Number of vertices in each tour
+    std::vector<std::vector<int>> tabu_vectors;  // A fixed-size vector of tabu vectors for each tour
+    int tabu_duration;
+    int current_iteration;
+    int num_tours;
+    int num_vertices;
 
 public:
-	// Constructor: Initialize the tabu vectors for a given number of vertices
-	TabuVector(int num_vertices, int tabu_duration)
-		: tabu_duration(tabu_duration), current_iteration(0), num_vertices(num_vertices) {}
+    // Constructor
+    TabuVector(int num_tours, int num_vertices, int tabu_duration)
+        : tabu_vectors(num_tours, std::vector<int>(num_vertices, 0)),
+        tabu_duration(tabu_duration), current_iteration(0), num_tours(num_tours), num_vertices(num_vertices) {}
 
-	// Move to the next iteration
-	void nextIteration()
-	{
-		current_iteration++;
-	}
+    // Move to the next iteration
+    void nextIteration() {
+        current_iteration++;
+    }
 
-	// Ensure that the tour has an initialized tabu vector
-	void ensureTourInitialized(int tour_index)
-	{
-		if (tabu_vectors.find(tour_index) == tabu_vectors.end())
-		{
-			tabu_vectors[tour_index] = std::vector<int>(num_vertices, 0);  // Initialize the vector with zeros
-		}
-	}
+    // Mark a vertex as tabu
+    void addTabu(int vertex_index, int tour_index) {
+        tabu_vectors[tour_index][vertex_index] = current_iteration + tabu_duration;
+    }
 
-	// Mark a vertex as tabu for a specific tour
-	void addTabu(int vertex_index, int tour_index)
-	{
-		ensureTourInitialized(tour_index);
-		tabu_vectors[tour_index][vertex_index] = current_iteration + tabu_duration;
-	}
+    // Check if a vertex is tabu
+    bool isTabu(int vertex_index, int tour_index) {
+        return tabu_vectors[tour_index][vertex_index] > current_iteration;
+    }
 
-	// Check if a vertex is tabu for a specific tour
-	bool isTabu(int vertex_index, int tour_index)
-	{
-		ensureTourInitialized(tour_index);
-		return tabu_vectors[tour_index][vertex_index] > current_iteration;
-	}
-
-	// Print the current contents of the tabu vector for all tours
-	void printTabuVector() const
-	{
-		std::cout << "Tabu Vectors:\n";
-		for (const auto& tour : tabu_vectors)
-		{
-			int tour_index = tour.first;
-			const auto& tabu_vector = tour.second;
-			std::cout << "Tour " << tour_index << ":\n";
-			for (size_t i = 0; i < tabu_vector.size(); ++i)
-			{
-				if (tabu_vector[i] > current_iteration)
-				{
-					std::cout << "  Vertex " << i << " is tabu until iteration " << tabu_vector[i] << "\n";
-				}
-			}
-		}
-	}
+    //Print tabu vectors
+    void printTabuVector() const {
+        for (int tour_index = 0; tour_index < num_tours; ++tour_index) {
+            for (int vertex_index = 0; vertex_index < num_vertices; ++vertex_index) {
+                if (tabu_vectors[tour_index][vertex_index] > current_iteration) {
+                    std::cout << "Vertex " << vertex_index << " in tour " << tour_index << " is tabu until " << tabu_vectors[tour_index][vertex_index] << "\n";
+                }
+            }
+        }
+    }
 };

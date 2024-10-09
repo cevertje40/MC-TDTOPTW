@@ -617,7 +617,7 @@ void Tabu::perturbe(Sol& sol)
 {
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
-		//find most consuming vertex
+		//find most time consuming vertex
 		int targetvertex = -1;
 		int end = (int) sol.tours[d].seq.size();
 		double maxratio= -DBL_MAX;
@@ -634,7 +634,7 @@ void Tabu::perturbe(Sol& sol)
 				maxratio = ratio;
 			}
 		}
-		//delete most consuming verter
+		//delete most time consuming vertex
 		if (targetvertex != -1)
 		{
 			sol.remove_vertex(sol.tours[d], targetvertex);
@@ -792,7 +792,7 @@ Res Tabu::solve(int bestknown)
 	parallel_construct(s);
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1,3);
-	TabuVector tabulist(ins->maxvertices,nb_tabu_it);
+	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);
 	ratiofunctions.push_back(&Moves::score);
 	ratiofunctions.push_back(&Moves::score_tt);
 	ratiofunctions.push_back(&Moves::score_v);
@@ -819,7 +819,6 @@ Res Tabu::solve(int bestknown)
 			{
 				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
-				//tabulist.printTabuList();
 				if (nb.size() == 0)
 				{
 					perturbe(s);
@@ -853,31 +852,31 @@ Res Tabu::solve(int bestknown)
 				break;
 			}
 		}//end switch
-		if (!s.check())
-		{
-			cout << "error in replace" << endl;
-		}
+		//if (!s.check())
+		//{
+			//cout << "error in replace" << endl;
+		//}
 		//VND
 		two_opt_nb(s, 1);
-		if (!s.check())
-		{
-			cout << "error in two-opt" << endl;
-		}
+		//if (!s.check())
+		//{
+			//cout << "error in two-opt" << endl;
+		//}
 		swap_nb(s, 1);
-		if (!s.check())
-		{
-			cout << "error in swap_nb" << endl;
-		}
+		//if (!s.check())
+		//{
+			//cout << "error in swap_nb" << endl;
+		//}
 		swap2_nb(s, 1);
-		if (!s.check())
-		{
-			cout << "error in swap2_nb" << endl;
-		}
+		//if (!s.check())
+		//{
+			//cout << "error in swap2_nb" << endl;
+		//}
 		move_nb(s, 1);
-		if (!s.check())
-		{
-			cout << "error in move_nb" << endl;
-		}
+		//if (!s.check())
+		//{
+			//cout << "error in move_nb" << endl;
+		//}
 		if (s.score > gb.score)
 		{
 			gb = s;

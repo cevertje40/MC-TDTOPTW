@@ -656,7 +656,7 @@ double Moves::weighted_ratio(double tt, double score, double weight, double volu
 	return pow(double(score)/ins->maxscore,alpha)/(pow((tt/ins->t[0].T_max), beta) * pow((weight)/ins->t[0].W_max, gamma)* pow((volume) / ins->t[0].V_max, gamma));
 }
 
-boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, int limit,double alpha, double beta, double gamma, double(Moves::*get_ratio)(double, double, double, double, double, double, double))
+boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double(Moves::*get_ratio)(double, double, double, double, double, double, double))
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
 	double bestratio = -DBL_MAX;
@@ -679,6 +679,12 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 				{
 					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+					// Tabu check for y in the current tour (tour index = d)
+					if ((tabulist.isTabu(y->index, d)) && (sol.score + y->score <= globalbest))
+					{
+						//cout << "tabu list stopped move" << endl;
+						continue; // skip if y is tabu for this tour
+					}
 					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 					{
 						double heuristicratio = (this->*get_ratio)(x->con[y->index]->determin + y->serv + y->con[z->index]->determin,y->score,y->weight,y->volume, 1.0, 1.0, 1.0);
@@ -743,10 +749,16 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
 						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+						// Tabu check for y in the current tour (tour index = d)
+						if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - r->score) <= globalbest))
+						{
+							//cout << "tabu list stopped move" << endl;
+							continue; // skip if y is tabu for this tour
+						}
 						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 						{
 							double heuristicratio = (this->*get_ratio)(x->con[y->index]->determin + y->serv + y->con[z->index]->determin, y->score,y->weight,y->volume, 1, 1, 1);
-							if ((heuristicratio - lostratio > bestratio) || (adm_nb.size() < limit))
+							if (heuristicratio - lostratio > bestratio)
 							{
 								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 								{
@@ -792,7 +804,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, int limit, double alpha, double beta, double gamma, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
+boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest , double alpha, double beta, double gamma, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
 	double bestratio = -DBL_MAX;
 	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
@@ -862,8 +874,13 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
 											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
+											if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d)) && (sol.score + (y1->score + y2->score - r->score) <= globalbest))
+											{
+												//cout << "tabu list stopped move" << endl;
+												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
+											}
 											double heuristicratio = (this->*get_ratio)(tt1+x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin,y1->score+ y2->score,y1->weight+ y2->weight, y1->volume+y2->volume, 1, 1, 1);
-											if ((heuristicratio-lostratio > bestratio) || (adm_nb.size() < limit))
+											if (heuristicratio-lostratio > bestratio)
 											{
 												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
 												{
@@ -919,7 +936,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
-boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, int limit, double alpha, double beta, double gamma, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
+boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest , double alpha, double beta, double gamma, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
 	double bestratio = -DBL_MAX;
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
@@ -953,10 +970,15 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 							{
 								Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+								if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - (r->score+s->score)) <= globalbest))
+								{
+									//cout << "vertices are tabu" << endl;
+									continue; // skip if y is tabu for this tour and the combination does not improve globalbest
+								}
 								if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
 								{
 									double heuristicratio = (this->*get_ratio)(x->con[y->index]->determin + y->serv + y->con[z->index]->determin, y->score, y->weight, y->volume, 1.0, 1.0, 1.0);
-									if ((heuristicratio - lostratio > bestratio) || (adm_nb.size() < limit))
+									if (heuristicratio - lostratio > bestratio)
 									{
 										if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 										{
@@ -1305,13 +1327,11 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 							{
 								Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-
 								if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - lostscore) <= globalbest))
 								{
 									//cout << "vertices are tabu" << endl;
 									continue; // skip if y is tabu for this tour and the combination does not improve globalbest
 								}
-
 								if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
 								{
 									if ((y->score - lostscore > bestscore))

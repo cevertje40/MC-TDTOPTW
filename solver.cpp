@@ -625,7 +625,7 @@ void Tabu::perturbe(Sol& sol)
 		{
 			Ins::Vertex* a = sol.tours[d].seq[i - 1];
 			Ins::Vertex* b = sol.tours[d].seq[i];
-			double usedtraveltime = (sol.tours[d].deptime[i]-b->serv) - sol.tours[d].deptime[i - 1];//includes waiting time
+			double usedtraveltime = (sol.tours[d].deptime[i]-(b->serv+sol.tours[d].action[i]*ins->breakdur)) - sol.tours[d].deptime[i - 1];//includes waiting time
 			double mintraveltime = a->con[b->index]->determin;
 			double ratio = usedtraveltime / mintraveltime;
 			if (ratio > maxratio)
@@ -853,34 +853,31 @@ Res Tabu::solve(int bestknown)
 				break;
 			}
 		}//end switch
-		
+		if (!s.check())
+		{
+			cout << "error in replace" << endl;
+		}
 		//VND
 		two_opt_nb(s, 1);
-		//if (!s.check())
-		//{
-		//	cout << "error in vnd1" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in two-opt" << endl;
+		}
 		swap_nb(s, 1);
-		//if (!s.check())
-		//{
-		//	cout << "error in vnd2" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in swap_nb" << endl;
+		}
 		swap2_nb(s, 1);
-		//if (!s.check())
-		//{
-			//cout << "error in vnd3" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in swap2_nb" << endl;
+		}
 		move_nb(s, 1);
-		//if (!s.check())
-		//{
-			//cout << "error in vnd4" << endl;
-		//}
-		//cout<<"iter: "<<debug_iter<<" s score: " << s.score << endl;
-		//if (debug_iter==900)
-		//{
-			//s.check_availability();
-			//cout << "debug hier" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in move_nb" << endl;
+		}
 		if (s.score > gb.score)
 		{
 			gb = s;

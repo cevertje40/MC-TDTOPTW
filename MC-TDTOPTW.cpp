@@ -232,7 +232,7 @@ void solve_dataset(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.3.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
@@ -335,8 +335,8 @@ int main()
 	//Ins instance(textfile);
 	//instance.construct_time_independent_traveltime(bemobile);
 	//instance.construct_time_dependent_traveltime(bemobile);
-	//solve_dataset(1);
-	debug_instance();
+	solve_dataset(1);
+	//debug_instance();
 	//debug_ctop();
 	//ctop_gap(1);
 }

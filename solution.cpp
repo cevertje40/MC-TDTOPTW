@@ -651,7 +651,7 @@ bool Tour::check()
 		tourok = false;
 	}
 	//b. TW check
-	for (int i = 0; i <= end; ++i)//utw van end depot ook checken
+	for (int i = 0; i <= end; ++i)//utw of end depot serves as T_max check
 	{
 		Ins::Vertex* current = seq[i];
 		int breakcurrent = action[i];
@@ -666,17 +666,27 @@ bool Tour::check()
 			tourok = false;
 		}
 	}//end for i
-	//c. weight check
+	//c. weight checks
 	if (abs(weightcheck - weight) > 0.01)
 	{
 		cout << red << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
 		tourok = false;
 	}
-	//d. volume check
+	if (weight-ins->t[index].W_max>0.01)
+	{
+		tourok = false;
+		cout << red << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
+	}
+	//d. volume checks
 	if (abs(volumecheck - volume) > 0.01)
 	{
 		cout << yellow << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
 		tourok = false;
+	}
+	if (volume - ins->t[index].V_max>0.01)
+	{
+		tourok = false;
+		cout << red << "tour: " << index << " volume " << volume << " above max: " << ins->t[index].V_max << endl;
 	}
 	//e. break timing check
 	bool breakcheck = false;

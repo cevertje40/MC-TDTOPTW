@@ -2293,7 +2293,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 							Ins::Vertex* c = toure->seq[j + 2];
 							if ((a->nbi[e][x->index]) && (x->nbi[e][b->index]) && (w->nbi[d][y->index]))
 							{
-								if ((toure->weight + (x->weight-b->weight) <= ins->t[e].W_max) && (toure->volume + (x->weight-b->volume) <= ins->t[e].V_max)&&(tourd->weight + (b->weight - x->weight) <= ins->t[d].W_max)&&(tourd->volume + (b->volume - x->volume) <= ins->t[d].V_max))
+								if ((toure->weight + (x->weight-b->weight) <= ins->t[e].W_max) && (toure->volume + (x->volume-b->volume) <= ins->t[e].V_max)&&(tourd->weight + (b->weight - x->weight) <= ins->t[d].W_max)&&(tourd->volume + (b->volume - x->volume) <= ins->t[d].V_max))
 								{//check if a potential increase in volume and weight is allowed on each tour
 									
 									//local evaluation on path d

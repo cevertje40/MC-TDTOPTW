@@ -1,4 +1,4 @@
 solution methods for the CTOP 
 filename,bestscore,score,cpu,gap
-100.3.3.3.txt;957;951;5.325;0.626959
-100.3.3.3.txt;951;5.325
+20.1.2.1.txt;248;248;11.058;0
+20.1.2.1.txt;248;11.058

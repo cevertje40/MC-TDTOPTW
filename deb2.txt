@@ -1,2 +1,2 @@
 ..\..\datasets\MCTDTOPTW\
-100.3.3.3.txt	957
+20.1.2.1.txt	248

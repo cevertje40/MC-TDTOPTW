@@ -298,6 +298,33 @@ void Tour::update(int start, int end)//keep break fixed and update travel time a
 	}//end for
 }
 
+void Tour::update_break(int newbreakindex)
+{
+	//update break to new position
+	action[breakindex] = 0;
+	breakindex = newbreakindex;
+	action[newbreakindex] = 1;
+	//update complete solution because break is repositioned
+	double currenttime = ins->t[index].EDT;
+	int end = (int)seq.size();
+	for (int u = 0; u < end - 1; ++u)
+	{
+		//gather departure time and corresponding time slot
+		Ins::Vertex* o = seq[u];
+		Ins::Vertex* p = seq[u + 1];
+		//travel time from van o to p
+		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
+		if (arrivaltime + (action[u + 1] * ins->breakdur) < p->LTW[index])
+		{
+			arrivaltime = p->LTW[index] - (action[u + 1] * ins->breakdur);
+		}
+		arrivaltime += p->serv + (action[u + 1] * ins->breakdur);
+		deptime[u + 1] = arrivaltime - ins->t[index].EDT;
+		currenttime = arrivaltime;
+	}//end for all u
+	calc_maxshift();
+}
+
 void Tour::update_break()//potentially reposition break and update travel time and maxshift
 {
 	//evaluate tour without break

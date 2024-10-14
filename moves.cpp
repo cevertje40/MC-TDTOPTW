@@ -2232,10 +2232,10 @@ bool Moves::shift_nb(Sol& sol, int mode)
 				//cout << "break pulled" << endl;
 				pull_break(sol, bestd->index);
 			}
-			if (!sol.check())
-			{
-				cout << "error in shift_nb" << endl;
-			}
+			//if (!sol.check())
+			//{
+				//cout << "error in shift_nb" << endl;
+			//}
 			succes = false;
 		}//end if improvement
 	}//end while improvement
@@ -2437,6 +2437,8 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 		Sol::Tour *beste=NULL;
 		int besti;
 		int bestj;
+		int bestbreakindexd;
+		int bestbreakindexe;
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			Sol::Tour* tourd = &sol.tours[d];
@@ -2464,6 +2466,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									//local evaluation on path d
 									//the break can come too early due to potential traveltime decrease 
 									bool reqbreakd = false;
+									int breakindexd = tourd->breakindex;
 									if (tourd->breakindex >= i + 1)//update break if it is currently position at x or after
 									{
 										reqbreakd = true;
@@ -2478,6 +2481,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											continue;
 										}
 										reqbreakd = false;
+										breakindexd = i + 1;
 										arrivaltime += ins->breakdur;
 										
 									}
@@ -2497,6 +2501,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									{
 										reqbreakd = false;
 										arrivaltime += ins->breakdur;
+										breakindexd = i + 2;
 									}
 									if (arrivaltime < y->LTW[d])
 									{
@@ -2509,8 +2514,9 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double arrivaltimey =arrivaltime+ y->serv;
 									double diffd = (ins->t[d].EDT+tourd->deptime[i + 2])-arrivaltimey;
 									//local evaluation on path e
-									//a break can come too early due to potential traveltime decrease 
+									//the break can come too early due to potential traveltime decrease 
 									bool reqbreake = false;
+									int breakindexe = toure->breakindex;
 									if (toure->breakindex >= j + 1)
 									{
 										reqbreake = true;
@@ -2525,6 +2531,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											continue;
 										}
 										reqbreake = false;
+										breakindexe = j + 1;
 										arrivaltime += ins->breakdur;
 									}
 									if (arrivaltime < x->LTW[e])
@@ -2543,6 +2550,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									{
 										reqbreake = false;
 										arrivaltime += ins->breakdur;
+										breakindexe = j + 2;
 									}
 									if (arrivaltime< c->LTW[e])
 									{
@@ -2555,31 +2563,87 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 									double arrivaltimec =arrivaltime + c->serv;
 									double diffe = (ins->t[e].EDT+toure->deptime[j + 2]) - arrivaltimec;
 									double localdecreasetotal = diffd + diffe;
-									//local improvement check: check if potential increase is allowed in the case of fixed break position and whether there is an overall travel time gain
-									if ((-diffd<= tourd->max_shift[i + 2]) && (-diffe <= toure->max_shift[j + 2]) && (localdecreasetotal > bestdecrease))
+									//local travel time gain
+									if (localdecreasetotal > bestdecrease)
 									{
 										//check enddepot time on path d
-										Tour temptourd = *tourd;
-										temptourd.replace_vertex(b,i+1);
-										//check enddepot time on path e
-										Tour temptoure = *toure;
-										temptoure.replace_vertex(x,j+1);
-										if ((temptourd.deptime.back() <= ins->t[d].T_max) && (temptoure.deptime.back() <= ins->t[e].T_max))
-										{//break repositioning can lengthen a tour and turn it infeasible
-											double globaldecreasetotal = (tourd->deptime.back() - temptourd.deptime.back())+(toure->deptime.back() - temptoure.deptime.back());
-											//global improvement check
-											if (globaldecreasetotal > bestdecrease)
+										departuretime = arrivaltimey;
+										arrivaltime = arrivaltimey;
+										for (int v = i + 3; v < int(tourd->seq.size()); ++v)
+										{
+											Ins::Vertex* o = tourd->seq[v-1];
+											Ins::Vertex* p = tourd->seq[v];
+											arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
+											if ((reqbreakd) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
 											{
-												bestdecrease = globaldecreasetotal;
-												beste = toure;
-												bestj = j + 1;
-												bestd = tourd;
-												besti = i + 1;
-												improvement = true;
-												if (mode == 0)
+												if (arrivaltime > ins->breakend)
 												{
-													goto swap2;
+													arrivaltime = DBL_MAX;
+													break;
 												}
+												breakindexd = v;
+												reqbreakd = false;
+												arrivaltime += ins->breakdur;
+											}
+											if (arrivaltime < p->LTW[d])
+											{
+												arrivaltime = p->LTW[d];
+											}
+											if (arrivaltime > p->UTW[d])
+											{
+												arrivaltime = DBL_MAX;
+												break;
+											}
+											arrivaltime += p->serv;
+											departuretime = arrivaltime;
+										}
+										double globaldecreasetotal = tourd->deptime.back() - (arrivaltime-ins->t[d].EDT);
+										//check enddepot time on path e
+										departuretime = arrivaltimec;
+										arrivaltime = arrivaltimec;
+										for (int v = j + 3; v < int(toure->seq.size()); ++v)
+										{
+											Ins::Vertex* o = toure->seq[v-1];
+											Ins::Vertex* p = toure->seq[v];
+											arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
+											if ((reqbreake) && ((max(p->LTW[e] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
+											{
+												if (arrivaltime > ins->breakend)
+												{
+													arrivaltime = DBL_MAX;
+													break;
+												}
+												breakindexe = v;
+												reqbreake = false;
+												arrivaltime += ins->breakdur;
+											}
+											if (arrivaltime < p->LTW[e])
+											{
+												arrivaltime = p->LTW[e];
+											}
+											if (arrivaltime > p->UTW[e])
+											{
+												arrivaltime = DBL_MAX;
+												break;
+											}
+											arrivaltime += p->serv;
+											departuretime = arrivaltime;
+										}
+										globaldecreasetotal += toure->deptime.back() - (arrivaltime - ins->t[e].EDT);
+										//global improvement check
+										if (globaldecreasetotal > bestdecrease)
+										{
+											bestdecrease = globaldecreasetotal;
+											beste = toure;
+											bestj = j + 1;
+											bestd = tourd;
+											besti = i + 1;
+											bestbreakindexd = breakindexd;
+											bestbreakindexe = breakindexe;
+											improvement = true;
+											if (mode == 0)
+											{
+												goto swap2;
 											}
 										}
 									}//end local check
@@ -2596,8 +2660,10 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			Sol remember = sol;
 			Ins::Vertex *x = bestd->seq[besti];
 			Ins::Vertex *b = beste->seq[bestj];
-			sol.replace_vertex(*bestd,b,besti);
-			sol.replace_vertex(*beste,x,bestj);
+			sol.replace_vertex(*bestd, b, besti);
+			sol.replace_vertex(*beste, x, bestj);
+			//sol.replace_vertex(*bestd,b,besti,bestbreakindexd);
+			//sol.replace_vertex(*beste,x,bestj,bestbreakindexe);
 			sol.available[bestd->seq[besti]->index] = false;
 			double actualdecrease = 0.0;
 			for (int t = 0; t < (int) sol.tours.size(); ++t)
@@ -2608,10 +2674,10 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 			//{
 				//cout << "error in swap2" << endl;
 			//}
-			if (abs(bestdecrease - actualdecrease) > 0.01)
-			{
-				cout << "error swap2" << endl;
-			}
+			//if ((bestdecrease - actualdecrease) > 0.01)
+			//{
+				//cout << "error swap2" << endl;
+			//}
 			succes = true;
 		}//end if improvement
 	}//end while improvement

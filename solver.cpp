@@ -817,8 +817,8 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
-				//auto nb = one_one_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
+				//auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
+				auto nb = one_one_replace_gen_nb(s,tabulist, gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
 					perturbe(s);
@@ -829,8 +829,8 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
-				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
-				//auto nb = two_one_replace_gen_nb(s,50,alpha, beta, gamma,out[0]);
+				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
+				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
 					perturbe(s);
@@ -841,8 +841,8 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
-				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
-				//auto nb = one_two_replace_gen_nb(s, 50, alpha, beta, gamma,out[0]);
+				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
+				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
 					perturbe(s);
@@ -857,7 +857,7 @@ Res Tabu::solve(int bestknown)
 			//cout << "error in replace" << endl;
 		//}
 		//VND
-		shift_nb(s,1);
+		//shift_nb(s,1);
 		two_opt_nb(s, 1);
 		//if (!s.check())
 		//{
@@ -868,7 +868,7 @@ Res Tabu::solve(int bestknown)
 		//{
 			//cout << "error in swap_nb" << endl;
 		//}
-		swap2_nb(s,1);
+		swap2_nb(s,0);
 		//if (!s.check())
 		//{
 			//cout << "error in swap2_nb" << endl;

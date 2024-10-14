@@ -23,6 +23,7 @@ class Tour
 	void remove_vertex(int position);
 	void remove_vertices(int position1, int position2);
 	void replace_vertex(Ins::Vertex* candidate, int position);
+	void replace_vertex(Ins::Vertex* candidate, int position,int breakindex);
 	void opt_vertices(int i, int j);//assumption i < j
 	void swap_vertices(int i, int j);//assumption i < j
 	bool check();
@@ -41,8 +42,9 @@ public:
 	Sol(){}
 	~Sol(){}
 	Sol(Ins& ins);
-	void insert_vertex(Tour &tour, Ins::Vertex* candidate, int position);//update score and availability 
-	void replace_vertex(Tour &tour, Ins::Vertex* candidate, int position);//update score and availability 
+	void insert_vertex(Tour &tour, Ins::Vertex* candidate, int position);
+	void replace_vertex(Tour &tour, Ins::Vertex* candidate, int position);
+	void replace_vertex(Tour &tour, Ins::Vertex* candidate, int position, int breakindex);
 	void remove_vertex(Tour &tour, int position);//update score and availability
 	void remove_vertices(Tour &tour, int position1, int position2);//update score and availability
 	void reset();

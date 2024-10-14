@@ -592,6 +592,17 @@ void Tour::replace_vertex(Ins::Vertex* candidate, int position)
 	}
 }
 
+void Tour::replace_vertex(Ins::Vertex* candidate, int position, int breakindex)
+{
+	Ins::Vertex* old = seq[position];
+	seq[position] = candidate;//replace point old with candidate
+	max_shift[position] = 0;//dummy value
+	volume -= old->volume - candidate->volume;
+	weight -= old->weight - candidate->weight;
+	score += candidate->score - old->score;// update score of the new solution
+	update_break(breakindex);//update travel time and max_shift for complete tour
+}
+
 void Tour::opt_vertices(int i, int j)
 {
 	//reverse sequence
@@ -856,6 +867,15 @@ void Sol::replace_vertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 	available[old->index] = true;
 	score += candidate->score - old->score;// update score of the new solution
 	tour.replace_vertex(candidate, position);
+}
+
+void Sol::replace_vertex(Tour& tour, Ins::Vertex* candidate, int position, int breakindex)
+{
+	Ins::Vertex* old = tour.seq[position];
+	available[candidate->index] = false;
+	available[old->index] = true;
+	score += candidate->score - old->score;// update score of the new solution
+	tour.replace_vertex(candidate, position, breakindex);
 }
 
 void Sol::remove_vertex(Sol::Tour& tour, int position)

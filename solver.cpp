@@ -794,11 +794,13 @@ Res Tabu::solve(int bestknown)
 	uniform_int_distribution<> nbpicker(1,3);
 	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);
 	ratiofunctions.push_back(&Moves::score);
-	ratiofunctions.push_back(&Moves::score_tt);
-	ratiofunctions.push_back(&Moves::score_v);
-	double alpha = 0.9;
-	double beta = 0.05;
-	double gamma = 0.05;
+	//ratiofunctions.push_back(&Moves::score_tt);
+	//ratiofunctions.push_back(&Moves::score_v);
+	//ratiofunctions.push_back(&Moves::score_w);
+	//ratiofunctions.push_back(&Moves::weighted_ratio);
+	double alpha = 0.70;
+	double beta = 0.15;
+	double gamma = 0.15;
 	int nonb1 = 0;
 	int nonb2 = 0;
 	int nonb3 = 0;
@@ -858,6 +860,7 @@ Res Tabu::solve(int bestknown)
 		//}
 		//VND
 		//shift_nb(s,1);
+		or_opt(s, 1);
 		two_opt_nb(s, 1);
 		//if (!s.check())
 		//{

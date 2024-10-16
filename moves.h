@@ -94,6 +94,7 @@ public:
 	bool one_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool two_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool one_two_replace(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
+	bool or_opt(Sol& sol, int mode = 1);
 	Ins* ins;
 	//evaluation criteria for nb generators
 	double score(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);

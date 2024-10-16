@@ -630,6 +630,79 @@ bool Moves::one_two_replace(Sol& sol, int mode)
 	return succes;
 }//end one_two_replace_nb
 
+bool Moves::or_opt(Sol& sol, int mode)
+{
+	bool succes = false;
+	for (int d = 0; d < ins->maxtours; ++d)
+	{
+		bool improvement = true;
+		
+		Sol::Tour& tour = sol.tours[d];
+		int size = int(tour.seq.size());
+		while (improvement)
+		{
+			improvement = false;
+			double bestdecrease = 0.0001;
+			int bestfrom_start;
+			int bestfrom_end;
+			int bestto;
+			vector<Ins::Vertex*> bestsubsequence;
+			for (int from_start = 1; from_start < size-2; ++from_start)
+			{
+				for (int from_end = from_start + 1; from_end < size - 1; ++from_end)
+				{
+					for (int to = 0; to < size - 1; ++to)
+					{
+						if (to >= from_start && to <= from_end) 
+						{
+							continue;  // Skip invalid insertions
+						}
+						// Step 1: Extract the subsequence from the route
+						vector<Ins::Vertex*> subsequence(tour.seq.begin() + from_start, tour.seq.begin() + from_end + 1);
+						Sol::Tour tourtry = tour;
+						// Step 2: Remove the subsequence from the original position in the route
+						tourtry.seq.erase(tourtry.seq.begin() + from_start, tourtry.seq.begin() + from_end + 1);
+						// Step 3: Insert the subsequence at the new position in the route
+						if (to > from_start) {
+							// If inserting later in the route, adjust the position since the original segment has been removed
+							to -= (from_end - from_start + 1);
+						}
+						tourtry.seq.insert(tourtry.seq.begin() + (to+1), subsequence.begin(), subsequence.end());
+						tourtry.update(to-1,size);
+						double decrease = tour.deptime.back()-tourtry.deptime.back();
+						if (decrease > bestdecrease)
+						{
+							bestdecrease = decrease;
+							bestfrom_start = from_start;
+							bestfrom_end = from_end;
+							bestto = to;
+							bestsubsequence = subsequence;
+						}//end if
+					}//end to
+				}//end from end
+			}//end from start
+			if (improvement)
+			{
+				Sol remember = sol;
+				sol.tours[d].seq.erase(sol.tours[d].seq.begin() + bestfrom_start, sol.tours[d].seq.begin() + bestfrom_end + 1);
+				sol.tours[d].seq.insert(sol.tours[d].seq.begin() + bestto, bestsubsequence.begin(), bestsubsequence.end());
+				double actualdecrease= remember.tours[d].deptime.back() - sol.tours[d].deptime.back();
+				if (!sol.check())
+				{
+					cout << "error in or-opt" << endl;
+				}
+				if (abs(bestdecrease - actualdecrease) > 0.01)
+				{
+					cout << "error or-opt" << endl;
+				}
+				succes = true;
+			}
+		}
+	}
+	return succes;
+}//end or_opt
+
+
 double Moves::score(double ntt, double score, double weight, double volume, double alpha, double beta, double gamma)
 {
 	return score;

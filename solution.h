@@ -16,7 +16,7 @@ class Tour
 	int breakindex;//position of break in tour
 	void update(int start, int end);//keep break fixed and update time and maxshift for positions after start
 	void update_break(int newbreakindex);//update solution and position break at input breakindex
-	void update_break();//complete update of the tour with optimized break repositioning
+	void update_break();//complete update of the tour with optimized break repositioning, only works for feasible tours
 	void update_maxshift(int start, int end, double arrivaltime);//update maxshift for positions before end
 	void calc_maxshift();//for specific tour of solution
 	void insert_vertex(Ins::Vertex* candidate,int position);

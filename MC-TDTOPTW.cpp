@@ -42,13 +42,14 @@ void create_dataset()
 	double breakstart = t_zero + 3;
 	double breakend = t_zero + 7;
 	double breakdur = 0.75;
+	double W_max = 22;//tons standard truck
+	double V_max = 47;//m3 standard truck
 	//automatic code
 	default_random_engine generator;
 	generator.seed((unsigned)time(0));
 	gamma_distribution<double> servicedist(servkappa,servtheta);
 	gamma_distribution<double> voldist(volkappa, voltheta);
 	gamma_distribution<double> weightdist(weightkappa,weighttheta);
-	cout << servicedist(generator) << endl;
 	for (int v = 0; v < vertexid.size(); ++v)//for all 3 maxvertices
 	{
 		for (int t = 0; t < tours.size(); ++t)
@@ -67,8 +68,6 @@ void create_dataset()
 					vector<vector<double>>ltws(maxvertices,vector<double>(maxtours,0.0));
 					vector<vector<double>>utws(maxvertices,vector<double>(maxtours,0.0));
 					double T_max = tmaxarray[tm];
-					double W_max = 22;//tons standard truck
-					double V_max = 47;//m3 standard truck
 					for (int i = 0; i < maxvertices; ++i)
 					{
 						ids[i] = vertexid[v][i];
@@ -127,7 +126,102 @@ void create_dataset()
 			}//for all tmax values
 		}//for all tour values
 	}//for all maxvertex size values
-}
+}//end create dataset
+
+void create_case_dataset()
+{
+	//user input
+	vector<int> vertexid = {41123,313785,13258,385118,3720,364264,157776,166244,387008,386129,386129,160818,327049,402721,44863,270930,7062,19163,372338,373339,18180,244826,22219,56570,362153,5601,212157,16160,371072,326079,371580,416467,42104,174355,175680,765,368836,214376,40173,39510,16424,19052,326308,373972,929,13258,231494,347964,40298,4194,24407,210867,38016,5925,16018,177771,347964,60597,160818,60536,40355,171803,396750,211108,18180,162644,362155,325548,43811,160818,210009,48395,19706,267041,378640,325186,291637,329252,287775,212369,271071,168058,5601,161516,37684,16959,365112,392661,290308,182322,387026,240713,263072,48395,162551,381984,10557,20563,14687,24418,369298,344288,227572,368017,363690,38688,231863,172198,36279,161055,183414,165179,4077,38916,48397,212369,311895,271807,287566,307372,18573,211242,212213,39491,53629,4072,356315,269163,159743,35070,328981,240699,43224,38403,41023,380583,372743,328981,16024,288005,212847,326268,349705,7534,176810,313785,175640,18205,11867,268875,357301,17459,373339,358281,20120,37882,160841,21668,42617,40355,17854,41123};
+	vector<double>weights = {0,1.72,0.94,2.72,1.95,0.93,1.4,1.95,0.93,0.31,0.52,1.27,1.44,2.36,0.26,2.25,2.48,0.93,8.85,0.11,1.96,1.61,0.06,1.34,2.87,0.21,1.45,1.56,0.84,1.52,3.84,21.86,1.34,2.97,0.95,1.34,3.24,2.03,0.24,0.77,1.38,0.93,2.8,0.15,2,0.21,3.34,1.85,1.04,2.31,2.49,1,2.62,0.46,6.3,1.44,1.85,0.21,0.11,0.93,0.16,2.43,2.86,1.66,0.94,3.05,7.69,1.34,2.9,0.06,6,0.24,1.64,1.24,0.77,20.95,1.64,3.24,4.5,1.06,4.03,2.48,0.52,3.4,0.61,0.11,2.11,3.34,3.36,2.49,0.69,0.93,5.69,3.26,0.31,0.91,2.63,3.91,0.72,1.02,2.37,35.96,0.56,3.44,0.46,14.03,1.56,0.42,1.2,0.33,28.03,0.93,3.41,2.35,0.93,1.34,0.61,0.43,5.22,0.93,2.34,1.28,2,7.53,0.76,0.65,1.34,2.52,0.93,19.66,0.21,0.93,1.34,0.51,1.34,2.46,1.29,3.49,4.42,1.54,18.23,2.07,8.06,0.79,4.74,0.21,0.8,2.15,4.29,0.62,0.92,6.6,0.51,2.64,3.29,3.11,0.93,0.78,0.93,3.81,0.3,0 };
+	vector<double> tmaxarray{8.0,10.0};
+	vector<double> twseverity{0.8,0.6};
+	vector<int> tours{8,10};
+	double t_zero = 6;
+	double servmean = 0.2;//deterministic in the case
+	double volmean = 1.0;
+	int max_score = 40;
+	double breakstart = t_zero + 3.5;
+	double breakend = t_zero + 6;
+	double breakdur = 0.75;
+	double W_max = 60;//tons standard truck
+	double V_max = 20;//m3 standard truck
+	//automatic code
+	default_random_engine generator;
+	generator.seed((unsigned)time(0));
+		for (int t = 0; t < tours.size(); ++t)
+		{
+			for (int tm = 0; tm < tmaxarray.size(); ++tm)
+			{
+				for (int tw = 0; tw < twseverity.size(); ++tw)
+				{
+					int maxvertices = int(vertexid.size());
+					vector<int> ids(maxvertices);
+					vector<int> scores(maxvertices);
+					vector<double>services(maxvertices);
+					vector<double>volumes(maxvertices);
+					vector<double>weights(maxvertices);
+					int maxtours = tours[t];
+					vector<vector<double>>ltws(maxvertices, vector<double>(maxtours, 0.0));
+					vector<vector<double>>utws(maxvertices, vector<double>(maxtours, 0.0));
+					double T_max = tmaxarray[tm];
+					for (int i = 0; i < maxvertices; ++i)
+					{
+						ids[i] = vertexid[i];
+						if ((i == 0) || (i == maxvertices - 1))//start & end vertex
+						{
+							scores[i] = 0;
+							services[i] = 0;
+							volumes[i] = 0;
+							weights[i] = 0;
+							for (int b = 0; b < maxtours; ++b)
+							{
+								ltws[i][b] = t_zero;
+								utws[i][b] = t_zero + T_max;
+							}
+						}
+						else
+						{//regular vertex
+							scores[i] = 1 + rand() % (max_score - 1);
+							services[i] = servmean;
+							weights[i] = weights[i];
+							volumes[i] = volmean;
+							int severity = int(twseverity[tw] * T_max);
+							for (int b = 0; b < maxtours; ++b)
+							{
+								int dividora = int(T_max - severity);
+								ltws[i][b] = t_zero + rand() % dividora;
+								int dividorb = int(t_zero + T_max - (severity + ltws[i][b]) + 1);
+								utws[i][b] = ltws[i][b] + severity + rand() % dividorb;
+							}
+						}
+					}
+					//write to file
+					ofstream output;
+					cout.precision(3);
+					string name = to_string(maxvertices) + "." + to_string(t + 1) + "." + to_string(tm + 1) + "." + to_string(tw + 1) + ".txt";
+					output.open(name, ios::out);
+					output << maxvertices << '\n';
+					output << maxtours << '\n';
+					output << breakdur << '\t' << breakstart << '\t' << breakend << '\n';
+					for (int a = 0; a < vertexid.size(); ++a)
+					{
+						output << ids[a] << '\t' << scores[a] << setprecision(2) << '\t' << services[a] << '\t' << weights[a] << '\t' << volumes[a] << '\t';
+						for (int b = 0; b < maxtours; ++b)
+						{
+							output << ltws[a][b] << '\t' << utws[a][b] << '\t';
+						}
+						output << '\n';
+					}
+					for (int b = 0; b < maxtours; ++b)
+					{
+						output << T_max << '\t' << W_max << '\t' << V_max << '\n';
+					}
+					output.close();
+
+				}//for all tw values
+			}//for all tmax values
+		}//for all tour values
+}//end create case
 
 vector<Dataset> read_dataset(string filename)
 {//reads in all the dataset names
@@ -329,7 +423,7 @@ void ctop_gap(int max_rep=5)
 
 int main()
 {
-
+	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
 	//Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"162.1.1.1.txt" };
 	//Ins instance(textfile);

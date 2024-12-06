@@ -793,10 +793,10 @@ Res Tabu::solve(int bestknown)
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1,3);
 	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);
-	ratiofunctions.push_back(&Moves::score);
+	//ratiofunctions.push_back(&Moves::score);
 	//ratiofunctions.push_back(&Moves::score_tt);
 	//ratiofunctions.push_back(&Moves::score_v);
-	//ratiofunctions.push_back(&Moves::score_w);
+	ratiofunctions.push_back(&Moves::score_w);
 	//ratiofunctions.push_back(&Moves::weighted_ratio);
 	double alpha = 0.70;
 	double beta = 0.15;
@@ -823,7 +823,7 @@ Res Tabu::solve(int bestknown)
 				auto nb = one_one_replace_gen_nb(s,tabulist, gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
-					perturbe(s);
+					//perturbe(s);
 					++nonb1;
 				}
 				executeMove(nb, s, tabulist);
@@ -831,11 +831,11 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
-				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,alpha, beta, gamma,out[0]);
+				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
+				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
-					perturbe(s);
+					//perturbe(s);
 					++nonb2;
 				}
 				executeMove(nb, s, tabulist);
@@ -843,11 +843,11 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
-				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score, alpha, beta, gamma,out[0]);
+				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
+				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
-					perturbe(s);
+					//perturbe(s);
 					++nonb3;
 				}
 				executeMove(nb, s, tabulist);
@@ -860,7 +860,7 @@ Res Tabu::solve(int bestknown)
 		//}
 		//VND
 		//shift_nb(s,1);
-		or_opt(s, 1);
+		//or_opt(s, 1);
 		two_opt_nb(s, 1);
 		//if (!s.check())
 		//{

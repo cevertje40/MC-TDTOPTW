@@ -636,7 +636,6 @@ bool Moves::or_opt(Sol& sol, int mode)
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
 		bool improvement = true;
-		
 		Sol::Tour& tour = sol.tours[d];
 		int size = int(tour.seq.size());
 		while (improvement)
@@ -645,13 +644,14 @@ bool Moves::or_opt(Sol& sol, int mode)
 			double bestdecrease = 0.0001;
 			int bestfrom_start;
 			int bestfrom_end;
-			int bestto;
+			int bestposition;
+			int bestbreakindex;
 			vector<Ins::Vertex*> bestsubsequence;
 			for (int from_start = 1; from_start < size-2; ++from_start)
 			{
 				for (int from_end = from_start + 1; from_end < size - 1; ++from_end)
 				{
-					for (int to = 0; to < size - 1; ++to)
+					for (int to = 1; to < size - 1; ++to)
 					{
 						if (to >= from_start && to <= from_end) 
 						{
@@ -663,20 +663,55 @@ bool Moves::or_opt(Sol& sol, int mode)
 						// Step 2: Remove the subsequence from the original position in the route
 						tourtry.seq.erase(tourtry.seq.begin() + from_start, tourtry.seq.begin() + from_end + 1);
 						// Step 3: Insert the subsequence at the new position in the route
-						if (to > from_start) {
+						int position = to;
+						if (position > from_start) {
 							// If inserting later in the route, adjust the position since the original segment has been removed
-							to -= (from_end - from_start + 1);
+							position -= (from_end - from_start);
 						}
-						tourtry.seq.insert(tourtry.seq.begin() + (to+1), subsequence.begin(), subsequence.end());
-						tourtry.update(to-1,size);
-						double decrease = tour.deptime.back()-tourtry.deptime.back();
+						tourtry.seq.insert(tourtry.seq.begin() + position, subsequence.begin(), subsequence.end());
+						double departuretime = ins->t[tour.index].EDT;
+						double arrivaltime=DBL_MAX;
+						int breakindex;
+						bool reqbreak = true;
+						for (int i = 1; i < size; ++i)
+						{
+							Ins::Vertex* o = tourtry.seq[i - 1];
+							Ins::Vertex* p = tourtry.seq[i];
+							arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
+							if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
+							{
+								if (arrivaltime > ins->breakend)
+								{
+									arrivaltime = DBL_MAX;
+									break;
+								}
+								breakindex = i;
+								reqbreak = false;
+								arrivaltime += ins->breakdur;
+							}
+							if (arrivaltime < p->LTW[d])
+							{
+								arrivaltime = p->LTW[d];
+							}
+							if (arrivaltime > p->UTW[d])
+							{
+								arrivaltime = DBL_MAX;
+								break;
+							}
+							arrivaltime += p->serv;
+							departuretime = arrivaltime;
+						}
+						arrivaltime -= ins->t[tour.index].EDT;
+						double decrease = tour.deptime.back()-arrivaltime;
 						if (decrease > bestdecrease)
 						{
+							improvement = true;
 							bestdecrease = decrease;
 							bestfrom_start = from_start;
 							bestfrom_end = from_end;
-							bestto = to;
+							bestposition = position;
 							bestsubsequence = subsequence;
+							bestbreakindex = breakindex;
 						}//end if
 					}//end to
 				}//end from end
@@ -685,7 +720,8 @@ bool Moves::or_opt(Sol& sol, int mode)
 			{
 				Sol remember = sol;
 				sol.tours[d].seq.erase(sol.tours[d].seq.begin() + bestfrom_start, sol.tours[d].seq.begin() + bestfrom_end + 1);
-				sol.tours[d].seq.insert(sol.tours[d].seq.begin() + bestto, bestsubsequence.begin(), bestsubsequence.end());
+				sol.tours[d].seq.insert(sol.tours[d].seq.begin() + bestposition, bestsubsequence.begin(), bestsubsequence.end());
+				sol.tours[d].update_break(bestbreakindex);
 				double actualdecrease= remember.tours[d].deptime.back() - sol.tours[d].deptime.back();
 				if (!sol.check())
 				{

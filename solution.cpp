@@ -175,6 +175,15 @@ void Sol::check_availability()
 	}
 }
 
+void Sol::repair()
+{
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Sol::Tour* tour = &tours[t];
+		score-=tour->repair();
+	}//end for all tours
+}
+
 ostream& operator<<(ostream& output, Sol& sol)
 {
 	const char sep = ' ';
@@ -851,6 +860,73 @@ bool Tour::check()
 	}
 	return tourok;
 }//end tour check
+
+int Tour::repair()
+{
+	//check feasibility (max travel time and closing time of every vertex)
+	bool infeasible = false;
+	int scoredecrease = 0;
+	// travel time check
+	double currenttime = ins->t[index].EDT + deptime[0];
+	int end = (int)seq.size() - 1;
+	for (int i = 0; i < end; ++i)
+	{
+		Ins::Vertex* last = seq[i];
+		Ins::Vertex* current = seq[i + 1];
+		int breakcurrent = action[i + 1];
+		double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
+		double waitingtime = 0;
+		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
+		{
+			waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
+			//cout << "waiting time for: "<<"i"<<i+1<<" , " <<tours[d].seq[i + 1]->index << " <=> " << waitingtime << endl;
+			arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
+		}
+		if (arrivaltime > current->UTW[index])
+		{
+			infeasible = true;
+			break;
+		}
+		arrivaltime += current->serv + breakcurrent * ins->breakdur;
+		//cout<<i+1<<" calc traveltime: " << arrivaltime-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
+		currenttime = arrivaltime;
+	}//end for i
+	while (infeasible)//while infeasible remove last regular vertex
+	{
+		scoredecrease += seq[end - 1]->score;
+		remove_vertex(end - 1);
+		//check feasibility (max travel time and closing time of every vertex)
+		infeasible = false;
+		// travel time check
+		currenttime = ins->t[index].EDT + deptime[0];
+		end = (int)seq.size() - 1;
+		for (int i = 0; i < end; ++i)
+		{
+			Ins::Vertex* last = seq[i];
+			Ins::Vertex* current = seq[i + 1];
+			int breakcurrent = action[i + 1];
+			double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
+			double waitingtime = 0;
+			if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
+			{
+				waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
+				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<tours[d].seq[i + 1]->index << " <=> " << waitingtime << endl;
+				arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
+			}
+			if (arrivaltime > current->UTW[index])
+			{
+				infeasible = true;
+				break;
+			}
+			arrivaltime += current->serv + breakcurrent * ins->breakdur;
+			//cout<<i+1<<" calc traveltime: " << arrivaltime-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
+			currenttime = arrivaltime;
+		}//end for i
+	}//end while infeasible
+	return scoredecrease;
+}//end tour repair
+
+
 
 
 void Sol::insert_vertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)

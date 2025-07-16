@@ -270,7 +270,7 @@ void Aco::construct(Sol& sol)
 
 ostream& operator<<(ostream& output, Res& res)
 {
-	output << "score: " << res.score << " after: " << res.time << " gap: " << res.gap << "\n";
+	output << "score: " << res.sol.score << " after: " << res.time << " gap: " << res.gap << "\n";
 	return output;
 }
 
@@ -315,7 +315,7 @@ Res Aco::solve(int bestknown)
 	gb.check();
 	cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
-	return Res(gb.score, cpuTime, bestknown);
+	return Res(gb, cpuTime, bestknown);
 }
 
 void Ils::serial_construct(Sol& sol)
@@ -603,7 +603,7 @@ Res Ils::solve(int bestknown)
 	gb.check();
 	cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
-	return Res(gb.score, cpuTime, bestknown);
+	return Res(gb, cpuTime, bestknown);
 }
 
 
@@ -819,8 +819,8 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				//auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = one_one_replace_gen_nb(s,tabulist, gb.score, alpha, beta, gamma,out[0]);
+				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
+				//auto nb = one_one_replace_gen_nb(s,tabulist, gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -897,10 +897,10 @@ Res Tabu::solve(int bestknown)
 	double cpuTime;
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
-	gb.write_to_cplex();
-	cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
+	//gb.write_to_cplex();
+	//cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
 	cout << gb << endl;
-	return Res(gb.score, cpuTime, bestknown);
+	return Res(gb, cpuTime, bestknown);
 }
 
 

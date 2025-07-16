@@ -90,6 +90,9 @@ public:
 	void read_time_dependent_traveltime();
 	void create_neighbourhood(string path, string name,int amnt_nb);
 	void read_neighbourhood(string path,string name);
+
+	void alter_instance();
+	void unalter_instance();
 	
 	/**acces of c object methods*/
 	int find_t(double time);

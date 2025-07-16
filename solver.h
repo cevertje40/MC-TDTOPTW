@@ -4,15 +4,15 @@
 class Res
 {
 public:
-	int score;
+	Sol sol;
 	double time;
 	int bestknown;
 	double gap;
 	Res() {}
-	Res(int& score, double& time) :score(score), time(time), bestknown(0), gap(0.0) {}
-	Res(int& score, double& time,int& bestknown):score(score), time(time), bestknown(bestknown)
+	Res(Sol sol, double& time) :sol(sol), time(time), bestknown(0), gap(0.0) {}
+	Res(Sol sol, double& time,int& bestknown):sol(sol), time(time), bestknown(bestknown)
 	{
-		gap = (double(bestknown - score) / bestknown)*100;
+		gap = (double(bestknown - sol.score) / bestknown)*100;
 	}
 	friend ostream& operator<<(ostream& output, Sol& res);
 };

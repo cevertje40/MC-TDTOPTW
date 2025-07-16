@@ -27,6 +27,7 @@ class Tour
 	void opt_vertices(int i, int j);//assumption i < j
 	void swap_vertices(int i, int j);//assumption i < j
 	bool check();
+	int repair();//repairs solution by removed last regular vertex, return score decrease
 };
 
 
@@ -53,5 +54,6 @@ public:
 	void write_to_file();
 	void write_to_cplex();
 	void check_availability();
+	void repair();
 	friend ostream& operator<<(ostream& output, Sol& sol);
 };

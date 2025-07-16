@@ -37,45 +37,43 @@ void Ins::read_time_independent_traveltime()
 void Ins::read_time_dependent_traveltime()
 {
 	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
-	ifstream tt;
-	tt.open(filepath + "tt" + to_string(maxvertices) + ".TXT", ifstream::in);
-	if (tt.is_open())
-	{
-		cout << "reading time-dependent travel time" << endl;
-		for (int i = 0; i < maxvertices; ++i)
-		{
-			for (int j = 0; j < maxvertices; ++j)
-			{
-				vector<double> dump(maxtimeslots);
-				string line;
-				getline(tt, line);
-				stringstream str(line);
-				for (int t = 0; t < maxtimeslots; ++t)
-				{
-					str >> dump[t];
-					str.ignore();
+	ifstream tt(filepath + "tt" + to_string(maxvertices) + ".TXT");
+	if (!tt.is_open()) {
+		cout << red << "could not open time-dependent travel time file" << endl;
+		return;
+	}
+	cout << "reading time-dependent travel time" << endl;
+	for (int i = 0; i < maxvertices; ++i) {
+		for (int j = 0; j < maxvertices; ++j) {
+			string line;
+			getline(tt, line);
+			stringstream str(line);
+
+			vector<double> dump(maxtimeslots);
+			for (double& val : dump) {
+				str >> val;
+				str.ignore();  // ignore delimiter (assumes comma or space)
+			}
+
+			auto& mu = v[i].con[j]->mu;
+			auto& nu = v[i].con[j]->nu;
+			mu.resize(maxtimeslots);
+			nu.resize(maxtimeslots);
+
+			for (int t = 0; t < maxtimeslots; ++t) {
+				if (t == maxtimeslots - 1) {
+					mu[t] = 0.0;
+					nu[t] = dump[t];
 				}
-				for (int t = 0; t < maxtimeslots; ++t)
-				{
-					if (t == maxtimeslots - 1)
-					{
-						v[i].con[j]->mu.push_back(double(dump[t] - dump[t]) / (time_periods[t + 1] - time_periods[t]));
-						v[i].con[j]->nu.push_back(double((dump[t]) - double(v[i].con[j]->mu[t] * time_periods[t])));
-					}
-					else
-					{
-						v[i].con[j]->mu.push_back(double(dump[t + 1] - dump[t]) / (time_periods[t + 1] - time_periods[t]));
-						v[i].con[j]->nu.push_back(double((dump[t]) - double(v[i].con[j]->mu[t] * time_periods[t])));
-					}
+				else {
+					double delta_time = time_periods[t + 1] - time_periods[t];
+					mu[t] = (dump[t + 1] - dump[t]) / delta_time;
+					nu[t] = dump[t] - mu[t] * time_periods[t];
 				}
 			}
 		}
-		tt.close();
 	}
-	else
-	{
-		cout << red << "could not open time-dependent travel time file" << endl;
-	}
+	tt.close();
 }//end read time dependent travel time
 
 Ins::Ins(MCTDTOPTW textfile)
@@ -523,6 +521,39 @@ void Ins::read_neighbourhood(string path,string name)
 		create_neighbourhood(path,name,50);
 	}
 }
+
+void Ins::alter_instance()
+{
+	breakdur = 0.0;
+	/*
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		for (int j = 0; j < maxvertices; ++j)
+		{
+			for (int t = 0; t < maxtimeslots; ++t)
+			{
+				if (t == maxtimeslots - 1)
+				{
+					v[i].con[j]->mu[t]=0.0;
+					v[i].con[j]->nu[t]=v[i].con[j]->determin;
+				}
+				else
+				{
+					v[i].con[j]->mu[t]=0.0;
+					v[i].con[j]->nu[t]=v[i].con[j]->determin;
+				}
+			}
+		}
+	}
+	*/
+}
+
+void Ins::unalter_instance()
+{
+	breakdur = 0.75;
+	//read_time_dependent_traveltime();
+}
+
 
 inline int Ins::find_t(double time)
 {

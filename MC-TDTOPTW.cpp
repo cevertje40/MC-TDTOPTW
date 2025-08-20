@@ -141,7 +141,7 @@ void create_case_dataset()
 		scoreid[i]= 1 + rand() % (max_score - 1);
 		sumscore += scoreid[i];
 	}
-	vector<double> tmaxarray{8.0,10.0};
+	vector<double> tmaxarray{6.0,8.0};
 	vector<double> twseverity{0.8,0.6};//lower value means more strict (Large, Medium)
 	vector<int> tours{8,10};
 	double t_zero = 6;
@@ -292,7 +292,7 @@ void solve_dataset(int max_rep = 5)
 			Ins instance(textfile);
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
-			instance.create_neighbourhood(textfile.path, textfile.name,170);
+			instance.create_neighbourhood(textfile.path, textfile.name,instance.maxvertices);
 			instance.alter_instance();
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
@@ -301,7 +301,7 @@ void solve_dataset(int max_rep = 5)
 			instance.unalter_instance();
 			cout << "after repair" << endl;
 			it->result[rep].sol.repair();
-			cout << it->result[rep].sol << endl;
+			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
 			avggap += it->result[rep].gap;
@@ -351,19 +351,87 @@ void debug_instance()
 	resdataset.push_back(ils.solve());
 }
 
+void doe(int max_rep = 10)
+{
+	cout << fixed << setprecision(2) << "enter name of dataset" << endl;
+	string filename;
+	getline(std::cin, filename);
+	if (filename.size() == 0)
+	{
+		filename = "all.txt";
+	}
+	ofstream output;
+	output.open("output.txt", ios::out);
+	output << "DOE for TS \n";
+	output << "umax,Nnimax,avg_gap\n";
+	output.close();
+	vector<int>umax{2,4,6};
+	vector<int>nimax{ 5000,10000,20000 };
+	vector<Dataset> set = read_dataset(filename);
+	vector<Dataset>::iterator it;
+	for (int par1 = 0; par1 < 3; ++par1)
+	{
+		for (int par2 = 0; par2 < 3; ++par2)
+		{
+			for (it = set.begin(); it != set.end(); ++it)
+			{
+				it->result.resize(max_rep);
+			}
+			for (int rep = 0; rep < max_rep; ++rep)
+			{
+				//solve the dataset
+				double avggap = 0.0;
+				double avgscore = 0.0;
+				for (it = set.begin(); it != set.end(); ++it)
+				{
+					Ins::MCTDTOPTW textfile = { it->path,it->filename };
+					Ins instance(textfile);
+					instance.read_time_independent_traveltime();
+					instance.read_time_dependent_traveltime();
+					instance.create_neighbourhood(textfile.path, textfile.name, instance.maxvertices);
+					Tabu tabu(instance,nimax[par1], umax[par2]);
+					it->result[rep] = tabu.solve(it->bestscore);
+					avggap += it->result[rep].gap;
+					avgscore += it->result[rep].sol.score;
+					cout << "name: " << it->filename << " best score: " << it->bestscore << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+				}//end it
+			}//end rep
+			//calculate results over all replicates
+			double globalgap = 0.0;
+			for (it = set.begin(); it != set.end(); ++it)
+			{
+				double avgscore = 0.0;
+				double avgcpu = 0.0;
+				for (int rep = 0; rep < max_rep; ++rep)
+				{
+					avgscore += it->result[rep].sol.score;
+					avgcpu += it->result[rep].time;
+				}
+				avgscore /= max_rep;
+				avgcpu /= max_rep;
+				double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100;
+				globalgap += avggap;
+			}
+			globalgap /= set.size();
+			cout<<"nimax: " << nimax[par1]<<"umax: " << umax[par2] << " avg gap is: " << globalgap << endl;
+			output.open("output.txt", ios::out | ios::app);
+			output << it->filename << ";" << nimax[par1] << ";" << umax[par2] << ";" << globalgap << ";" << "\n";
+			output.close();
+		}//end par 1
+	}//end par2
+}//end doe
+
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b80.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b58.txt"};
 	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
 	Ins instance(textfile);
-	instance.read_time_independent_traveltime();
-	instance.read_time_dependent_traveltime();
-	instance.create_neighbourhood(textfile.path, textfile.name,200);
+	instance.create_neighbourhood(textfile.path, textfile.name,50);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
 	Tabu tabu(instance, 10000,2);
-	res = tabu.solve(531);
+	res = tabu.solve(1446);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
 	cout << res.sol.score << " cpu time: " << res.time << endl;
@@ -399,12 +467,12 @@ void ctop_gap(int max_rep=5)
 		{
 			Ins::CTOP textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			instance.create_neighbourhood(textfile.path, textfile.name, 50);
+			instance.create_neighbourhood(textfile.path, textfile.name,50);
 			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,100,2,3);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Tabu tabu(instance, 10000,5);
+			Tabu tabu(instance, 10000,2);
 			it->result[rep] = tabu.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
@@ -439,12 +507,8 @@ int main()
 {
 	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
-	//Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"162.1.1.1.txt" };
-	//Ins instance(textfile);
-	//instance.construct_time_independent_traveltime(bemobile);
-	//instance.construct_time_dependent_traveltime(bemobile);
-	solve_dataset(1);
 	//debug_instance();
 	//debug_ctop();
-	//ctop_gap(1);
+	solve_dataset(5);
+	//ctop_gap(10);
 }

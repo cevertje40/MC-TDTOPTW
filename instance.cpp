@@ -201,7 +201,7 @@ Ins::Ins(CTOP textfile)
 			str >> v[i].serv;
 			str >> v[i].score;
 			maxscore += v[i].score;
-			v[i].serv = 0.0;//set service time equal to for set1-3
+			//v[i].serv = 0.0;//set service time equal to for set1-3, comment for set4-6
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)
@@ -525,7 +525,7 @@ void Ins::read_neighbourhood(string path,string name)
 void Ins::alter_instance()
 {
 	breakdur = 0.0;
-	/*
+	
 	for (int i = 0; i < maxvertices; ++i)
 	{
 		for (int j = 0; j < maxvertices; ++j)
@@ -545,13 +545,13 @@ void Ins::alter_instance()
 			}
 		}
 	}
-	*/
+
 }
 
 void Ins::unalter_instance()
 {
 	breakdur = 0.75;
-	//read_time_dependent_traveltime();
+	read_time_dependent_traveltime();
 }
 
 

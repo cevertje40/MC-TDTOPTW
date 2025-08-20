@@ -692,7 +692,7 @@ bool Tour::check()
 		currenttime = arrivaltime;
 	}//end for i
 	length = currenttime - ins->t[index].EDT;
-	if (abs(length - deptime.back()) > 0.01)
+	if (fabs(length - deptime.back()) > 0.01)
 	{
 		cout << red << "tour: " << index << "new calculated length: " << length << " stored length: " << deptime.back() << "max length" << ins->t[index].T_max << endl;
 		tourok = false;
@@ -714,7 +714,7 @@ bool Tour::check()
 		}
 	}//end for i
 	//c. weight checks
-	if (abs(weightcheck - weight) > 0.01)
+	if (fabs(weightcheck - weight) > 0.01)
 	{
 		cout << red << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
 		tourok = false;
@@ -725,7 +725,7 @@ bool Tour::check()
 		cout << red << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
 	}
 	//d. volume checks
-	if (abs(volumecheck - volume) > 0.01)
+	if (fabs(volumecheck - volume) > 0.01)
 	{
 		cout << yellow << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
 		tourok = false;
@@ -852,7 +852,7 @@ bool Tour::check()
 	}// end for i
 	for (int i = 0; i <= end; ++i)
 	{
-		if (abs(max_shift[i] - max_shiftcheck[i]) > 0.01)
+		if (fabs(max_shift[i] - max_shiftcheck[i]) > 0.01)
 		{
 			cout << red <<"tour: "<< index << "error in max_shift for position: " << i <<" new max_shift: "<<max_shiftcheck[i]<<" stored max_shift: "<<max_shift[i] << endl;
 			tourok = false;
@@ -879,18 +879,20 @@ int Tour::repair()
 		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
 		{
 			waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-			//cout << "waiting time for: "<<"i"<<i+1<<" , " <<tours[d].seq[i + 1]->index << " <=> " << waitingtime << endl;
 			arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
 		}
-		if (arrivaltime > current->UTW[index])
+		if (arrivaltime > current->UTW[index])//UTW violation
 		{
 			infeasible = true;
 			break;
 		}
 		arrivaltime += current->serv + breakcurrent * ins->breakdur;
-		//cout<<i+1<<" calc traveltime: " << arrivaltime-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
 		currenttime = arrivaltime;
 	}//end for i
+	if(currenttime > ins->t[index].EDT + ins->t[index].T_max)//max travel time violation (break at enddepot might cause violation)
+	{
+		infeasible = true;
+	}
 	while (infeasible)//while infeasible remove last regular vertex
 	{
 		scoredecrease += seq[end - 1]->score;
@@ -910,18 +912,20 @@ int Tour::repair()
 			if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
 			{
 				waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<tours[d].seq[i + 1]->index << " <=> " << waitingtime << endl;
 				arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
 			}
-			if (arrivaltime > current->UTW[index])
+			if (arrivaltime > current->UTW[index])//UTW violation
 			{
 				infeasible = true;
 				break;
 			}
 			arrivaltime += current->serv + breakcurrent * ins->breakdur;
-			//cout<<i+1<<" calc traveltime: " << arrivaltime-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
 			currenttime = arrivaltime;
 		}//end for i
+		if (currenttime > ins->t[index].EDT + ins->t[index].T_max)//max travel time violation at end depot (break at enddepot might cause violation)
+		{
+			infeasible = true;
+		}
 	}//end while infeasible
 	return scoredecrease;
 }//end tour repair

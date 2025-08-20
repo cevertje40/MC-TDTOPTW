@@ -97,11 +97,30 @@ public:
 	bool or_opt(Sol& sol, int mode = 1);
 	Ins* ins;
 	//evaluation criteria for nb generators
-	double score(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);
-	double score_tt(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);
-	double score_w(double tt, double score, double weight, double volume, double alpha, double beta, double gammaa);
-	double score_v(double tt, double score, double weight, double volume, double alpha, double beta, double gammaa);
-	double weighted_ratio(double tt, double score, double weight, double volume, double alpha, double beta, double gamma);
+	inline double score(double ntt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	{
+		return score;
+	}
+
+	inline double score_tt(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	{
+		return score / (tt);
+	}
+
+	inline double score_w(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	{
+		return score / (weight);
+	}
+
+	inline double score_v(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	{
+		return score / (volume);
+	}
+
+	inline double weighted_ratio(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	{
+		return pow(double(score) / ins->maxscore, alpha) / (pow((tt / ins->t[0].T_max), beta) * pow((weight) / ins->t[0].W_max, gamma) * pow((volume) / ins->t[0].V_max, gamma));
+	}
 	//nb generators
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));

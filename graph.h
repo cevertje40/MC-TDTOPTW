@@ -18,6 +18,8 @@
 #include "time.h"
 #include <boost/heap/priority_queue.hpp>
 #include <boost/circular_buffer.hpp>
+#include <cmath>
+#include <unordered_set>
 
 
 using namespace std;

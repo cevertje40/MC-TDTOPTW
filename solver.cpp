@@ -615,36 +615,50 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it): Moves(ins),max_noimpr(max_
 
 void Tabu::perturbe(Sol& sol)
 {
+	constexpr double removalRate = 0.2; // Remove up to 20% of vertices from a tour
+	std::uniform_real_distribution<double> prob(0.0, 1.0);
+	std::uniform_int_distribution<> offset(1, 2); // how far from the worst to go
 	for (int d = 0; d < ins->maxtours; ++d)
 	{
-		//find most time consuming vertex
-		int targetvertex = -1;
-		int end = (int) sol.tours[d].seq.size();
-		double maxratio= -DBL_MAX;
-		for (int i = 1; i < end-1; ++i)
+		Sol::Tour& tour = sol.tours[d];
+		int end = (int)tour.seq.size();
+		// Skip if tour is tiny
+		if (end <= 3) continue;
+		// Identify vertex inefficiencies
+		struct Entry {
+			int pos;
+			double inefficiency;
+		};
+		std::vector<Entry> ineff;
+		for (int i = 1; i < end - 1; ++i)
 		{
-			Ins::Vertex* a = sol.tours[d].seq[i - 1];
-			Ins::Vertex* b = sol.tours[d].seq[i];
-			double usedtraveltime = (sol.tours[d].deptime[i]-(b->serv+sol.tours[d].action[i]*ins->breakdur)) - sol.tours[d].deptime[i - 1];//includes waiting time
-			double mintraveltime = a->con[b->index]->determin;
-			double ratio = usedtraveltime / mintraveltime;
-			if (ratio > maxratio)
-			{
-				targetvertex = i;
-				maxratio = ratio;
-			}
+			Ins::Vertex* a = tour.seq[i - 1];
+			Ins::Vertex* b = tour.seq[i];
+			double usedTT = (tour.deptime[i] - (b->serv + tour.action[i] * ins->breakdur)) - tour.deptime[i - 1];
+			double minTT = a->con[b->index]->determin;
+			double ratio = usedTT / max(1.0, minTT);
+			ineff.push_back({ i, ratio });
 		}
-		//delete most time consuming vertex
-		if (targetvertex != -1)
+		// Sort by inefficiency (descending)
+		std::sort(ineff.begin(), ineff.end(), [](const Entry& lhs, const Entry& rhs) {
+			return lhs.inefficiency > rhs.inefficiency;
+			});
+		int numToRemove = max(1, int(removalRate * ineff.size()));
+		unordered_set<int> removed;
+		for (int i = 0; i < numToRemove; ++i)
 		{
-			sol.remove_vertex(sol.tours[d], targetvertex);
+			int index = ineff[i + offset(engine) % min(3, (int)ineff.size())].pos;
+			// Avoid removing the same twice
+			if (removed.count(index)) continue;
+			sol.remove_vertex(tour, index);
+			removed.insert(index);
 		}
 	}
 }
 
 void Tabu::parallel_construct(Sol& sol)
 {
-	//only use candidates that you can reach from the stard depot and still return to the end depot
+	//only use candidates that you can reach from the start depot and still return to the end depot
 	vector<Ins::Vertex*>candidates;
 	for (int i = 1; i < ins->maxvertices-1; ++i)
 	{
@@ -653,6 +667,11 @@ void Tabu::parallel_construct(Sol& sol)
 			candidates.push_back(&ins->v[i]);
 		}
 	}
+	//sort candidates based on score
+	sort(candidates.begin(), candidates.end(),[](Ins::Vertex* a, Ins::Vertex* b) 
+	{
+			return (double)a->score  > (double)b->score ;
+	});
 	for (int i = 0; i < candidates.size() - 1; ++i)
 	{
 		//calculate traveltime for candidate under consideration
@@ -796,7 +815,7 @@ Res Tabu::solve(int bestknown)
 	//ratiofunctions.push_back(&Moves::score);
 	//ratiofunctions.push_back(&Moves::score_tt);
 	//ratiofunctions.push_back(&Moves::score_v);
-	ratiofunctions.push_back(&Moves::score_w);
+	//ratiofunctions.push_back(&Moves::score_w);
 	//ratiofunctions.push_back(&Moves::weighted_ratio);
 	double alpha = 0.70;
 	double beta = 0.15;
@@ -804,6 +823,7 @@ Res Tabu::solve(int bestknown)
 	int nonb1 = 0;
 	int nonb2 = 0;
 	int nonb3 = 0;
+	int no_feasible_moves_in_a_row = 0;
 	while (noimpr < max_noimpr)
 	{
 		//select neighborhood structure at random
@@ -824,9 +844,16 @@ Res Tabu::solve(int bestknown)
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
+					//s.check();
 					++nonb1;
+					++no_feasible_moves_in_a_row;
+				}
+				else
+				{
+					no_feasible_moves_in_a_row = 0;
 				}
 				executeMove(nb, s, tabulist);
+				
 				break;
 			}
 			case 2:
@@ -836,7 +863,13 @@ Res Tabu::solve(int bestknown)
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
+					//s.check();
 					++nonb2;
+					++no_feasible_moves_in_a_row;
+				}
+				else
+				{
+					no_feasible_moves_in_a_row = 0;
 				}
 				executeMove(nb, s, tabulist);
 				break;
@@ -848,12 +881,24 @@ Res Tabu::solve(int bestknown)
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
+					//s.check();
 					++nonb3;
+					++no_feasible_moves_in_a_row;
+				}
+				else
+				{
+					no_feasible_moves_in_a_row = 0;
 				}
 				executeMove(nb, s, tabulist);
 				break;
 			}
 		}//end switch
+		//if (no_feasible_moves_in_a_row > 5) //if no feasible moves are found in a row, perturb the solution
+		//{
+			//perturbe(s);
+			//no_feasible_moves_in_a_row = 0;
+			//s.check();
+		//}
 		//if (!s.check())
 		//{
 			//cout << "error in replace" << endl;

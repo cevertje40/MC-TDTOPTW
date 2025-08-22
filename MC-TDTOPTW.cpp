@@ -293,14 +293,14 @@ void solve_dataset(int max_rep = 5)
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
 			instance.create_neighbourhood(textfile.path, textfile.name,instance.maxvertices);
-			instance.alter_instance();
+			//instance.alter_instance();
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
 			Tabu tabu(instance, 10000,2);
 			it->result[rep] = tabu.solve(it->bestscore);
-			instance.unalter_instance();
-			cout << "after repair" << endl;
-			it->result[rep].sol.repair();
+			//instance.unalter_instance();
+			//cout << "after repair" << endl;
+			//it->result[rep].sol.repair();
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
@@ -363,10 +363,10 @@ void doe(int max_rep = 10)
 	ofstream output;
 	output.open("output.txt", ios::out);
 	output << "DOE for TS \n";
-	output << "umax,Nnimax,avg_gap\n";
+	output << "Nnimax,umax,avg_gap,std_gap\n";
 	output.close();
 	vector<int>umax{2,4,6};
-	vector<int>nimax{ 5000,10000,20000 };
+	vector<int>nimax{5000,10000,20000};
 	vector<Dataset> set = read_dataset(filename);
 	vector<Dataset>::iterator it;
 	for (int par1 = 0; par1 < 3; ++par1)
@@ -388,7 +388,7 @@ void doe(int max_rep = 10)
 					Ins instance(textfile);
 					instance.read_time_independent_traveltime();
 					instance.read_time_dependent_traveltime();
-					instance.create_neighbourhood(textfile.path, textfile.name, instance.maxvertices);
+					instance.create_neighbourhood(textfile.path, textfile.name,50);
 					Tabu tabu(instance,nimax[par1], umax[par2]);
 					it->result[rep] = tabu.solve(it->bestscore);
 					avggap += it->result[rep].gap;
@@ -398,24 +398,44 @@ void doe(int max_rep = 10)
 			}//end rep
 			//calculate results over all replicates
 			double globalgap = 0.0;
+			double globalgap_sq = 0.0;
 			for (it = set.begin(); it != set.end(); ++it)
 			{
 				double avgscore = 0.0;
 				double avgcpu = 0.0;
+				vector<double> gaps(max_rep);
+
 				for (int rep = 0; rep < max_rep; ++rep)
 				{
 					avgscore += it->result[rep].sol.score;
 					avgcpu += it->result[rep].time;
+					gaps[rep] = it->result[rep].gap;
 				}
+
 				avgscore /= max_rep;
 				avgcpu /= max_rep;
-				double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100;
+
+				// Compute avg gap per instance
+				double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100.0;
 				globalgap += avggap;
+
+				// Compute standard deviation of gap
+				double gap_sum = accumulate(gaps.begin(), gaps.end(), 0.0);
+				double gap_mean = gap_sum / max_rep;
+
+				double sq_sum = 0.0;
+				for (double g : gaps)
+					sq_sum += (g - gap_mean) * (g - gap_mean);
+
+				double gap_stdev = sqrt(sq_sum / max_rep);
+				globalgap_sq += gap_stdev;
 			}
 			globalgap /= set.size();
-			cout<<"nimax: " << nimax[par1]<<"umax: " << umax[par2] << " avg gap is: " << globalgap << endl;
+			globalgap_sq /= set.size();
+
+			cout<<"nimax: " << nimax[par1]<<"umax: " << umax[par2] << " avg gap is: " << globalgap <<"sd gap is: "<<globalgap_sq << endl;
 			output.open("output.txt", ios::out | ios::app);
-			output << it->filename << ";" << nimax[par1] << ";" << umax[par2] << ";" << globalgap << ";" << "\n";
+			output << nimax[par1] << ";" << umax[par2] << ";" << globalgap << ";" << globalgap_sq << "\n";
 			output.close();
 		}//end par 1
 	}//end par2
@@ -509,6 +529,7 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	solve_dataset(5);
+	//solve_dataset(5);
 	//ctop_gap(10);
+	doe(10);
 }

@@ -8,9 +8,9 @@ class Dataset
 public:
 	string path;
 	string filename;
-	int bestscore;
 	vector<Res> result;
-	Dataset(string& path, string& filename, int& bestscore) : path(path), filename(filename), bestscore(bestscore) {}
+	int bestknown;
+	Dataset(string& path, string& filename, int& bestknown) : path(path), filename(filename), bestknown(bestknown){}
 };
 
 using namespace std;
@@ -246,10 +246,10 @@ vector<Dataset> read_dataset(string filename)
 		{
 			str=stringstream(line);//store line as stringstream
 			string name;
-			int bestscore;
+			int bestknown;
 			str>> name;
-			str>> bestscore;
-			set.push_back(Dataset(path, name, bestscore));
+			str>> bestknown;
+			set.push_back(Dataset(path, name, bestknown));
 		}
 		ifs.close();
 	}
@@ -292,23 +292,19 @@ void solve_dataset(int max_rep = 5)
 			Ins instance(textfile);
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
-			instance.create_neighbourhood(textfile.path, textfile.name,instance.maxvertices);
-			//instance.alter_instance();
+			instance.create_neighbourhood(textfile.path, textfile.name,50);
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
 			Tabu tabu(instance, 10000,2);
-			it->result[rep] = tabu.solve(it->bestscore);
-			//instance.unalter_instance();
-			//cout << "after repair" << endl;
-			//it->result[rep].sol.repair();
+			it->result[rep] = tabu.solve(it->bestknown);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
-			cout << "name: " << it->filename << " best score: " << it->bestscore << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
-			output << it->filename << ";" << it->bestscore << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
+			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
 		}
 	}
@@ -327,7 +323,7 @@ void solve_dataset(int max_rep = 5)
 		avgscore /= max_rep;
 		avgcpu /= max_rep;
 		output<<it->filename<<";" << avgscore << ";" << avgcpu << "\n";
-		double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100;
+		double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100;
 		globalgap += avggap;
 	}
 	output.close();
@@ -335,20 +331,95 @@ void solve_dataset(int max_rep = 5)
 	cout << "global avg gap is: " << globalgap << endl;
 }
 
+void case_study(int max_rep = 5) 
+{
+	cout << fixed << setprecision(2) << "enter name of dataset" << endl;
+	string filename;
+	getline(std::cin, filename);
+	if (filename.size() == 0)
+	{
+		filename = "case.txt";
+	}
+	ofstream output;
+	output.open("output.txt", ios::out);
+	output << "solution methods for the CTOP \n";
+	output << "filename,bestscore,score,cpu,gap,removed\n";
+	output.close();
+	vector<Dataset> set = read_dataset(filename);
+	vector<Dataset>::iterator it;
+	for (it = set.begin(); it != set.end(); ++it)
+	{
+		it->result.resize(max_rep);
+	}
+
+	for (int rep = 0; rep < max_rep; ++rep)
+	{
+		//solve the dataset
+		double avggap = 0.0;
+		double avgscore = 0.0;
+		for (it = set.begin(); it != set.end(); ++it)
+		{
+			Ins::MCTDTOPTW textfile = { it->path,it->filename };
+			Ins instance(textfile);
+			instance.read_time_independent_traveltime();
+			instance.read_time_dependent_traveltime();
+			instance.create_neighbourhood(textfile.path, textfile.name, instance.maxvertices);
+			instance.alter_instance();
+			Tabu tabu(instance, 10000, 2);
+			it->result[rep] = tabu.solve(it->bestknown);
+			instance.unalter_instance();
+			cout << "after repair" << endl;
+			it->result[rep].removed=it->result[rep].sol.repair();
+			cout << it->result[rep].sol << endl;
+			avggap += it->result[rep].gap;
+			avgscore += it->result[rep].sol.score;
+			cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap<<" removed: "<< it->result[rep].removed << endl;
+			output.open("output.txt", ios::out | ios::app);
+			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap<< ";" << it->result[rep].removed << "\n";
+			output.close();
+		}
+	}
+	//calculate results over all replicates
+	double globalgap = 0.0;
+	output.open("output.txt", ios::out | ios::app);
+	for (it = set.begin(); it != set.end(); ++it)
+	{
+		double avgscore = 0.0;
+		double avgcpu = 0.0;
+		double avgremoved = 0.0;
+		for (int rep = 0; rep < max_rep; ++rep)
+		{
+			avgscore += it->result[rep].sol.score;
+			avgcpu += it->result[rep].time;
+			avgremoved += it->result[rep].removed;
+		}
+		avgscore /= max_rep;
+		avgcpu /= max_rep;
+		avgremoved /= max_rep;
+		output << it->filename << ";" << avgscore << ";" << avgcpu << " ; " << avgremoved<< "\n";
+		double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100;
+		globalgap += avggap;
+	}
+	output.close();
+	globalgap /= set.size();
+	cout << "global avg gap is: " << globalgap << endl;
+
+}
+
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"162.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
 	instance.create_neighbourhood(textfile.path, textfile.name,170);
 	//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
-	//Tabu tabu(instance, 10000,2);
-	//resdataset.push_back(tabu.solve());
-	Ils ils(instance, 10000, 100, 20, 30);
-	resdataset.push_back(ils.solve());
+	Tabu tabu(instance, 10000,2);
+	resdataset.push_back(tabu.solve());
+	//Ils ils(instance, 10000, 100, 20, 30);
+	//resdataset.push_back(ils.solve());
 }
 
 void doe(int max_rep = 10)
@@ -390,10 +461,10 @@ void doe(int max_rep = 10)
 					instance.read_time_dependent_traveltime();
 					instance.create_neighbourhood(textfile.path, textfile.name,50);
 					Tabu tabu(instance,nimax[par1], umax[par2]);
-					it->result[rep] = tabu.solve(it->bestscore);
+					it->result[rep] = tabu.solve(it->bestknown);
 					avggap += it->result[rep].gap;
 					avgscore += it->result[rep].sol.score;
-					cout << "name: " << it->filename << " best score: " << it->bestscore << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+					cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 				}//end it
 			}//end rep
 			//calculate results over all replicates
@@ -416,7 +487,7 @@ void doe(int max_rep = 10)
 				avgcpu /= max_rep;
 
 				// Compute avg gap per instance
-				double avggap = (double(it->bestscore - avgscore) / it->bestscore) * 100.0;
+				double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100.0;
 				globalgap += avggap;
 
 				// Compute standard deviation of gap
@@ -493,12 +564,12 @@ void ctop_gap(int max_rep=5)
 			//Ils ils(instance, 10000,100,2,3);
 			//it->result[rep] = ils.solve(it->bestscore);
 			Tabu tabu(instance, 10000,2);
-			it->result[rep] = tabu.solve(it->bestscore);
+			it->result[rep] = tabu.solve(it->bestknown);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
-			cout << "name: " << it->filename << " best score: " << it->bestscore<<" " << tabu.name << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " best score: " << it->bestknown<<" " << tabu.name << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
-			output << it->filename << ";" << it->bestscore << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
+			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
 		}
 		//calculate dataset performance
@@ -516,7 +587,7 @@ void ctop_gap(int max_rep=5)
 			avgscore += it->result[rep].sol.score;
 		}
 		avgscore /= max_rep;
-		double avggap= (double(it->bestscore - avgscore) / it->bestscore) * 100;
+		double avggap= (double(it->bestknown - avgscore) / it->bestknown) * 100;
 		globalgap += avggap;
 	}
 	globalgap /= set.size();
@@ -529,7 +600,10 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(5);
-	//ctop_gap(10);
-	doe(10);
+	//solve_dataset(1);
+	//ctop_gap(1);
+	//doe(10);
+	case_study(10);
+
+
 }

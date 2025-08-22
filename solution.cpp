@@ -175,13 +175,17 @@ void Sol::check_availability()
 	}
 }
 
-void Sol::repair()
+int Sol::repair()
 {
-	for (int t = 0; t < ins->maxtours; ++t)
-	{
+	int total_removed = 0;
+	for (int t = 0; t < ins->maxtours; ++t) {
 		Sol::Tour* tour = &tours[t];
-		score-=tour->repair();
-	}//end for all tours
+		auto result = tour->repair();
+		score -= result.first;      // subtract score decrease
+		total_removed += result.second; // accumulate removed vertices
+	}
+	std::cout << "Vertices removed in repair: " << total_removed << std::endl;
+	return total_removed;
 }
 
 ostream& operator<<(ostream& output, Sol& sol)
@@ -861,74 +865,73 @@ bool Tour::check()
 	return tourok;
 }//end tour check
 
-int Tour::repair()
+pair<int, int> Tour::repair()
 {
-	//check feasibility (max travel time and closing time of every vertex)
-	bool infeasible = false;
 	int scoredecrease = 0;
-	// travel time check
+	int removed = 0;
+
+	bool infeasible = false;
 	double currenttime = ins->t[index].EDT + deptime[0];
-	int end = (int)seq.size() - 1;
-	for (int i = 0; i < end; ++i)
-	{
+	int end = static_cast<int>(seq.size()) - 1;
+
+	// first feasibility check
+	for (int i = 0; i < end; ++i) {
 		Ins::Vertex* last = seq[i];
 		Ins::Vertex* current = seq[i + 1];
 		int breakcurrent = action[i + 1];
 		double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-		double waitingtime = 0;
-		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
-		{
-			waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-			arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
+
+		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index]) {
+			arrivaltime = current->LTW[index] - breakcurrent * ins->breakdur;
 		}
-		if (arrivaltime > current->UTW[index])//UTW violation
-		{
+		if (arrivaltime > current->UTW[index]) {
 			infeasible = true;
 			break;
 		}
 		arrivaltime += current->serv + breakcurrent * ins->breakdur;
 		currenttime = arrivaltime;
-	}//end for i
-	if(currenttime > ins->t[index].EDT + ins->t[index].T_max)//max travel time violation (break at enddepot might cause violation)
-	{
+	}
+	if (currenttime > ins->t[index].EDT + ins->t[index].T_max) {
 		infeasible = true;
 	}
-	while (infeasible)//while infeasible remove last regular vertex
-	{
+
+	// repair loop
+	while (infeasible) {
+		end = static_cast<int>(seq.size()) - 1;
+		if (end <= 1) break; // no regular vertices left
+
 		scoredecrease += seq[end - 1]->score;
+		++removed;
 		remove_vertex(end - 1);
-		//check feasibility (max travel time and closing time of every vertex)
+
+		// recheck feasibility
 		infeasible = false;
-		// travel time check
 		currenttime = ins->t[index].EDT + deptime[0];
-		end = (int)seq.size() - 1;
-		for (int i = 0; i < end; ++i)
-		{
+		end = static_cast<int>(seq.size()) - 1;
+
+		for (int i = 0; i < end; ++i) {
 			Ins::Vertex* last = seq[i];
 			Ins::Vertex* current = seq[i + 1];
 			int breakcurrent = action[i + 1];
 			double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-			double waitingtime = 0;
-			if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
-			{
-				waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-				arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
+
+			if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index]) {
+				arrivaltime = current->LTW[index] - breakcurrent * ins->breakdur;
 			}
-			if (arrivaltime > current->UTW[index])//UTW violation
-			{
+			if (arrivaltime > current->UTW[index]) {
 				infeasible = true;
 				break;
 			}
 			arrivaltime += current->serv + breakcurrent * ins->breakdur;
 			currenttime = arrivaltime;
-		}//end for i
-		if (currenttime > ins->t[index].EDT + ins->t[index].T_max)//max travel time violation at end depot (break at enddepot might cause violation)
-		{
+		}
+		if (currenttime > ins->t[index].EDT + ins->t[index].T_max) {
 			infeasible = true;
 		}
-	}//end while infeasible
-	return scoredecrease;
-}//end tour repair
+	}
+
+	return { scoredecrease, removed };
+}
 
 
 

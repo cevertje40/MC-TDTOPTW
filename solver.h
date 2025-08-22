@@ -6,11 +6,11 @@ class Res
 public:
 	Sol sol;
 	double time;
-	int bestknown;
 	double gap;
+	int removed;
 	Res() {}
-	Res(Sol sol, double& time) :sol(sol), time(time), bestknown(0), gap(0.0) {}
-	Res(Sol sol, double& time,int& bestknown):sol(sol), time(time), bestknown(bestknown)
+	Res(Sol sol, double& time) :sol(sol), time(time), gap(0.0) {}
+	Res(Sol sol, double& time, int& bestknown) :sol(sol), time(time)
 	{
 		gap = (double(bestknown - sol.score) / bestknown)*100;
 	}

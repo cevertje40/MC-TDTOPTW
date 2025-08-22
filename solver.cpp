@@ -672,11 +672,10 @@ void Tabu::parallel_construct(Sol& sol)
 	{
 			return (double)a->score  > (double)b->score ;
 	});
-	for (int i = 0; i < candidates.size() - 1; ++i)
+	for (int i = 0; i < candidates.size(); ++i)
 	{
 		//calculate traveltime for candidate under consideration
 		vector<double>traveltime(ins->maxtours, 0.0);//traveltime per route
-		vector<bool>feasible(ins->maxtours, false);//feasibility per route
 		int besttour = -1;
 		double besttraveltime = DBL_MAX;
 		int bestbrk = 0;
@@ -687,7 +686,7 @@ void Tabu::parallel_construct(Sol& sol)
 			double currenttime = tour.deptime.back() + ins->t[t].EDT;
 			Ins::Vertex* last = tour.seq.back();
 			Ins::Vertex* candidate = candidates[i];
-			if ((tour.weight + candidate->weight < ins->t[t].W_max) && (tour.volume + candidate->volume < ins->t[t].V_max))
+			if ((tour.weight + candidate->weight <= ins->t[t].W_max) && (tour.volume + candidate->volume <= ins->t[t].V_max))
 			{
 				double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
 				int brk = -1;
@@ -704,12 +703,11 @@ void Tabu::parallel_construct(Sol& sol)
 				//tw checks
 				if (arrivaltime < candidate->LTW[t])
 				{
-					arrivaltime = candidate->LTW[t];//wachten als je te vroeg bent	
+					arrivaltime = candidate->LTW[t];//waiting if you arrive to early	
 				}
 				if (arrivaltime > candidate->UTW[t])
 				{
-					continue;//stop the calculation
-					feasible[t] = false;
+					continue;//discard candidate
 				}
 				//add service time
 				arrivaltime += candidate->serv;
@@ -721,12 +719,11 @@ void Tabu::parallel_construct(Sol& sol)
 				}
 				if (enddepottime > ins->t[t].LAT)//enddepot heeft geen service time
 				{
-					feasible[t] = false;
+					continue;//discard candidate
 				}
 				else
 				{
 					succes = true;
-					feasible[t] = true;
 					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
 					if (traveltime[t] < besttraveltime)//candidates are already sorted from high score to low score
 					{
@@ -764,7 +761,7 @@ void Tabu::parallel_construct(Sol& sol)
 		double arrivaltime = ins->arrival_time(tour.seq.back()->con[ins->maxvertices - 1], currenttime);
 		tour.deptime.push_back(arrivaltime - ins->t[t].EDT);
 		tour.seq.push_back(&ins->v[ins->maxvertices - 1]);
-		tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
+		tour.max_shift.push_back(0);//dummy, will be updated in max_shift function
 		if (tour.breakindex == -1)
 		{
 			tour.action.push_back(1);

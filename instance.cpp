@@ -525,7 +525,6 @@ void Ins::read_neighbourhood(string path,string name)
 void Ins::alter_instance()
 {
 	breakdur = 0.0;
-	
 	for (int i = 0; i < maxvertices; ++i)
 	{
 		for (int j = 0; j < maxvertices; ++j)

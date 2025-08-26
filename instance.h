@@ -3,7 +3,7 @@
 
 using namespace std;
 
-class Ins//problem instance class that stores all required information f
+class Ins//problem instance class that stores all required information
 {
 public:
 	struct MCTDTOPTW 

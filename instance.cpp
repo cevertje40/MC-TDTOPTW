@@ -445,7 +445,7 @@ void Ins::create_neighbourhood(string path, string name, int amnt_nb)
 				v[i].nb[d].push_back(&v[maxvertices - 1]);
 				//indexed list aanmaken
 				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
-				v[i].nbi[d].set(0);//sets all bits to false
+				v[i].nbi[d].reset();//sets all bits to false
 				for (int x = 0; x < (int)v[i].nb[d].size(); ++x)
 				{
 					v[i].nbi[d][v[i].nb[d][x]->index] = true;
@@ -525,6 +525,7 @@ void Ins::read_neighbourhood(string path,string name)
 void Ins::alter_instance()
 {
 	breakdur = 0.0;
+	/*
 	for (int i = 0; i < maxvertices; ++i)
 	{
 		for (int j = 0; j < maxvertices; ++j)
@@ -544,13 +545,13 @@ void Ins::alter_instance()
 			}
 		}
 	}
-
+	*/
 }
 
 void Ins::unalter_instance()
 {
 	breakdur = 0.75;
-	read_time_dependent_traveltime();
+	//read_time_dependent_traveltime();
 }
 
 

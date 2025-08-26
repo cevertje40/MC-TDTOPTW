@@ -678,6 +678,7 @@ void Tabu::parallel_construct(Sol& sol)
 		vector<double>traveltime(ins->maxtours, 0.0);//traveltime per route
 		int besttour = -1;
 		double besttraveltime = DBL_MAX;
+		double bestkey = DBL_MAX;
 		int bestbrk = 0;
 		bool succes = false;
 		for (int t = 0; t < ins->maxtours; ++t)
@@ -725,12 +726,29 @@ void Tabu::parallel_construct(Sol& sol)
 				{
 					succes = true;
 					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
+					
+					
+					double cap_frac = candidate->weight / ins->t[t].W_max+ candidate->volume / ins->t[t].V_max;
+					double delta_t = traveltime[t];
+					double denom = max(1e-12, delta_t) + max(1e-12, cap_frac);
+					double key = candidate->score / denom;  // higher is better
+					
+					if (key < bestkey)
+					{
+						besttour = t;
+						besttraveltime = arrivaltime - ins->t[t].EDT;//include the possible break time
+						bestkey = key;
+						bestbrk = brk;
+					}
+
+					/*
 					if (traveltime[t] < besttraveltime)//candidates are already sorted from high score to low score
 					{
 						besttour = t;
 						besttraveltime = arrivaltime - ins->t[t].EDT;//include the possible break time
 						bestbrk = brk;
 					}
+					*/
 				}//end else
 			}//end cap constraints
 		}//end for all tours
@@ -784,16 +802,18 @@ void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& 
 	{
 		auto exec_nb = nb.top();
 		exec_nb.execute(s);
+		
 		for (int i = 0; i < exec_nb.move.first.size(); ++i)
 		{
-			tabulist.addTabu(exec_nb.move.first[i]->index,exec_nb.tour);
+			tabulist.addTabu(exec_nb.move.first[i]->index,exec_nb.tour);//out
 		}
 		for (int i = 0; i < exec_nb.move.second.size(); ++i)
 		{
-			tabulist.addTabu(exec_nb.move.second[i]->index,exec_nb.tour);
+			tabulist.addTabu(exec_nb.move.second[i]->index,exec_nb.tour);//in
 		}
-		tabulist.nextIteration();
+		
 	}
+	tabulist.nextIteration();
 }
 
 
@@ -932,6 +952,14 @@ Res Tabu::solve(int bestknown)
 		{
 			++noimpr;
 		}
+		/*
+		if (noimpr%500 == 0)
+		{
+			++nb_tabu_it;
+			nb_tabu_it=clamp(nb_tabu_it,2,50);
+			tabulist.setDuration(nb_tabu_it);
+		}
+		*/
 		++debug_iter;
 		//cout << debug_iter << endl;
 	}//end while smaller than max_noimpr

@@ -3,14 +3,54 @@
 #include "solver.h"
 
 
-class Dataset
+class Instance
 {
 public:
 	string path;
 	string filename;
 	vector<Res> result;
-	int bestknown;
-	Dataset(string& path, string& filename, int& bestknown) : path(path), filename(filename), bestknown(bestknown){}
+	int bestknown{0};
+	double avgscore{0.0};
+	double sdscore{0.0};
+	double avggap{0.0};
+	double sdgap{0.0};
+	double avgtime{0.0 };
+	Instance(const string& path, const string& filename, int bestknown) : path(path), filename(filename), bestknown(bestknown){}
+	void calculate_statistics()
+	{
+		avgscore = 0.0;
+		sdscore = 0.0;
+		avggap = 0.0;
+		sdgap = 0.0;
+		avgtime = 0.0;
+		const int n = (int) result.size();
+
+		if (n == 0) return;//no results yet
+
+		if (n == 1) {// single result: sd = 0
+			avgscore = result[0].sol.score;
+			avggap = result[0].gap;
+			avgtime = result[0].time;
+			return;
+		}
+
+		for (int i = 0; i < n; ++i)
+		{
+			avgscore += result[i].sol.score;
+			avggap += result[i].gap;
+			avgtime += result[i].time;
+		}
+		avgscore /= n;
+		avggap /= n;
+		avgtime /= n;
+		for (int i = 0; i < n; ++i)
+		{
+			sdscore += pow((result[i].sol.score - avgscore), 2);
+			sdgap += pow((result[i].gap - avggap), 2);
+		}
+		sdscore = sqrt(sdscore / (n-1));
+		sdgap = sqrt(sdgap / (n-1));
+	}
 };
 
 using namespace std;
@@ -230,9 +270,9 @@ void create_case_dataset()
 		}//for all tour values
 }//end create case
 
-vector<Dataset> read_dataset(string filename)
+vector<Instance> read_dataset(string filename)
 {//reads in all the dataset names
-	vector<Dataset> set;
+	vector<Instance> dataset;
 	string path;
 	ifstream ifs;
 	ifs.open(filename, ifstream::in);
@@ -249,7 +289,7 @@ vector<Dataset> read_dataset(string filename)
 			int bestknown;
 			str>> name;
 			str>> bestknown;
-			set.push_back(Dataset(path, name, bestknown));
+			dataset.push_back(Instance(path, name, bestknown));
 		}
 		ifs.close();
 	}
@@ -257,7 +297,7 @@ vector<Dataset> read_dataset(string filename)
 	{
 		printf("\ninput error in filenames file");
 	}
-	return set;
+	return dataset;
 }
 
 void solve_dataset(int max_rep = 5)
@@ -274,8 +314,8 @@ void solve_dataset(int max_rep = 5)
 	output << "solution methods for the CTOP \n";
 	output << "filename,bestscore,score,cpu,gap\n";
 	output.close();
-	vector<Dataset> set = read_dataset(filename);
-	vector<Dataset>::iterator it;
+	vector<Instance> set = read_dataset(filename);
+	vector<Instance>::iterator it;
 	for (it = set.begin(); it != set.end(); ++it)
 	{
 		it->result.resize(max_rep);
@@ -304,31 +344,31 @@ void solve_dataset(int max_rep = 5)
 			avgscore += it->result[rep].sol.score;
 			cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
-			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
+			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << '\n';
 			output.close();
 		}
 	}
 	//calculate results over all replicates
-	double globalgap = 0.0;
+	double avg_avg_gap = 0.0;
+	double sd_avg_gap = 0.0;
 	output.open("output.txt", ios::out | ios::app);
+	output << "filename;avgscore;avgtime;avggap;sdgap\n";
 	for (it = set.begin(); it != set.end(); ++it)
 	{
-		double avgscore = 0.0;
-		double avgcpu = 0.0;
-		for (int rep = 0; rep < max_rep; ++rep)
-		{
-			avgscore += it->result[rep].sol.score;
-			avgcpu += it->result[rep].time;
-		}
-		avgscore /= max_rep;
-		avgcpu /= max_rep;
-		output<<it->filename<<";" << avgscore << ";" << avgcpu << "\n";
-		double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100;
-		globalgap += avggap;
+		it->calculate_statistics();
+		output<<it->filename<<";" << it->avgscore << ";" << it->avgtime<< ";"<<it->avggap<<";"<<it->sdgap << '\n';
+		avg_avg_gap += it->avggap;
+		
 	}
+	avg_avg_gap /= set.size();
+	for (it = set.begin(); it != set.end(); ++it)
+	{
+		sd_avg_gap += pow(it->avggap-avg_avg_gap, 2);
+	}
+	sd_avg_gap = sqrt(sd_avg_gap / (set.size() - 1));
+	output << "avg avg gap: " << avg_avg_gap<< " sd avg gap: "<< sd_avg_gap << '\n';
 	output.close();
-	globalgap /= set.size();
-	cout << "global avg gap is: " << globalgap << endl;
+	cout << "avg avg gap is: " << avg_avg_gap<<" sd avg gap: "<<sd_avg_gap << endl;
 }
 
 void case_study(int max_rep = 5) 
@@ -345,9 +385,9 @@ void case_study(int max_rep = 5)
 	output << "solution methods for the CTOP \n";
 	output << "filename,bestscore,score,cpu,gap,removed\n";
 	output.close();
-	vector<Dataset> set = read_dataset(filename);
-	vector<Dataset>::iterator it;
-	for (it = set.begin(); it != set.end(); ++it)
+	vector<Instance> dataset = read_dataset(filename);
+	vector<Instance>::iterator it;
+	for (it = dataset.begin(); it != dataset.end(); ++it)
 	{
 		it->result.resize(max_rep);
 	}
@@ -357,7 +397,7 @@ void case_study(int max_rep = 5)
 		//solve the dataset
 		double avggap = 0.0;
 		double avgscore = 0.0;
-		for (it = set.begin(); it != set.end(); ++it)
+		for (it = dataset.begin(); it != dataset.end(); ++it)
 		{
 			Ins::MCTDTOPTW textfile = { it->path,it->filename };
 			Ins instance(textfile);
@@ -382,7 +422,7 @@ void case_study(int max_rep = 5)
 	//calculate results over all replicates
 	double globalgap = 0.0;
 	output.open("output.txt", ios::out | ios::app);
-	for (it = set.begin(); it != set.end(); ++it)
+	for (it = dataset.begin(); it != dataset.end(); ++it)
 	{
 		double avgscore = 0.0;
 		double avgcpu = 0.0;
@@ -401,7 +441,7 @@ void case_study(int max_rep = 5)
 		globalgap += avggap;
 	}
 	output.close();
-	globalgap /= set.size();
+	globalgap /= dataset.size();
 	cout << "global avg gap is: " << globalgap << endl;
 
 }
@@ -438,13 +478,13 @@ void doe(int max_rep = 10)
 	output.close();
 	vector<int>umax{2,4,6};
 	vector<int>nimax{5000,10000,20000};
-	vector<Dataset> set = read_dataset(filename);
-	vector<Dataset>::iterator it;
+	vector<Instance> dataset = read_dataset(filename);
+	vector<Instance>::iterator it;
 	for (int par1 = 0; par1 < 3; ++par1)
 	{
 		for (int par2 = 0; par2 < 3; ++par2)
 		{
-			for (it = set.begin(); it != set.end(); ++it)
+			for (it = dataset.begin(); it != dataset.end(); ++it)
 			{
 				it->result.resize(max_rep);
 			}
@@ -453,7 +493,7 @@ void doe(int max_rep = 10)
 				//solve the dataset
 				double avggap = 0.0;
 				double avgscore = 0.0;
-				for (it = set.begin(); it != set.end(); ++it)
+				for (it = dataset.begin(); it != dataset.end(); ++it)
 				{
 					Ins::MCTDTOPTW textfile = { it->path,it->filename };
 					Ins instance(textfile);
@@ -470,7 +510,7 @@ void doe(int max_rep = 10)
 			//calculate results over all replicates
 			double globalgap = 0.0;
 			double globalgap_sq = 0.0;
-			for (it = set.begin(); it != set.end(); ++it)
+			for (it = dataset.begin(); it != dataset.end(); ++it)
 			{
 				double avgscore = 0.0;
 				double avgcpu = 0.0;
@@ -501,8 +541,8 @@ void doe(int max_rep = 10)
 				double gap_stdev = sqrt(sq_sum / max_rep);
 				globalgap_sq += gap_stdev;
 			}
-			globalgap /= set.size();
-			globalgap_sq /= set.size();
+			globalgap /= dataset.size();
+			globalgap_sq /= dataset.size();
 
 			cout<<"nimax: " << nimax[par1]<<"umax: " << umax[par2] << " avg gap is: " << globalgap <<"sd gap is: "<<globalgap_sq << endl;
 			output.open("output.txt", ios::out | ios::app);
@@ -542,9 +582,9 @@ void ctop_gap(int max_rep=5)
 	output << "solution methods for the CTOP \n";
 	output << "filename,bestscore,score,cpu,gap\n";
 	output.close();
-	vector<Dataset> set = read_dataset(filename);
-	vector<Dataset>::iterator it;
-	for (it = set.begin(); it != set.end(); ++it)
+	vector<Instance> dataset = read_dataset(filename);
+	vector<Instance>::iterator it;
+	for (it = dataset.begin(); it != dataset.end(); ++it)
 	{
 		it->result.resize(max_rep);
 	}
@@ -554,7 +594,7 @@ void ctop_gap(int max_rep=5)
 		//solve the dataset
 		double avggap = 0.0;
 		double avgscore = 0.0;
-		for (it = set.begin(); it != set.end(); ++it)
+		for (it = dataset.begin(); it != dataset.end(); ++it)
 		{
 			Ins::CTOP textfile = { it->path,it->filename };
 			Ins instance(textfile);
@@ -573,13 +613,13 @@ void ctop_gap(int max_rep=5)
 			output.close();
 		}
 		//calculate dataset performance
-		avggap /= set.size();
-		avgscore /= set.size();
+		avggap /= dataset.size();
+		avgscore /= dataset.size();
 		cout << "average gap of " << filename << " is: " << avggap << " avg score: " << avgscore << endl;
 	}
 	//calculate results over all replicates
 	double globalgap = 0.0;
-	for (it = set.begin(); it != set.end(); ++it)
+	for (it = dataset.begin(); it != dataset.end(); ++it)
 	{
 		double avgscore = 0.0;
 		for (int rep = 0; rep < max_rep; ++rep)
@@ -590,7 +630,7 @@ void ctop_gap(int max_rep=5)
 		double avggap= (double(it->bestknown - avgscore) / it->bestknown) * 100;
 		globalgap += avggap;
 	}
-	globalgap /= set.size();
+	globalgap /= dataset.size();
 	cout << "global avg gap is: " << globalgap << endl;
 }//end ctop_gap
 
@@ -600,10 +640,10 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(1);
+	solve_dataset(5);
 	//ctop_gap(1);
 	//doe(10);
-	case_study(10);
+	//case_study(10);
 
 
 }

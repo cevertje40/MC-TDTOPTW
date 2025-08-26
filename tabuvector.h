@@ -32,6 +32,8 @@ public:
         return tabu_vectors[tour_index][vertex_index] > current_iteration;
     }
 
+    void setDuration(int duration) { tabu_duration = duration; }
+
     //Print tabu vectors
     void printTabuVector() const {
         for (int tour_index = 0; tour_index < num_tours; ++tour_index) {

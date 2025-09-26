@@ -757,6 +757,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	double bestratio = -DBL_MAX;
 	#pragma omp parallel
 	{//start parallel session
+		double local_best = -DBL_MAX;
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
@@ -808,13 +809,17 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 								double shift = (arrivaltime - ins->t[d].EDT) - tour.deptime[j + 1];//increase in travel time
 								if (shift <= tour.max_shift[j + 1])//check of het punt geinsert kan worden
 								{
-									#pragma omp critical
+									double ratio = (this->*get_ratio)((arrivaltime - (z->serv + breakz * ins->breakdur)) - currenttime, y->score, y->weight, y->volume, 1.0, 1.0, 1.0);
+									if (ratio > local_best)
 									{
-										double ratio = (this->*get_ratio)((arrivaltime - (z->serv + breakz * ins->breakdur)) - currenttime, y->score, y->weight, y->volume, 1.0, 1.0, 1.0);
-										adm_nb.push(One_one_rep_nb(d, -1, j, y, y->score, ratio, { {},{y} }));
-										if (ratio > bestratio)
+										local_best = ratio;
+										#pragma omp critical
 										{
-											bestratio = ratio;
+											if (ratio > bestratio)
+											{
+												adm_nb.push(One_one_rep_nb(d, -1, j, y, y->score, ratio, { {},{y} }));
+												bestratio = ratio;
+											}
 										}
 									}
 								}
@@ -845,7 +850,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 					{
 						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
 						// Tabu check for y in the current tour (tour index = d)
-						if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - r->score) <= globalbest))
+						if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - r->score) <= globalbest))
 						{
 							//cout << "tabu list stopped move" << endl;
 							continue; // skip if y is tabu for this tour
@@ -853,7 +858,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 						{
 							double heuristicratio = (this->*get_ratio)(x->con[y->index]->determin + y->serv + y->con[z->index]->determin, y->score,y->weight,y->volume, 1, 1, 1);
-							if (heuristicratio - lostratio > bestratio)
+							if (heuristicratio - lostratio > local_best)
 							{
 								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 								{
@@ -905,6 +910,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
 	#pragma omp parallel
 	{//start parallel session
+		double local_best = -DBL_MAX;
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
@@ -969,13 +975,13 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
 											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
-											if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d)) && (sol.score + (y1->score + y2->score - r->score) <= globalbest))
+											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) && (sol.score + (y1->score + y2->score - r->score) <= globalbest))
 											{
 												//cout << "tabu list stopped move" << endl;
 												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
 											}
 											double heuristicratio = (this->*get_ratio)(tt1+x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin,y1->score+ y2->score,y1->weight+ y2->weight, y1->volume+y2->volume, 1, 1, 1);
-											if (heuristicratio-lostratio > bestratio)
+											if (heuristicratio-lostratio > local_best)
 											{
 												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
 												{
@@ -1005,6 +1011,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 														double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
 														if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
 														{
+															local_best = heuristicratio - lostratio;
 															#pragma omp critical
 															{
 																double ratio= (this->*get_ratio)(tt1+tt2, y1->score + y2->score, y1->weight + y2->weight, y1->volume + y2->volume, 1, 1, 1);
@@ -1065,7 +1072,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 							{
 								Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-								if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - (r->score+s->score)) <= globalbest))
+								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - (r->score+s->score)) <= globalbest))
 								{
 									//cout << "vertices are tabu" << endl;
 									continue; // skip if y is tabu for this tour and the combination does not improve globalbest
@@ -1124,63 +1131,64 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
-	int bestscore = -INT_MAX;
+	int bestscore = -INT_MAX;// Thread-local gating to avoid races; publish only under critical.
 	#pragma omp parallel
 	{//start parallel session
+		int local_bestscore = -INT_MAX;
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			//1- INSERT PART
-			int t=sol.tourindex[d];
-			Sol::Tour& tour = sol.tours[t];
+			Sol::Tour& tour = sol.tours[d];
 			int endj = (int)tour.seq.size();
 			for (int j = 0; j < endj - 1; ++j)// for all positions in the tour
 			{
 				Ins::Vertex* x = tour.seq[j];//predecessor y
 				Ins::Vertex* z = tour.seq[j + 1];//successor y
 				int breakz = tour.action[j + 1];//break on z
-				int nb_size = (int)x->nb[t].size();
+				int nb_size = (int)x->nb[d].size();
 				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 				{
-					Ins::Vertex* y = x->nb[t][i];//potential insertion at position j
+					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
 					// Tabu check for y in the current tour (tour index = t)
-					if ((tabulist.isTabu(y->index, t))&&(sol.score+y->score<=globalbest))
+					if ((tabulist.isTabu(y->index, d))&&(sol.score+y->score<=globalbest))
 					{
 						//cout << "tabu list stopped move" << endl;
 						continue; // skip if y is tabu for this tour
 					}
-					if ((sol.available[y->index]) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & improvement to current best admissable
+					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 					{
-						if (y->score > bestscore)
+						if (y->score > local_bestscore)
 						{
-							if ((tour.weight + y->weight <= ins->t[t].W_max) && (tour.volume + y->volume <= ins->t[t].V_max))//cap constraint check
+							if ((tour.weight + y->weight <= ins->t[d].W_max) && (tour.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 							{
 								//gather departure time
-								double currenttime = tour.deptime[j] + ins->t[t].EDT;//service bij x zit hier al in
+								double currenttime = tour.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
 								//travel time from x to y
 								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-								if (arrivaltime < y->LTW[t])//break inserten kan niet dus break kan ltw niet dichter brengen
+								if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
 								{
-									arrivaltime = y->LTW[t];
+									arrivaltime = y->LTW[d];
 								}
-								if (arrivaltime > y->UTW[t])
+								if (arrivaltime > y->UTW[d])
 								{
 									continue;//infeasible
 								}
 								arrivaltime += y->serv;
 								//travel time from y to z
 								arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[t])
+								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
 								{
-									arrivaltime = z->LTW[t] - (breakz * ins->breakdur);
+									arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
 								}
 								arrivaltime += z->serv + breakz * ins->breakdur;
-								double shift = (arrivaltime - ins->t[t].EDT) - tour.deptime[j + 1];//increase in travel time
+								double shift = (arrivaltime - ins->t[d].EDT) - tour.deptime[j + 1];//increase in travel time
 								if (shift <= tour.max_shift[j + 1])//check of het punt geinsert kan worden
 								{
+									local_bestscore = y->score;
 									#pragma omp critical
 									{
-										adm_nb.push(One_one_rep_nb(t, -1, j, y, y->score,y->score,{{},{y}}));
+										adm_nb.push(One_one_rep_nb(d, -1, j, y, y->score,y->score,{{},{y}}));
 										if (y->score > bestscore)
 										{
 											bestscore = y->score;
@@ -1193,11 +1201,11 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 				}//for all nb
 			}//end for all positions in sol
 			//1- REPLACE PART
-			int endh = (int)sol.tours[t].seq.size();
+			int endh = (int)sol.tours[d].seq.size();
 			for (int h = 1; h < endh - 1; ++h)// for all  included regular vertices
 			{
 				//with replacing: for all existing regular member vertices: remove 1 and revaluate solution
-				Tour tourrem = sol.tours[t];
+				Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
 				tourrem.remove_vertex(h);
 				int endj = (int)tourrem.seq.size();
@@ -1206,47 +1214,48 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 					Ins::Vertex* x = tourrem.seq[j];//predecessor y
 					Ins::Vertex* z = tourrem.seq[j + 1];//successor y
 					int breakz = tourrem.action[j + 1];
-					int nb_size = (int)x->nb[t].size();
+					int nb_size = (int)x->nb[d].size();
 					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
-						Ins::Vertex* y = x->nb[t][i];//potential insertion at position j
-						if (((tabulist.isTabu(r->index, t)) || (tabulist.isTabu(y->index, t))) && (sol.score + (y->score - r->score) <= globalbest))
+						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
+						if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - r->score) <= globalbest))
 						{
 							//cout << "tabu list stopped move" << endl;
 							continue; // skip if y is tabu for this tour
 						}
-						if ((sol.available[y->index]) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & improvement to current best admissable
+						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 						{
-							if (y->score - r->score > bestscore)
+							if (y->score - r->score > local_bestscore)
 							{
-								if ((tourrem.weight + y->weight <= ins->t[t].W_max) && (tourrem.volume + y->volume <= ins->t[t].V_max))//cap constraint check
+								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 								{
 									//gather departure time
-									double currenttime = tourrem.deptime[j] + ins->t[t].EDT;//service bij x zit hier al in
+									double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
 									//travel time from x to y
 									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-									if (arrivaltime < y->LTW[t])//break inserten kan niet dus break kan ltw niet dichter brengen
+									if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
 									{
-										arrivaltime = y->LTW[t];
+										arrivaltime = y->LTW[d];
 									}
-									if (arrivaltime > y->UTW[t])
+									if (arrivaltime > y->UTW[d])
 									{
 										continue;//infeasible
 									}
 									arrivaltime += y->serv;
 									//travel time from y to z
 									arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[t])
+									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
 									{
-										arrivaltime = z->LTW[t] - (breakz * ins->breakdur);
+										arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
 									}
 									arrivaltime += z->serv + breakz * ins->breakdur;
-									double shift = (arrivaltime - ins->t[t].EDT) - tourrem.deptime[j + 1];//increase in travel time
+									double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
 									if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
 									{
+										local_bestscore = y->score - r->score;
 										#pragma omp critical
 										{
-											adm_nb.push(One_one_rep_nb(t, h, j, y, y->score - r->score, y->score - r->score,{{r},{y}}));
+											adm_nb.push(One_one_rep_nb(d, h, j, y, y->score - r->score, y->score - r->score,{{r},{y}}));
 											if (y->score - r->score > bestscore)
 											{
 												bestscore = y->score - r->score;
@@ -1270,6 +1279,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
 	#pragma omp parallel
 	{//start parallel session
+		int local_bestscore = -INT_MAX;// Thread-local gating to avoid races; publish only under critical.
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
@@ -1332,12 +1342,12 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
 											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
-											if ((tabulist.isTabu(r->index, d))||(tabulist.isTabu(y1->index, d))||(tabulist.isTabu(y2->index, d)) && (sol.score + (y1->score+y2->score - r->score) <= globalbest))
+											if (((tabulist.isTabu(r->index, d))||(tabulist.isTabu(y1->index, d))||(tabulist.isTabu(y2->index, d))) && (sol.score + (y1->score+y2->score - r->score) <= globalbest))
 											{
 												//cout << "tabu list stopped move" << endl;
 												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
 											}
-											if (((y1->score + y2->score) - r->score > bestscore))
+											if (((y1->score + y2->score) - r->score > local_bestscore))
 											{
 												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index])&&(y2!=y1))//availability & nb check & two insertions need to be different vertices
 												{
@@ -1366,6 +1376,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 														double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
 														if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
 														{
+															local_bestscore = (y1->score + y2->score) - r->score;
 															#pragma omp critical
 															{
 																adm_nb.push(One_two_rep_nb(d,h,j,k,y1,y2,(y1->score + y2->score) - r->score, (y1->score + y2->score) - r->score,{{r},{y1,y2}}));
@@ -1397,6 +1408,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
 	#pragma omp parallel
 	{//start parallel session
+		int local_bestscore = -INT_MAX;// Thread-local gating to avoid races; publish only under critical.
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
@@ -1423,14 +1435,14 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 							{
 								Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-								if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d)) && (sol.score + (y->score - lostscore) <= globalbest))
+								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - lostscore) <= globalbest))
 								{
 									//cout << "vertices are tabu" << endl;
 									continue; // skip if y is tabu for this tour and the combination does not improve globalbest
 								}
 								if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
 								{
-									if ((y->score - lostscore > bestscore))
+									if ((y->score - lostscore > local_bestscore))
 									{
 										if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
 										{
@@ -1457,6 +1469,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 											double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
 											if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
 											{
+												local_bestscore = y->score - lostscore;
 												#pragma omp critical
 												{
 													adm_nb.push(Two_one_rep_nb(d, g, h, j, y, y->score - lostscore, y->score - lostscore, {{r,s},{y} }));
@@ -2217,7 +2230,7 @@ bool Moves::shift_nb(Sol& sol, int mode)
 			{
 				for (int j = 1; j < end - 1; ++j)
 				{
-					if (i != j)//no relocate on same position
+					if (i != j)
 					{
 						int first = min(i,j);
 						int second = max(i,j);

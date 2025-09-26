@@ -59,8 +59,10 @@ void Ins::read_time_dependent_traveltime()
 			auto& nu = v[i].con[j]->nu;
 			mu.resize(maxtimeslots);
 			nu.resize(maxtimeslots);
-
-			for (int t = 0; t < maxtimeslots; ++t) {
+			//double mintraveltime = DBL_MAX;
+			for (int t = 0; t < maxtimeslots; ++t) 
+			{
+				//mintraveltime = min(mintraveltime, dump[t]);
 				if (t == maxtimeslots - 1) {
 					mu[t] = 0.0;
 					nu[t] = dump[t];
@@ -71,6 +73,7 @@ void Ins::read_time_dependent_traveltime()
 					nu[t] = dump[t] - mu[t] * time_periods[t];
 				}
 			}
+			//v[i].con[j]->determin = mintraveltime;//temporary test
 		}
 	}
 	tt.close();
@@ -393,6 +396,62 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 	output.close(); 
 }
 
+
+enum class NbScoreKey {
+	TimePerReward,              // A
+	DepotTimePerReward,         // B
+	SlackAware,                 // C
+	DeadlineBias,               // D
+	Composite                   // E
+};
+
+struct NbScoreParams {
+	double alpha = 0.6; // composite blend
+	double phi = 0.25; // slack penalty weight
+	double psi = 0.2;  // deadline penalty weight
+	double SLmin = 0.0001; // slack scale (hours)
+};
+
+inline double nb_score(
+	const Ins::Vertex& vi, const Ins::Vertex& vj,
+	int d, int endIdx, double LATd,
+	NbScoreKey key, const NbScoreParams& P)
+{
+	const double det_ij = vi.con[vj.index]->determin;
+	const double det_jv = vj.con[endIdx]->determin;
+	const double serv_j = vj.serv;
+	const double score_j = max(1.0, (double)vj.score);
+
+	const double T_ij = det_ij + serv_j;
+	const double T_ijv = det_ij + serv_j + det_jv;
+
+	const double slack = max(0.0, vj.UTW[d] - vj.LTW[d]);
+	const double slack_factor = 1.0 + P.phi * (1.0 - min(1.0, slack / P.SLmin));
+	const double urgency = (LATd > 0.0) ? max(0.0, (LATd - vj.UTW[d])) / LATd : 0.0;
+
+	switch (key) {
+	case NbScoreKey::TimePerReward:        // A
+		return T_ij / score_j;
+
+	case NbScoreKey::DepotTimePerReward:   // B
+		return T_ijv / score_j;
+
+	case NbScoreKey::SlackAware:           // C
+		return (T_ij / score_j) * slack_factor;
+
+	case NbScoreKey::DeadlineBias:         // D
+		return (T_ij / score_j) * (1.0 + P.psi * urgency);
+
+	case NbScoreKey::Composite:            // E
+	default: {
+		const double blend = P.alpha * T_ij + (1.0 - P.alpha) * T_ijv;
+		return (blend / score_j) * slack_factor;
+	}
+	}
+}
+
+
+
 void Ins::create_neighbourhood(string path, string name, int amnt_nb)
 {
 	#pragma omp parallel
@@ -412,8 +471,25 @@ void Ins::create_neighbourhood(string path, string name, int amnt_nb)
 					{
 						if (v[i].LTW[d] + v[i].serv + v[i].con[j]->determin <= v[j].UTW[d])
 						{
-							score.push_back(max(1.0,v[i].con[j]->determin + v[j].serv) / v[j].score);
-							v[i].nb[d].push_back(&v[j]);
+							double arr_j = v[i].LTW[d] + v[i].serv + v[i].con[j]->determin;
+							if (arr_j < v[j].LTW[d]) 
+							{
+								arr_j = v[j].LTW[d]; // wait for j to open if needed
+							}
+							// Earliest depart from j after service
+							double dep_j = arr_j + v[j].serv;
+							double eta_depot = dep_j + v[j].con[maxvertices - 1]->determin;
+							//departing at ltw +serv from i you have to be able to reach depot from j before the depots' utw
+							if (eta_depot <= v[maxvertices-1].UTW[d])
+							{
+								score.push_back(max(1.0, v[i].con[j]->determin + v[j].serv) / v[j].score);
+								v[i].nb[d].push_back(&v[j]);
+								//NbScoreParams P; // defaults OK; tweak if desired
+								//const auto key = NbScoreKey::Composite; // choose one
+								//const double s = nb_score(v[i], v[j], d, maxvertices - 1, t[d].LAT, key, P);
+								//score.push_back(s);
+								//v[i].nb[d].push_back(&v[j]);
+							}
 						}
 					}
 				}//end for j

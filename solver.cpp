@@ -856,6 +856,7 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
+				//auto nb = one_one_replace_gen_nb(s, tabulist, s.score);
 				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_one_replace_gen_nb(s,tabulist, gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
@@ -875,6 +876,7 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
+				//auto nb = two_one_replace_gen_nb(s, tabulist, s.score);
 				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
@@ -893,6 +895,7 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
+				//auto nb = one_two_replace_gen_nb(s, tabulist, s.score);
 				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
 				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score, alpha, beta, gamma,out[0]);
 				if (nb.size() == 0)
@@ -968,7 +971,7 @@ Res Tabu::solve(int bestknown)
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
 	//gb.write_to_cplex();
-	//cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
+	cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
 	cout << gb << endl;
 	return Res(gb, cpuTime, bestknown);
 }

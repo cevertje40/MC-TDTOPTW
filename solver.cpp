@@ -829,11 +829,10 @@ Res Tabu::solve(int bestknown)
 	int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1,3);
 	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);
-	//ratiofunctions.push_back(&Moves::score);
-	//ratiofunctions.push_back(&Moves::score_tt);
-	//ratiofunctions.push_back(&Moves::score_v);
-	//ratiofunctions.push_back(&Moves::score_w);
-	//ratiofunctions.push_back(&Moves::weighted_ratio);
+	//ratiofunctions.push_back(&Moves::ratio_scorediff);
+	//ratiofunctions.push_back(&Moves::ratio_scorediff_time);
+	//ratiofunctions.push_back(&Moves::ratio_scorediff_volume);
+	//ratiofunctions.push_back(&Moves::ratio_scorediff_weight);
 	double alpha = 0.70;
 	double beta = 0.15;
 	double gamma = 0.15;

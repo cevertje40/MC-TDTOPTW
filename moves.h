@@ -97,30 +97,29 @@ public:
 	bool or_opt(Sol& sol, int mode = 1);
 	Ins* ins;
 	//evaluation criteria for nb generators
-	inline double score(double ntt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	inline double ratio_scorediff(double dt, double ds, double dw, double dv,double a, double b, double g) 
 	{
-		return score;
+		return ds;
 	}
 
-	inline double score_tt(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv,double a, double b, double g)
 	{
-		return score / (tt);
+		const double eps = 1e-9;
+		return ds / max(eps, max(0.0, dt));
 	}
 
-	inline double score_w(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv,double a, double b, double g) 
 	{
-		return score / (weight);
+		const double eps = 1e-9;
+		return ds / max(eps, max(0.0, dw));  // if dw<=0, treat as very favorable
 	}
 
-	inline double score_v(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
+	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv,double a, double b, double g) 
 	{
-		return score / (volume);
+		const double eps = 1e-9;
+		return ds / max(eps, max(0.0, dv));
 	}
 
-	inline double weighted_ratio(double tt, double score, double weight, double volume, double alpha, double beta, double gamma)
-	{
-		return pow(double(score) / ins->maxscore, alpha) / (pow((tt / ins->t[0].T_max), beta) * pow((weight) / ins->t[0].W_max, gamma) * pow((volume) / ins->t[0].V_max, gamma));
-	}
 	//nb generators
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));

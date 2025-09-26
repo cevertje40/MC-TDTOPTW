@@ -557,6 +557,8 @@ void Tour::remove_vertex(int position)
 
 void Tour::remove_vertices(int position1, int position2)
 {
+	if (position1 == position2) return;         // or assert
+	if (position1 > position2) swap(position1, position2);
 	Ins::Vertex* candidate1 = seq[position1];
 	Ins::Vertex* candidate2 = seq[position2];
 	score -= candidate1->score;// update score of the tour
@@ -565,18 +567,15 @@ void Tour::remove_vertices(int position1, int position2)
 	weight -= candidate1->weight;
 	volume -= candidate2->volume;
 	weight -= candidate2->weight;
-	seq.erase(seq.begin() + position1);//insert point y after x
-	deptime.erase(deptime.begin() + position1);//insert temporary value
-	max_shift.erase(max_shift.begin() + position1);
-	action.erase(action.begin() + position1);//insert regular visit action change later when necessary
-	if (position1 < position2)
-	{
-		position2 -= 1;
-	}
+	//remove position 2 first (higher index)
 	seq.erase(seq.begin() + position2);//insert point y after x
 	deptime.erase(deptime.begin() + position2);//insert temporary value
 	max_shift.erase(max_shift.begin() + position2);
 	action.erase(action.begin() + position2);//insert regular visit action change later when necessary
+	seq.erase(seq.begin() + position1);//insert point y after x
+	deptime.erase(deptime.begin() + position1);//insert temporary value
+	max_shift.erase(max_shift.begin() + position1);
+	action.erase(action.begin() + position1);//insert regular visit action change later when necessary
 	update_break();
 }
 

@@ -1,5 +1,7 @@
 #include "graph.h"
 
+using namespace std;
+
 void Node::addarc(Link* ARC)//dereference arc=>node
 {
 	ARC->next = first;

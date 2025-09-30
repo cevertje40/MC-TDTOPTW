@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include <vector>
 #include <iostream>
-using namespace std;
+
 class TabuVector {
 private:
     std::vector<std::vector<int>> tabu_vectors;  // A fixed-size vector of tabu vectors for each tour

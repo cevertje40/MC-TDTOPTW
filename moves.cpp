@@ -1,5 +1,7 @@
 #include "moves.h"
 
+using namespace std;
+
 bool Moves::insert_nb(Sol& sol, int mode)//insert vertex into a tour in order to increase the score
 {
 	bool improvement = true;
@@ -246,7 +248,7 @@ bool Moves::exchange_nb(Sol& sol, int mode)//replaces a vertex of a tour with no
 									//}
 									//ratiocheck = double(y->score - z->score) / consumption;
 									//double ratiocheck = double(y->score - z->score);
-									double ratiocheck = double(y->score - z->score) / max(1, (y->weight - z->weight));
+									double ratiocheck = double(y->score - z->score) / max(1.0, (y->weight - z->weight));
 									if (ratiocheck > bestratio)//enkel op minimale increase checken
 									{
 										improvement = true;

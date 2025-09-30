@@ -1,61 +1,28 @@
 // ConsoleColor.h
 
 #pragma once
-#include <iostream>
-#include <windows.h>
+#include <ostream>
 
-inline std::ostream& blue(std::ostream& s)
-{
-	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hStdout, FOREGROUND_BLUE
-		| FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	return s;
-}
+namespace term {
 
-inline std::ostream& red(std::ostream& s)
-{
-	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hStdout,
-		FOREGROUND_RED | FOREGROUND_INTENSITY);
-	return s;
-}
+	enum class Color : int {
+		reset = 0,
+		red = 31,
+		green = 32,
+		yellow = 33,
+		blue = 34,
+		white = 37,
+	};
 
-inline std::ostream& green(std::ostream& s)
-{
-	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hStdout,
-		FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	return s;
-}
+	struct Set {
+		int code;
+	};
 
-inline std::ostream& yellow(std::ostream& s)
-{
-	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hStdout,
-		FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
-	return s;
-}
+	inline std::ostream& operator<<(std::ostream& os, Set s) {
+		return os << "\x1b[" << s.code << 'm';
+	}
 
-inline std::ostream& white(std::ostream& s)
-{
-	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hStdout,
-		FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-	return s;
-}
+	inline Set fg(Color c) { return Set{ static_cast<int>(c) }; }
+	inline Set reset() { return Set{ 0 }; }
 
-struct color {
-	color(WORD attribute) :m_color(attribute) {};
-	WORD m_color;
-};
-
-template <class _Elem, class _Traits>
-std::basic_ostream<_Elem, _Traits>&
-operator<<(std::basic_ostream<_Elem, _Traits>& i, color& c)
-{
-	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hStdout, c.m_color);
-	return i;
-}
-
-// Copyleft Vincent Godin
+} // namespace term

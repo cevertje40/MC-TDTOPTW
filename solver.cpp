@@ -1,5 +1,7 @@
 #include "solver.h"
 
+using namespace std;
+
 Aco::Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_sol, double max_ni_p, double p_best): Moves(ins), alpha(alpha), beta(beta), rho(rho), max_ants(max_ants), ni(0), p_best(p_best)
 {
 	max_it = int(max_sol / max_ants);
@@ -18,7 +20,7 @@ Aco::Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_
 			{
 				//double consumption = ins.v[i].con[j]->determin / ins.t[0].T_max;
 				double consumption = (((ins.v[i].con[j]->determin+ins.v[j].serv) / ins.t[0].T_max) + (ins.v[j].weight / ins.t[0].W_max) + (ins.v[j].volume / ins.t[0].V_max)) / 3;
-				eta[i][j] = max(0.001,ins.v[j].score) / consumption;
+				eta[i][j] = std::max(1,ins.v[j].score) / consumption;
 			}
 			else
 				eta[i][j] = 0.0;
@@ -417,8 +419,14 @@ void Ils::serial_construct(Sol& sol)
 			{
 				if (prob_v[i] != 0)
 				{
-					double consumption = ((last->con[i]->determin / ins->t[tour.index].T_max) + (ins->v[i].weight / ins->t[tour.index].W_max) + (ins->v[i].volume / ins->t[tour.index].V_max)) / 3;
-					prob_v[i] = max(0.001,ins->v[i].score) / consumption;
+					double tt = (last->con[i]->determin) / ins->t[tour.index].T_max;
+					double w = (ins->v[i].weight) / ins->t[tour.index].W_max;
+					double vol = (ins->v[i].volume) / ins->t[tour.index].V_max;
+					double consumption = (tt + w + vol) / 3.0;
+					double score_pos = std::max(1.0, static_cast<double>(ins->v[i].score));
+					// Avoid divide-by-zero
+					constexpr double eps = 1e-12;
+					prob_v[i] = score_pos / std::max(consumption, eps);
 					denominator += prob_v[i];
 				}
 			}
@@ -844,7 +852,7 @@ Res Tabu::solve(int bestknown)
 	{
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
-		//int pick = 2;
+		//int pick = 2;//to debug
 		//double alpha= rand() / (double)RAND_MAX;
 		//double beta = rand() / (double)RAND_MAX;
 		//double gamma= rand() / (double)RAND_MAX;

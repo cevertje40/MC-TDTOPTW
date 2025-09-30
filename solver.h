@@ -14,7 +14,7 @@ public:
 	{
 		gap = (double(bestknown - sol.score) / bestknown)*100;
 	}
-	friend ostream& operator<<(ostream& output, Sol& res);
+	friend std::ostream& operator<<(std::ostream& output, Sol& res);
 };
 
 class Aco: public Moves
@@ -28,9 +28,9 @@ private:
 	int ni;//number of non improvement iterations
 	int max_ni;//number of iterations allowed without improvement before pheromone reset
 	double p_best;//controls pheromone update process
-	vector<vector<double>> tau;
-	vector<vector<double>> eta;
-	vector<Sol> s;//solution container
+	std::vector<std::vector<double>> tau;
+	std::vector<std::vector<double>> eta;
+	std::vector<Sol> s;//solution container
 	Sol gb;//global best solution
 	int iter_nr;//nr of best ant of the iteration
 	double iter_score;//score of best ant of the iteration
@@ -40,7 +40,7 @@ public:
 	void update_global_best();
 	void pheromone_update();
 	Res solve(int bestknown=1);
-	string name = "ACO";
+	std::string name = "ACO";
 };
 
 class Ils : public Moves
@@ -58,7 +58,7 @@ private:
 public:
 	Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3);
 	Res solve(int bestknown=1);
-	string name = "ILS";
+	std::string name = "ILS";
 };
 
 using Move = std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>;
@@ -75,12 +75,12 @@ private:
 
 public:
 	typedef double (Moves::* ScoreFunctionPointer)(double, double, double, double, double, double, double);
-	vector<ScoreFunctionPointer>ratiofunctions;
+	std::vector<ScoreFunctionPointer>ratiofunctions;
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it);
 	void perturbe(Sol& sol);
 	Res solve(int bestknown = 1);
-	string name = "Tabu";
+	std::string name = "Tabu";
 };
 
 class HALNS : public Moves
@@ -94,7 +94,7 @@ class HALNS : public Moves
 public:
 	HALNS(Ins& ins, int max_it, int T_init);
 	Res solve(int bestknown = 1);
-	string name = "HALNS";
+	std::string name = "HALNS";
 };
 
 

@@ -6,10 +6,10 @@ class Tour
 	public:
 	Ins* ins;//pointer to instance object
 	int index;
-	vector <Ins::Vertex*> seq;//sequence of vertex pointers
-	vector<double> deptime;//departuretime-EDT at each vertex
-	vector<double> max_shift;//local evaluation metric, maximum amount of time each vertex can be shifted forward in time
-	vector<int> action;//0 visit, 1 break and visit
+	std::vector <Ins::Vertex*> seq;//sequence of vertex pointers
+	std::vector<double> deptime;//departuretime-EDT at each vertex
+	std::vector<double> max_shift;//local evaluation metric, maximum amount of time each vertex can be shifted forward in time
+	std::vector<int> action;//0 visit, 1 break and visit
 	int score;//total score of tour
 	double weight;//weight per tour
 	double volume;//volume per tour
@@ -27,7 +27,7 @@ class Tour
 	void opt_vertices(int i, int j);//assumption i < j
 	void swap_vertices(int i, int j);//assumption i < j
 	bool check();
-	pair<int,int> repair();//repairs solution by removed last regular vertex, return score decrease
+	std::pair<int,int> repair();//repairs solution by removed last regular vertex, return score decrease
 };
 
 
@@ -35,8 +35,8 @@ class Sol :public Tour
 {
 public:
 	Ins* ins;//pointer to instance object
-	vector<Tour>tours;//solution consist of collection of tours
-	vector<int>tourindex;//random tour index
+	std::vector<Tour>tours;//solution consist of collection of tours
+	std::vector<int>tourindex;//random tour index
 	boost::dynamic_bitset<> available;// bitset that states for every vertex if it is still available for inclusion
 	int score;//sum of all tour scores
 	//methods
@@ -55,5 +55,5 @@ public:
 	void write_to_cplex();
 	void check_availability();
 	int repair();
-	friend ostream& operator<<(ostream& output, Sol& sol);
+	friend std::ostream& operator<<(std::ostream& output, Sol& sol);
 };

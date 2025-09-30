@@ -1,5 +1,7 @@
 #include "instance.h"
 
+using namespace std;
+
 void Ins::read_time_independent_traveltime()
 {
 	// read in time-independent (freeflow) travel time
@@ -30,7 +32,7 @@ void Ins::read_time_independent_traveltime()
 	}
 	else
 	{
-		cout << red << "could not open time-independent travel time file" << endl;
+		cout << term::fg(term::Color::red) << "could not open time-independent travel time file" << endl;
 	}
 }//end read time independent
 
@@ -39,7 +41,7 @@ void Ins::read_time_dependent_traveltime()
 	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
 	ifstream tt(filepath + "tt" + to_string(maxvertices) + ".TXT");
 	if (!tt.is_open()) {
-		cout << red << "could not open time-dependent travel time file" << endl;
+		cout << term::fg(term::Color::red) << "could not open time-dependent travel time file" << endl;
 		return;
 	}
 	cout << "reading time-dependent travel time" << endl;
@@ -204,7 +206,7 @@ Ins::Ins(CTOP textfile)
 			str >> v[i].serv;
 			str >> v[i].score;
 			maxscore += v[i].score;
-			//v[i].serv = 0.0;//set service time equal to for set1-3, comment for set4-6
+			v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)

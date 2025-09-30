@@ -1,5 +1,7 @@
 #include "solution.h"
 
+using namespace std;
+
 Sol::Sol(Ins& ins):ins(&ins)
 {
 	tours.resize(ins.maxtours);
@@ -259,14 +261,14 @@ bool Sol::check()
 	{
 		if (included[i] > 1)//regular vertex included more than once
 		{
-			cout << red << "included more than one, vertex:" << i << endl;
+			cout << term::fg(term::Color::red) << "included more than one, vertex:" << i << endl;
 			solok = false;
 		}
 		if (included[i] == 1)
 		{
 			if (available[i] == true)
 			{
-				cout << red << "error in availability bitset for vertex: " << i << endl;
+				cout << term::fg(term::Color::red) << "error in availability bitset for vertex: " << i << endl;
 				solok = false;
 			}
 		}
@@ -274,7 +276,7 @@ bool Sol::check()
 		{
 			if (available[i] == false)
 			{
-				cout << red << "error in availability bitset for vertex: " << i << endl;
+				cout << term::fg(term::Color::red) << "error in availability bitset for vertex: " << i << endl;
 				solok = false;
 			}
 		}
@@ -282,7 +284,7 @@ bool Sol::check()
 	//3. total score check
 	if (scorecheck != score)
 	{
-		cout << red << "score of best solution should be: " << scorecheck << " stored score is: " << score << endl;
+		cout << term::fg(term::Color::red) << "score of best solution should be: " << scorecheck << " stored score is: " << score << endl;
 		solok = false;
 	}
 	return solok;
@@ -697,7 +699,7 @@ bool Tour::check()
 	length = currenttime - ins->t[index].EDT;
 	if (fabs(length - deptime.back()) > 0.01)
 	{
-		cout << red << "tour: " << index << "new calculated length: " << length << " stored length: " << deptime.back() << "max length" << ins->t[index].T_max << endl;
+		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated length: " << length << " stored length: " << deptime.back() << "max length" << ins->t[index].T_max << endl;
 		tourok = false;
 	}
 	//b. TW check
@@ -707,36 +709,36 @@ bool Tour::check()
 		int breakcurrent = action[i];
 		if (deptime[i] + ins->t[index].EDT - seq[i]->serv + 0.01 < current->LTW[index])//service time zit al in traveltime
 		{
-			cout << red << "tour: " << index << "FAILURE!!! LTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
+			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! LTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
 			tourok = false;
 		}
 		if (((deptime[i] + ins->t[index].EDT) - seq[i]->serv) - 0.01 > current->UTW[index])
 		{
-			cout << red << "tour: " << index << "FAILURE!!! UTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
+			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! UTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
 			tourok = false;
 		}
 	}//end for i
 	//c. weight checks
 	if (fabs(weightcheck - weight) > 0.01)
 	{
-		cout << red << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
+		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
 		tourok = false;
 	}
 	if (weight-ins->t[index].W_max>0.01)
 	{
 		tourok = false;
-		cout << red << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
+		cout << term::fg(term::Color::red) << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
 	}
 	//d. volume checks
 	if (fabs(volumecheck - volume) > 0.01)
 	{
-		cout << yellow << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
+		cout << term::fg(term::Color::yellow) << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
 		tourok = false;
 	}
 	if (volume - ins->t[index].V_max>0.01)
 	{
 		tourok = false;
-		cout << red << "tour: " << index << " volume " << volume << " above max: " << ins->t[index].V_max << endl;
+		cout << term::fg(term::Color::red) << "tour: " << index << " volume " << volume << " above max: " << ins->t[index].V_max << endl;
 	}
 	//e. break timing check
 	bool breakcheck = false;
@@ -747,7 +749,7 @@ bool Tour::check()
 		{
 			if (breakindex != i)
 			{
-				cout << red << "tour: " << index << "breakindex and sol action don't match" << endl;
+				cout << term::fg(term::Color::red) << "tour: " << index << "breakindex and sol action don't match" << endl;
 				tourok = false;
 			}
 			++amountbreaks;
@@ -769,7 +771,7 @@ bool Tour::check()
 					}
 					else
 					{
-						cout << red << "tour: " << index << " break wrongly planned at end vertex" << endl;
+						cout << term::fg(term::Color::red) << "tour: " << index << " break wrongly planned at end vertex" << endl;
 						tourok = false;
 					}
 				}
@@ -778,12 +780,12 @@ bool Tour::check()
 
 					if ((ins->t[index].EDT + deptime[i] - seq[i]->serv) - (ins->breakdur) < ins->breakstart)
 					{
-						cout << red << "tour: " << index << "break too early" << endl;
+						cout << term::fg(term::Color::red) << "tour: " << index << "break too early" << endl;
 						tourok = false;
 					}
 					else
 					{
-						cout << red << "tour: " << index << "break too late" << endl;
+						cout << term::fg(term::Color::red) << "tour: " << index << "break too late" << endl;
 						tourok = false;
 					}
 				}
@@ -797,7 +799,7 @@ bool Tour::check()
 	}
 	else
 	{
-		cout << red << "tour: " << index << "amount of breaks not ok" << amountbreaks << endl;
+		cout << term::fg(term::Color::red) << "tour: " << index << "amount of breaks not ok" << amountbreaks << endl;
 		tourok = false;
 	}
 	//g. tour should start and end at the respective depots
@@ -807,7 +809,7 @@ bool Tour::check()
 	}
 	else
 	{
-		cout << red<<"tour: " << index << "start and end vertex not ok" << endl;
+		cout << term::fg(term::Color::red)  <<"tour: " << index << "start and end vertex not ok" << endl;
 		tourok = false;
 	}
 	//h. max_shift check
@@ -857,7 +859,7 @@ bool Tour::check()
 	{
 		if (fabs(max_shift[i] - max_shiftcheck[i]) > 0.01)
 		{
-			cout << red <<"tour: "<< index << "error in max_shift for position: " << i <<" new max_shift: "<<max_shiftcheck[i]<<" stored max_shift: "<<max_shift[i] << endl;
+			cout << term::fg(term::Color::red) <<"tour: "<< index << "error in max_shift for position: " << i <<" new max_shift: "<<max_shiftcheck[i]<<" stored max_shift: "<<max_shift[i] << endl;
 			tourok = false;
 		}
 	}

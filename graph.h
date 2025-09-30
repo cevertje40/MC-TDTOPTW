@@ -21,9 +21,6 @@
 #include <cmath>
 #include <unordered_set>
 
-
-using namespace std;
-
 class Link
 {
 private:
@@ -35,9 +32,9 @@ public:
 	double optimaltt;	//in minute
 	Link* next;	// LL control
 	Link* nextbackward;// LL control
-	vector<double> traveltime;//in minute
-	vector<double> k;
-	vector<double> th;
+	std::vector<double> traveltime;//in minute
+	std::vector<double> k;
+	std::vector<double> th;
 
 	Link() : link_id(0), from(0), to(0), optimaltt(0), next(0), nextbackward(0)
 	{
@@ -136,20 +133,20 @@ public:
 class Graph
 {
 private:
-	double calculate_mean_d(vector<double>& input);
-	double calculate_stdv_pop_d(double mean, vector<double>& input);
-	double calculate_stdv_sample(double mean, vector<double>& input);
+	double calculate_mean_d(std::vector<double>& input);
+	double calculate_stdv_pop_d(double mean, std::vector<double>& input);
+	double calculate_stdv_sample(double mean, std::vector<double>& input);
 public:
 	int maxnodes;
 	int maxlinks;
 	
-	vector<Link> l;
-	vector<Node> n;
-	vector<Nodep> np;
+	std::vector<Link> l;
+	std::vector<Node> n;
+	std::vector<Nodep> np;
 	Graph(int maxnodes,int maxlinks);
 	double dijkstra_independent(int source, int target);//TI 1 to 1
-	vector<double> dijkstra_independent_to_all_threaded(int source, vector<int> targets, int thread);//TI 1 to all thread safe
+	std::vector<double> dijkstra_independent_to_all_threaded(int source, std::vector<int> targets, int thread);//TI 1 to all thread safe
 	double dijkstra_dependent(int source, int target, double currenttime);//TD 1 to 1
-	vector<double> dijkstra_dependent_to_all_threaded(int source, vector<int>targets, double currenttime, int thread); //TD 1 to all thread safe
+	std::vector<double> dijkstra_dependent_to_all_threaded(int source, std::vector<int>targets, double currenttime, int thread); //TD 1 to all thread safe
 };
 

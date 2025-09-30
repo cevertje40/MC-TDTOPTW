@@ -1,7 +1,7 @@
 // MC-TDTOPTW.cpp
 
 #include "solver.h"
-
+using namespace std;
 
 class Instance
 {
@@ -53,7 +53,7 @@ public:
 	}
 };
 
-using namespace std;
+
 
 void create_dataset()
 {
@@ -640,8 +640,8 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	solve_dataset(10);
-	//ctop_gap(10);
+	//solve_dataset(1);
+	ctop_gap(1);
 	//doe(10);
 	//case_study(10);
 

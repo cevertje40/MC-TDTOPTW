@@ -6,14 +6,14 @@
 class One_one_rep_nb
 {
 public:
-	pair<vector<Ins::Vertex*>,vector<Ins::Vertex*>>move;//out, in
+	std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>move;//out, in
 	int tour;
 	int rempos;//removal index
 	int inspos;//insert index
 	Ins::Vertex* inscand;
 	double ratio;//ratio increase/decrease
 	double score;//score increase/decrease
-	One_one_rep_nb(int tour, int rempos, int inspos, Ins::Vertex* inscand, double score, double ratio, pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move) :tour(tour), rempos(rempos), inspos(inspos), inscand(inscand), score(score), ratio(ratio), move(move) {}
+	One_one_rep_nb(int tour, int rempos, int inspos, Ins::Vertex* inscand, double score, double ratio, std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>move) :tour(tour), rempos(rempos), inspos(inspos), inscand(inscand), score(score), ratio(ratio), move(move) {}
 	friend bool operator< (const One_one_rep_nb& x, const One_one_rep_nb& y)
 	{
 		return x.ratio < y.ratio;
@@ -32,7 +32,7 @@ public:
 class One_two_rep_nb
 {
 public:
-	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;//out, in
+	std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>move;//out, in
 	int tour;
 	int rempos;
 	int inspos1;
@@ -41,7 +41,7 @@ public:
 	Ins::Vertex* inscand2;
 	double ratio;//ratio increase/decrease
 	double score;//score increase/decrease
-	One_two_rep_nb(int tour, int rempos, int inspos1, int inspos2, Ins::Vertex* inscand1, Ins::Vertex* inscand2, double score,double ratio, pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move) :tour(tour), rempos(rempos), inspos1(inspos1), inspos2(inspos2), inscand1(inscand1), inscand2(inscand2), score(score), ratio(ratio), move(move) {}
+	One_two_rep_nb(int tour, int rempos, int inspos1, int inspos2, Ins::Vertex* inscand1, Ins::Vertex* inscand2, double score,double ratio, std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>move) :tour(tour), rempos(rempos), inspos1(inspos1), inspos2(inspos2), inscand1(inscand1), inscand2(inscand2), score(score), ratio(ratio), move(move) {}
 	friend bool operator< (const One_two_rep_nb& x, const One_two_rep_nb& y)
 	{
 		return x.ratio < y.ratio;
@@ -57,7 +57,7 @@ public:
 class Two_one_rep_nb
 {
 public:
-	pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move;//out, in
+	std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>move;//out, in
 	int tour;
 	int rempos1;
 	int rempos2;
@@ -65,7 +65,7 @@ public:
 	Ins::Vertex* inscand;
 	double ratio;//ratio increase/decrease
 	double score;//score increase/decrease
-	Two_one_rep_nb(int tour, int rempos1, int rempos2, int inspos, Ins::Vertex* inscand, double score,double ratio, pair<vector<Ins::Vertex*>, vector<Ins::Vertex*>>move) :tour(tour), rempos1(rempos1), rempos2(rempos2), inspos(inspos), inscand(inscand), score(score), ratio(ratio), move(move) {}
+	Two_one_rep_nb(int tour, int rempos1, int rempos2, int inspos, Ins::Vertex* inscand, double score,double ratio, std::pair<std::vector<Ins::Vertex*>, std::vector<Ins::Vertex*>>move) :tour(tour), rempos1(rempos1), rempos2(rempos2), inspos(inspos), inscand(inscand), score(score), ratio(ratio), move(move) {}
 	friend bool operator< (const Two_one_rep_nb& x, const Two_one_rep_nb& y)
 	{
 		return x.ratio < y.ratio;
@@ -105,19 +105,19 @@ public:
 	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv,double a, double b, double g)
 	{
 		const double eps = 1e-9;
-		return ds / max(eps, max(0.0, dt));
+		return ds / std::max(eps, std::max(0.0, dt));
 	}
 
 	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv,double a, double b, double g) 
 	{
 		const double eps = 1e-9;
-		return ds / max(eps, max(0.0, dw));  // if dw<=0, treat as very favorable
+		return ds / std::max(eps, std::max(0.0, dw));  // if dw<=0, treat as very favorable
 	}
 
 	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv,double a, double b, double g) 
 	{
 		const double eps = 1e-9;
-		return ds / max(eps, max(0.0, dv));
+		return ds / std::max(eps, std::max(0.0, dv));
 	}
 
 	//nb generators

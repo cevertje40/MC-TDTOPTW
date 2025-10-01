@@ -315,7 +315,7 @@ Res Aco::solve(int bestknown)
 	double cpuTime;
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
-	cout << gb << endl;
+	std::cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
 	return Res(gb, cpuTime, bestknown);
 }
@@ -609,7 +609,7 @@ Res Ils::solve(int bestknown)
 	double cpuTime;
 	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
 	gb.check();
-	cout << gb << endl;
+	std::cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
 	return Res(gb, cpuTime, bestknown);
 }
@@ -818,6 +818,30 @@ void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& 
 	}
 }
 
+struct Pressures { double time_p = 0, weight_p = 0, volume_p = 0; };
+
+inline Pressures compute_pressures(const Sol& s) {
+	double t_p = 0.0, w_p = 0.0, v_p = 0.0;
+
+	for (size_t d = 0; d < s.tours.size(); ++d) {
+		const Tour& tour = s.tours[d];
+
+		// Safety: empty or degenerate tour
+		const double used_time = tour.deptime.back();  // hours since EDT
+		const double used_w = std::max(0.0, tour.weight);                           // tons
+		const double used_v = std::max(0.0, tour.volume);                           // m^3
+
+		const double T = std::max(1e-9, s.ins->t[d].T_max);
+		const double W = std::max(1e-9, s.ins->t[d].W_max);
+		const double V = std::max(1e-9, s.ins->t[d].V_max);
+
+		t_p = std::max(t_p, std::min(1.0, used_time / T));
+		w_p = std::max(w_p, std::min(1.0, used_w / W));
+		v_p = std::max(v_p, std::min(1.0, used_v / V));
+	}
+	return { t_p, w_p, v_p };
+}
+
 
 Res Tabu::solve(int bestknown)
 {
@@ -828,26 +852,87 @@ Res Tabu::solve(int bestknown)
 	//s.write_to_file();
 	parallel_construct(s);
 	gb = s;//set global best to initial solution
-	int noimpr = 0;
-	//int debug_iter = 0;
-	uniform_int_distribution<> nbpicker(1,3);
-	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);
+
+	//criteria selector based on constraint pressure
 	ratiofunctions.clear();
 	ratiofunctions.push_back(&Moves::ratio_scorediff);
 	ratiofunctions.push_back(&Moves::ratio_scorediff_time);
 	ratiofunctions.push_back(&Moves::ratio_scorediff_volume);
 	ratiofunctions.push_back(&Moves::ratio_scorediff_weight);
-	int nonb1 = 0;
-	int nonb2 = 0;
-	int nonb3 = 0;
+	enum Crit { SCORE = 0, TIME = 1, VOLUME = 2, WEIGHT = 3, N_CRIT = 4 };
+	struct CritStats { double ema_gain = 0.0; long used = 0; };
+	std::array<CritStats, N_CRIT> crit_stats{};
+	const double EMA_RHO = 0.1; //	learning rate for exponential moving average of gains
+	const double THRESH = 0.80;   // start biasing after 80% utilization
+	const double GAMMA = 5.0;    // bias strength
+	const double EPS_GAIN = 1e-6;// to avoid zero gains
+
+	uniform_int_distribution<> nbpicker(1,3);//random move selector
+	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);//tabulist init
+
+	int noimpr = 0;//number of iterations with no improvement
+	int iter = 0;//number of iterations
+	int nonb1 = 0;//non improving counter for move 1
+	int nonb2 = 0;//non improving counter for move 2
+	int nonb3 = 0;//non improving counter for move 3
 	int no_feasible_moves_in_a_row = 0;
 	while (noimpr < max_noimpr)
 	{
+		int prev_score = s.score;
+		bool moved = false;
+		//select criterion based on constraint pressure
+		auto P = compute_pressures(s);
+		auto ctx_mult = [&](int crit)->double {
+			if (crit == TIME)   return 1.0 + std::max(0.0, P.time_p - THRESH) * GAMMA;
+			if (crit == VOLUME) return 1.0 + std::max(0.0, P.volume_p - THRESH) * GAMMA;
+			if (crit == WEIGHT) return 1.0 + std::max(0.0, P.weight_p - THRESH) * GAMMA;
+			return 1.0; // SCORE neutral
+			};
+
+		auto perf = [&](int crit)->double { return crit_stats[crit].ema_gain + EPS_GAIN; };
+
+		std::array<double, N_CRIT> w = {
+			perf(SCORE) * ctx_mult(SCORE),
+			perf(TIME) * ctx_mult(TIME),
+			perf(VOLUME) * ctx_mult(VOLUME),
+			perf(WEIGHT) * ctx_mult(WEIGHT)
+		};
+
+		// 1) Sanitize: set negatives/NaN/inf to 0
+		for (double& wi : w) {
+			if (!(wi > 0.0) || !std::isfinite(wi)) wi = 0.0;  // catches NaN/inf/neg
+		}
+
+		// 2) Normalize by max so the largest weight is 1.0 (keeps magnitudes healthy)
+		double maxw = *std::max_element(w.begin(), w.end());
+		if (maxw > 0.0) {
+			for (double& wi : w) wi /= maxw;
+		}
+
+		// 3) Mix with a uniform floor so nothing collapses to zero
+		//    (p' = 0.85*p + 0.15*1.0)
+		for (double& wi : w) wi = 0.85 * wi + 0.15;
+
+		auto pick_weighted = [&](const std::array<double, N_CRIT>& ww)->int {
+			double sum = 0.0;
+			for (double x : ww) sum += x;
+			if (!(sum > 0.0)) {
+				return std::uniform_int_distribution<int>(0, N_CRIT - 1)(engine);
+			}
+			double u = std::uniform_real_distribution<double>(0.0, sum)(engine);
+			double acc = 0.0;
+			for (int i = 0; i < N_CRIT; ++i) {
+				acc += ww[i];
+				if (u < acc) return i;
+			}
+			return N_CRIT - 1; // fallback
+			};
+
+		int crit_id = pick_weighted(w);
+		ScoreFunctionPointer f = ratiofunctions[crit_id];
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
 		//int pick = 2;//to debug
-		vector<ScoreFunctionPointer> out;
-		sample(ratiofunctions.begin(),ratiofunctions.end(),back_inserter(out),1,engine);
 		//build admissable neighborhoods using the selected neighborhoodstructure
 		switch (pick)
 		{
@@ -855,7 +940,7 @@ Res Tabu::solve(int bestknown)
 			{
 				//auto nb = one_one_replace_gen_nb(s, tabulist, s.score);
 				//auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = one_one_replace_gen_nb(s,tabulist, gb.score,out[0]);
+				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score,f);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -867,17 +952,16 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					moved = true;
 					tabulist.nextIteration();
 				}
-				
-				
 				break;
 			}
 			case 2:
 			{
 				//auto nb = two_one_replace_gen_nb(s, tabulist, s.score);
 				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,out[0]);
+				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,f);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -889,16 +973,16 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					moved = true;
 					tabulist.nextIteration();
 				}
-				
 				break;
 			}
 			case 3:
 			{
 				//auto nb = one_two_replace_gen_nb(s, tabulist, s.score);
 				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,out[0]);
+				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,f);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -910,6 +994,7 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					moved = true;
 					tabulist.nextIteration();
 				}
 				break;
@@ -948,6 +1033,20 @@ Res Tabu::solve(int bestknown)
 		//{
 			//cout << "error in move_nb" << endl;
 		//}
+		//update constraint pressure
+		if (moved) 
+		{
+			double gain = std::max(0, s.score - prev_score);
+			crit_stats[crit_id].ema_gain =
+				(1.0 - EMA_RHO) * crit_stats[crit_id].ema_gain + EMA_RHO * gain;
+			crit_stats[crit_id].used++;
+		}
+		else 
+		{
+			// gentle global decay
+			for (int c = 0; c < N_CRIT; ++c)
+				crit_stats[c].ema_gain *= (1.0 - 0.05 * EMA_RHO);
+		}
 		if (s.score > gb.score)
 		{
 			gb = s;
@@ -957,22 +1056,25 @@ Res Tabu::solve(int bestknown)
 		{
 			++noimpr;
 		}
+		++iter;
 		/*
-		if (noimpr%500 == 0)
+		if ((iter % 1000) == 0) 
 		{
-			++nb_tabu_it;
-			nb_tabu_it=clamp(nb_tabu_it,2,50);
-			tabulist.setDuration(nb_tabu_it);
+			std::cout << std::fixed << std::setprecision(2)
+				<< "[P] T=" << P.time_p << " W=" << P.weight_p << " V=" << P.volume_p
+				<< " | used S=" << crit_stats[SCORE].used
+				<< " T=" << crit_stats[TIME].used
+				<< " V=" << crit_stats[VOLUME].used
+				<< " W=" << crit_stats[WEIGHT].used << "\n";
 		}
 		*/
-		//++debug_iter;
 		//cout << debug_iter << endl;
 	}//end while smaller than max_noimpr
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	//gb.write_to_cplex();
-	cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
-	cout << gb << endl;
+	std::cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
+	std::cout << gb << endl;
 	return Res(gb, cpuTime, bestknown);
 }
 

@@ -449,11 +449,11 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	vector<Res> resdataset;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
-	instance.create_neighbourhood(textfile.path, textfile.name,170);
+	instance.create_neighbourhood(textfile.path, textfile.name,50);
 	//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
 	Tabu tabu(instance, 10000,2);
@@ -640,8 +640,8 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(5);
-	ctop_gap(1);
+	solve_dataset(5);
+	//ctop_gap(5);
 	//doe(10);
 	//case_study(10);
 

@@ -206,7 +206,7 @@ Ins::Ins(CTOP textfile)
 			str >> v[i].serv;
 			str >> v[i].score;
 			maxscore += v[i].score;
-			v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
+			//v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)

@@ -806,44 +806,37 @@ void Tabu::parallel_construct(Sol& sol)
 template<typename MoveType>
 void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& tabulist) 
 {
-	if (nb.size() >= 1)
+	auto exec_nb = nb.top();
+	exec_nb.execute(s);
+	for (int i = 0; i < exec_nb.move.first.size(); ++i)
 	{
-		auto exec_nb = nb.top();
-		exec_nb.execute(s);
-		
-		for (int i = 0; i < exec_nb.move.first.size(); ++i)
-		{
-			tabulist.addTabu(exec_nb.move.first[i]->index,exec_nb.tour);//out
-		}
-		for (int i = 0; i < exec_nb.move.second.size(); ++i)
-		{
-			tabulist.addTabu(exec_nb.move.second[i]->index,exec_nb.tour);//in
-		}
-		
+		tabulist.addTabu(exec_nb.move.first[i]->index,exec_nb.tour);//out
 	}
-	tabulist.nextIteration();
+	for (int i = 0; i < exec_nb.move.second.size(); ++i)
+	{
+		tabulist.addTabu(exec_nb.move.second[i]->index,exec_nb.tour);//in
+	}
 }
 
 
 Res Tabu::solve(int bestknown)
 {
-	clock_t start, end;
-	start = clock();
-	int noimpr = 0;
+	using clock = std::chrono::steady_clock;
+	auto t0 = clock::now();
 	s.reset();
 	//s.read_from_file();
 	//s.write_to_file();
 	parallel_construct(s);
-	int debug_iter = 0;
+	gb = s;//set global best to initial solution
+	int noimpr = 0;
+	//int debug_iter = 0;
 	uniform_int_distribution<> nbpicker(1,3);
 	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);
-	//ratiofunctions.push_back(&Moves::ratio_scorediff);
-	//ratiofunctions.push_back(&Moves::ratio_scorediff_time);
-	//ratiofunctions.push_back(&Moves::ratio_scorediff_volume);
-	//ratiofunctions.push_back(&Moves::ratio_scorediff_weight);
-	double alpha = 0.70;
-	double beta = 0.15;
-	double gamma = 0.15;
+	ratiofunctions.clear();
+	ratiofunctions.push_back(&Moves::ratio_scorediff);
+	ratiofunctions.push_back(&Moves::ratio_scorediff_time);
+	ratiofunctions.push_back(&Moves::ratio_scorediff_volume);
+	ratiofunctions.push_back(&Moves::ratio_scorediff_weight);
 	int nonb1 = 0;
 	int nonb2 = 0;
 	int nonb3 = 0;
@@ -853,9 +846,6 @@ Res Tabu::solve(int bestknown)
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
 		//int pick = 2;//to debug
-		//double alpha= rand() / (double)RAND_MAX;
-		//double beta = rand() / (double)RAND_MAX;
-		//double gamma= rand() / (double)RAND_MAX;
 		vector<ScoreFunctionPointer> out;
 		sample(ratiofunctions.begin(),ratiofunctions.end(),back_inserter(out),1,engine);
 		//build admissable neighborhoods using the selected neighborhoodstructure
@@ -864,8 +854,8 @@ Res Tabu::solve(int bestknown)
 			case 1:
 			{
 				//auto nb = one_one_replace_gen_nb(s, tabulist, s.score);
-				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
-				//auto nb = one_one_replace_gen_nb(s,tabulist, gb.score, alpha, beta, gamma,out[0]);
+				//auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
+				auto nb = one_one_replace_gen_nb(s,tabulist, gb.score,out[0]);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -876,16 +866,18 @@ Res Tabu::solve(int bestknown)
 				else
 				{
 					no_feasible_moves_in_a_row = 0;
+					executeMove(nb, s, tabulist);
+					tabulist.nextIteration();
 				}
-				executeMove(nb, s, tabulist);
+				
 				
 				break;
 			}
 			case 2:
 			{
 				//auto nb = two_one_replace_gen_nb(s, tabulist, s.score);
-				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
-				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,alpha, beta, gamma,out[0]);
+				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
+				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,out[0]);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -896,15 +888,17 @@ Res Tabu::solve(int bestknown)
 				else
 				{
 					no_feasible_moves_in_a_row = 0;
+					executeMove(nb, s, tabulist);
+					tabulist.nextIteration();
 				}
-				executeMove(nb, s, tabulist);
+				
 				break;
 			}
 			case 3:
 			{
 				//auto nb = one_two_replace_gen_nb(s, tabulist, s.score);
-				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
-				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score, alpha, beta, gamma,out[0]);
+				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
+				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,out[0]);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -915,8 +909,9 @@ Res Tabu::solve(int bestknown)
 				else
 				{
 					no_feasible_moves_in_a_row = 0;
+					executeMove(nb, s, tabulist);
+					tabulist.nextIteration();
 				}
-				executeMove(nb, s, tabulist);
 				break;
 			}
 		}//end switch
@@ -970,12 +965,10 @@ Res Tabu::solve(int bestknown)
 			tabulist.setDuration(nb_tabu_it);
 		}
 		*/
-		++debug_iter;
+		//++debug_iter;
 		//cout << debug_iter << endl;
 	}//end while smaller than max_noimpr
-	end = clock();
-	double cpuTime;
-	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
+	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	//gb.write_to_cplex();
 	cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;

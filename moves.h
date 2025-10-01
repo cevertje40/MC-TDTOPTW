@@ -97,33 +97,33 @@ public:
 	bool or_opt(Sol& sol, int mode = 1);
 	Ins* ins;
 	//evaluation criteria for nb generators
-	inline double ratio_scorediff(double dt, double ds, double dw, double dv,double a, double b, double g) 
+	inline double ratio_scorediff(double dt, double ds, double dw, double dv) 
 	{
 		return ds;
 	}
 
-	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv,double a, double b, double g)
+	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv, double t_max)
 	{
 		const double eps = 1e-9;
 		return ds / std::max(eps, std::max(0.0, dt));
 	}
 
-	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv,double a, double b, double g) 
+	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv,double w_max) 
 	{
 		const double eps = 1e-9;
 		return ds / std::max(eps, std::max(0.0, dw));  // if dw<=0, treat as very favorable
 	}
 
-	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv,double a, double b, double g) 
+	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv, double v_max) 
 	{
 		const double eps = 1e-9;
 		return ds / std::max(eps, std::max(0.0, dv));
 	}
 
 	//nb generators
-	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
-	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
-	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double alpha, double beta, double gamma, double (Moves::*get_score)(double, double, double, double, double, double, double));
+	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double));
+	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double));
+	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double));
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);

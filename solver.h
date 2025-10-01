@@ -74,7 +74,7 @@ private:
 	
 
 public:
-	typedef double (Moves::* ScoreFunctionPointer)(double, double, double, double, double, double, double);
+	typedef double (Moves::* ScoreFunctionPointer)(double, double, double, double);
 	std::vector<ScoreFunctionPointer>ratiofunctions;
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it);

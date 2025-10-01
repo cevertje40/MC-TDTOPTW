@@ -753,7 +753,7 @@ bool Moves::or_opt(Sol& sol, int mode)
 	return succes;
 }//end or_opt
 
-boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::*get_ratio)(double, double, double, double))
+boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::*get_ratio)(double, double, double, double, double, double, double))
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
 	double bestkey = -DBL_MAX;
@@ -788,7 +788,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 						double base_det = x->con[z->index]->determin + z->serv + breakz * ins->breakdur;
 						double ins_det = x->con[y->index]->determin + y->serv+ y->con[z->index]->determin + breakz * ins->breakdur;
 						double dt_lb = max(0.0, ins_det - base_det);
-						double key_ub = (this->*get_ratio)(dt_lb,y->score,y->weight,y->volume);
+						double key_ub = (this->*get_ratio)(dt_lb,y->score,y->weight,y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 						if (key_ub > local_bestkey)
 						{
 							if ((tour.weight + y->weight <= ins->t[d].W_max) && (tour.volume + y->volume <= ins->t[d].V_max))//cap constraint check
@@ -814,7 +814,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 								double shift = (arrivaltime - ins->t[d].EDT) - tour.deptime[j + 1];//increase in travel time
 								if (shift <= tour.max_shift[j + 1])//check of het punt geinsert kan worden
 								{
-									double key = (this->*get_ratio)(shift, y->score, y->weight, y->volume);
+									double key = (this->*get_ratio)(shift, y->score, y->weight, y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 									if (key > local_bestkey)
 									{
 										local_bestkey = key;
@@ -864,7 +864,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 							double base_det = x->con[z->index]->determin + z->serv + breakz * ins->breakdur;
 							double ins_det = x->con[y->index]->determin + y->serv+ y->con[z->index]->determin + breakz * ins->breakdur;
 							double dt_lb = max(0.0, ins_det - base_det);
-							double key_ub = (this->*get_ratio)(dt_lb, y->score-r->score,y->weight-r->weight,y->volume-r->volume);
+							double key_ub = (this->*get_ratio)(dt_lb, y->score-r->score,y->weight-r->weight,y->volume-r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 							if (key_ub> local_bestkey)
 							{
 								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
@@ -890,7 +890,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 									double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
 									if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
 									{
-										double key = (this->*get_ratio)(shift, y->score-r->score, y->weight-r->weight, y->volume-r->volume);
+										double key = (this->*get_ratio)(shift, y->score-r->score, y->weight-r->weight, y->volume-r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 										if (key > local_bestkey)
 										{
 											local_bestkey = key;
@@ -915,7 +915,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double))
+boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
 	double bestkey = -DBL_MAX;
 	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
@@ -992,7 +992,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 											double base_det = x2->con[z2->index]->determin + z2->serv + breakz2 * ins->breakdur;
 											double ins_det = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin + breakz2 * ins->breakdur;
 											double dt_lb = max(0.0, ins_det - base_det);
-											double key_ub = (this->*get_ratio)(shift1+dt_lb,(y1->score+ y2->score)-r->score,(y1->weight+ y2->weight)-r->weight, (y1->volume+y2->volume)-r->volume);
+											double key_ub = (this->*get_ratio)(shift1+dt_lb,(y1->score+ y2->score)-r->score,(y1->weight+ y2->weight)-r->weight, (y1->volume+y2->volume)-r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 											if (key_ub > local_bestkey)
 											{
 												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
@@ -1022,7 +1022,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 														double shift2 = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
 														if (shift2 <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
 														{
-															double key = (this->*get_ratio)(shift1 + shift2, (y1->score + y2->score)-r->score, (y1->weight + y2->weight)-r->weight, (y1->volume + y2->volume)-r->volume);
+															double key = (this->*get_ratio)(shift1 + shift2, (y1->score + y2->score)-r->score, (y1->weight + y2->weight)-r->weight, (y1->volume + y2->volume)-r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 															if (key > local_bestkey)
 															{
 																local_bestkey = key;
@@ -1052,7 +1052,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
-boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double))
+boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
 	double bestkey = -DBL_MAX;
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
@@ -1095,7 +1095,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 								double base_det = x->con[z->index]->determin + z->serv + breakz * ins->breakdur;
 								double ins_det = x->con[y->index]->determin + y->serv + y->con[z->index]->determin + breakz * ins->breakdur;
 								double dt_lb = max(0.0, ins_det - base_det);
-								double key_ub = (this->*get_ratio)(dt_lb, y->score - (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume));
+								double key_ub = (this->*get_ratio)(dt_lb, y->score - (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume), ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 								if (key_ub > local_bestkey)
 								{
 									if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
@@ -1121,7 +1121,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 										double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
 										if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
 										{
-											double key = (this->*get_ratio)(shift, y->score- (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume));
+											double key = (this->*get_ratio)(shift, y->score- (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume), ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 											if (key > local_bestkey)
 											{
 												local_bestkey = key;

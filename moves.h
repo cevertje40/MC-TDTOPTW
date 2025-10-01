@@ -97,33 +97,45 @@ public:
 	bool or_opt(Sol& sol, int mode = 1);
 	Ins* ins;
 	//evaluation criteria for nb generators
-	inline double ratio_scorediff(double dt, double ds, double dw, double dv) 
+	inline double ratio_scorediff(double dt, double ds, double dw, double dv, double /*t_max*/, double /*w_max*/, double /*v_max*/)
 	{
 		return ds;
 	}
 
-	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv, double t_max)
+	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv, double t_max, double /*w_max*/, double /*v_max*/)
 	{
-		const double eps = 1e-9;
-		return ds / std::max(eps, std::max(0.0, dt));
+		const double tau = 0.01; // ~1% of route time
+		const double k_pos = 1.0, k_neg = 0.5, cap = 5.0;
+		double dt_norm = dt / std::max(1e-9, t_max);
+		if (dt_norm > 0.0) return ds / (dt_norm + tau);
+		double benefit = std::min(cap, (-dt_norm) / tau);
+		return ds * (1.0 + k_neg * benefit);
 	}
 
-	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv,double w_max) 
+	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv, double /*t_max*/, double w_max, double /*v_max*/)
 	{
-		const double eps = 1e-9;
-		return ds / std::max(eps, std::max(0.0, dw));  // if dw<=0, treat as very favorable
+		const double tau = 0.01; // ~1% of route time
+		const double k_pos = 1.0, k_neg = 0.5, cap = 5.0;
+		double dw_norm = dw / std::max(1e-9, w_max);
+		if (dw_norm > 0.0) return ds / (dw_norm + tau);
+		double benefit = std::min(cap, (-dw_norm) / tau);
+		return ds * (1.0 + k_neg * benefit);
 	}
 
-	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv, double v_max) 
+	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv, double /*t_max*/, double /*w_max*/, double v_max)
 	{
-		const double eps = 1e-9;
-		return ds / std::max(eps, std::max(0.0, dv));
+		const double tau = 0.01; // ~1% of route time
+		const double k_pos = 1.0, k_neg = 0.5, cap = 5.0;
+		double dv_norm = dv / std::max(1e-9, v_max);
+		if (dv_norm > 0.0) return ds / (dv_norm + tau);
+		double benefit = std::min(cap, (-dv_norm) / tau);
+		return ds * (1.0 + k_neg * benefit);
 	}
 
 	//nb generators
-	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double));
-	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double));
-	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double));
+	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
+	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
+	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);

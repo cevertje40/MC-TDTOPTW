@@ -272,7 +272,10 @@ Ins::Ins(CTOP textfile)
 				c[counter].from = i;
 				c[counter].to = j;
 				//calculate euclidean distance
-				c[counter].determin = sqrt(pow(x_coordinates[i] - x_coordinates[j], 2) + pow(y_coordinates[i] - y_coordinates[j], 2));
+				//c[counter].determin = sqrt(pow(x_coordinates[i] - x_coordinates[j], 2) + pow(y_coordinates[i] - y_coordinates[j], 2));
+				double dx = x_coordinates[i] - x_coordinates[j];
+				double dy = y_coordinates[i] - y_coordinates[j];
+				c[counter].determin = static_cast<int>(std::floor(std::hypot(dx, dy) + 0.5));
 				c[counter].mu.resize(maxtimeslots);
 				c[counter].nu.resize(maxtimeslots);
 				for (int t = 0; t < maxtimeslots; ++t)

@@ -555,14 +555,14 @@ void doe(int max_rep = 10)
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b58.txt"};
-	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b1.txt"};
+	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b89.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b89.txt"};
 	Ins instance(textfile);
 	instance.create_neighbourhood(textfile.path, textfile.name,50);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
 	Tabu tabu(instance, 10000,2);
-	res = tabu.solve(1446);
+	res = tabu.solve(489);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
 	cout << res.sol.score << " cpu time: " << res.time << endl;
@@ -639,9 +639,9 @@ int main()
 	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
-	//debug_ctop();
-	solve_dataset(5);
-	//ctop_gap(5);
+	debug_ctop();
+	//solve_dataset(5);
+	//ctop_gap(1);
 	//doe(10);
 	//case_study(10);
 

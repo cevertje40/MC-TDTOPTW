@@ -206,7 +206,7 @@ Ins::Ins(CTOP textfile)
 			str >> v[i].serv;
 			str >> v[i].score;
 			maxscore += v[i].score;
-			v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
+			//v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)
@@ -271,8 +271,7 @@ Ins::Ins(CTOP textfile)
 				int counter = i * maxvertices + j;
 				c[counter].from = i;
 				c[counter].to = j;
-				//calculate euclidean distance
-				//c[counter].determin = sqrt(pow(x_coordinates[i] - x_coordinates[j], 2) + pow(y_coordinates[i] - y_coordinates[j], 2));
+				//calculate EUC_2D: Euclidean distance rounded
 				double dx = x_coordinates[i] - x_coordinates[j];
 				double dy = y_coordinates[i] - y_coordinates[j];
 				c[counter].determin = static_cast<int>(std::floor(std::hypot(dx, dy) + 0.5));

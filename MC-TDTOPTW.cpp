@@ -556,13 +556,13 @@ void debug_ctop()
 {
 	Res res;
 	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b89.txt"};
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b89.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b5.txt"};
 	Ins instance(textfile);
 	instance.create_neighbourhood(textfile.path, textfile.name,50);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
 	Tabu tabu(instance, 10000,2);
-	res = tabu.solve(489);
+	res = tabu.solve(139);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
 	cout << res.sol.score << " cpu time: " << res.time << endl;
@@ -575,7 +575,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set2.txt";
+		filename = "set5.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -598,7 +598,7 @@ void ctop_gap(int max_rep=5)
 		{
 			Ins::CTOP textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			instance.create_neighbourhood(textfile.path, textfile.name,50);
+			instance.create_neighbourhood(textfile.path, textfile.name,150);
 			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,100,2,3);
@@ -639,9 +639,9 @@ int main()
 	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
-	debug_ctop();
+	//debug_ctop();
 	//solve_dataset(5);
-	//ctop_gap(1);
+	ctop_gap(1);
 	//doe(10);
 	//case_study(10);
 

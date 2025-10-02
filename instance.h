@@ -86,7 +86,7 @@ public:
 	void construct_time_dependent_traveltime(Graph& graph);
 	void read_time_independent_traveltime();
 	void read_time_dependent_traveltime();
-	void create_neighbourhood(std::string path, std::string name,int amnt_nb);
+	void create_neighbourhood(std::string path, std::string name);
 	void read_neighbourhood(std::string path, std::string name);
 
 	void alter_instance();

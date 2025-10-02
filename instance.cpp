@@ -456,111 +456,97 @@ inline double nb_score(
 
 
 
-void Ins::create_neighbourhood(string path, string name, int amnt_nb)
+struct Cand { int j; double s; };
+
+void Ins::create_neighbourhood(std::string path, std::string name)
 {
-	#pragma omp parallel
-	{//start parallel session
-		#pragma omp for nowait
-		for (int i = 0; i < maxvertices - 1; ++i)//for all regular vertices
-		{
-			v[i].nb.resize(maxtours);
-			v[i].nbi.resize(maxtours);
-			for (int d = 0; d < maxtours; ++d)
-			{
-				//calculate neighbourhood potential
-				vector<double> score;
-				for (int j = 1; j < maxvertices - 1; ++j)
-				{
-					if (i != j)
-					{
-						if (v[i].LTW[d] + v[i].serv + v[i].con[j]->determin <= v[j].UTW[d])
-						{
-							double arr_j = v[i].LTW[d] + v[i].serv + v[i].con[j]->determin;
-							if (arr_j < v[j].LTW[d]) 
-							{
-								arr_j = v[j].LTW[d]; // wait for j to open if needed
-							}
-							// Earliest depart from j after service
-							double dep_j = arr_j + v[j].serv;
-							double eta_depot = dep_j + v[j].con[maxvertices - 1]->determin;
-							//departing at ltw +serv from i you have to be able to reach depot from j before the depots' utw
-							if (eta_depot <= v[maxvertices-1].UTW[d])
-							{
-								score.push_back(max(1.0, v[i].con[j]->determin + v[j].serv) / v[j].score);
-								v[i].nb[d].push_back(&v[j]);
-								//NbScoreParams P; // defaults OK; tweak if desired
-								//const auto key = NbScoreKey::Composite; // choose one
-								//const double s = nb_score(v[i], v[j], d, maxvertices - 1, t[d].LAT, key, P);
-								//score.push_back(s);
-								//v[i].nb[d].push_back(&v[j]);
-							}
-						}
-					}
-				}//end for j
-				// sort based on score potential
-				bool unsorted = true;
-				while (unsorted)
-				{
-					unsorted = false;
-					for (int j = 0; j < (int)score.size() - 1; ++j)
-					{
-						if (score[j] > score[j + 1])
-						{
-							Vertex* tempnb = v[i].nb[d][j];
-							double temps = score[j];
-							v[i].nb[d][j] = v[i].nb[d][j + 1];
-							score[j] = score[j + 1];
-							score[j + 1] = temps;
-							v[i].nb[d][j + 1] = tempnb;
-							unsorted = true;
-						}
-					}//end for
-				}//end while
-				//select top elements
-				if ((int)v[i].nb[d].size() > amnt_nb)
-				{
-					v[i].nb[d].erase(v[i].nb[d].begin() + amnt_nb, v[i].nb[d].end());
-				}
-				//automatically add the end depot
-				v[i].nb[d].push_back(&v[maxvertices - 1]);
-				//indexed list aanmaken
-				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
-				v[i].nbi[d].reset();//sets all bits to false
-				for (int x = 0; x < (int)v[i].nb[d].size(); ++x)
-				{
-					v[i].nbi[d][v[i].nb[d][x]->index] = true;
-				}
-				//for a swap operation each vertex is neighbour of itself
-				v[i].nbi[d][i] = true;
-			}//end for d
-		}//end for i
-	}//end parallel
-	//and enddepot to enddepot
-	v[maxvertices - 1].nb.resize(maxtours);
-	v[maxvertices - 1].nbi.resize(maxtours);
-	for (int d = 0; d < maxtours; ++d)
-	{
-		v[maxvertices - 1].nbi[d] = boost::dynamic_bitset<>(maxvertices);
-		//v[maxvertices - 1].nbi[d].set(0);
-		v[maxvertices - 1].nb[d].push_back(&v[maxvertices - 1]);
-		v[maxvertices - 1].nbi[d][maxvertices - 1] = true;
-	}
-	ofstream file;
-	file.open(path+"nb" + name);
-	for (int i = 0; i < maxvertices; ++i)//for all regular vertices
-	{
-		for (int d = 0; d < maxtours; ++d)
-		{
-			file << v[i].nb[d].size() << "\n";
-			for (int j = 0; j < v[i].nb[d].size(); ++j)
-			{
-				file << v[i].nb[d][j]->index << ";";
+	const int N = maxvertices - 2; // regular vertices count
+	// one unified rule for all instances:
+	const int K_min = 50;
+	const int K_max = 150;
+	const double beta = 3.0;
+	const int K = std::min(K_max, std::max(K_min, int(std::ceil(beta * std::sqrt(std::max(1, N))))));
+	cout << "K nb is: " << K << endl;
+	const int depot = maxvertices - 1;
+
+#pragma omp parallel for
+	for (int i = 0; i < maxvertices - 1; ++i) {
+		v[i].nb.resize(maxtours);
+		v[i].nbi.resize(maxtours);
+
+		for (int d = 0; d < maxtours; ++d) {
+			std::vector<Cand> cands;
+			cands.reserve(std::min(N, K * 5)); // cheap guess; grows if needed
+
+			// build candidates (time-feasible arcs only)
+			for (int j = 1; j < maxvertices - 1; ++j) {
+				if (j == i) continue;
+
+				// earliest arrival at j if we leave i at LTW(i) + serv(i)
+				double arr_j = v[i].LTW[d] + v[i].serv + v[i].con[j]->determin;
+				if (arr_j < v[j].LTW[d]) arr_j = v[j].LTW[d];
+				if (arr_j > v[j].UTW[d]) continue; // cannot reach j in time
+
+				// earliest depart j after service
+				double dep_j = arr_j + v[j].serv;
+				// reach depot in time?
+				double eta_depot = dep_j + v[j].con[depot]->determin;
+				if (eta_depot > v[depot].UTW[d]) continue;
+
+				// scoring (simple, instance-agnostic)
+				// smaller is better; we’ll sort ascending
+				const double tt_ij = v[i].con[j]->determin;
+				const double tt_jD = v[j].con[depot]->determin;
+				const double eps = 1e-6;
+				double s = (tt_ij + 0.5 * tt_jD + eps) / (v[j].score + eps);
+
+				cands.push_back({ j, s });
 			}
+
+			// keep top-K
+			if ((int)cands.size() > K) {
+				std::nth_element(cands.begin(), cands.begin() + K, cands.end(),
+					[](const Cand& a, const Cand& b) { return a.s < b.s; });
+				cands.resize(K);
+			}
+			std::sort(cands.begin(), cands.end(),
+				[](const Cand& a, const Cand& b) { return a.s < b.s; });
+
+			// materialize nb + nbi
+			v[i].nb[d].clear();
+			v[i].nb[d].reserve(cands.size() + 1);
+			for (const auto& c : cands) v[i].nb[d].push_back(&v[c.j]);
+			v[i].nb[d].push_back(&v[depot]); // always include depot
+
+			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+			v[i].nbi[d].reset();
+			for (auto* pj : v[i].nb[d]) v[i].nbi[d][pj->index] = true;
+			v[i].nbi[d][i] = true; // self for swap
+		}
+	}
+
+	// depot neighborhood (as you had)
+	v[depot].nb.resize(maxtours);
+	v[depot].nbi.resize(maxtours);
+	for (int d = 0; d < maxtours; ++d) {
+		v[depot].nb[d].clear();
+		v[depot].nb[d].push_back(&v[depot]);
+		v[depot].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+		v[depot].nbi[d][depot] = true;
+	}
+
+	// write to file (unchanged)
+	std::ofstream file(path + "nb" + name);
+	for (int i = 0; i < maxvertices; ++i) {
+		for (int d = 0; d < maxtours; ++d) {
+			file << v[i].nb[d].size() << "\n";
+			for (int j = 0; j < (int)v[i].nb[d].size(); ++j)
+				file << v[i].nb[d][j]->index << ";";
 			file << "\n";
 		}
 	}
 	file.close();
-}//end neighbourhood
+}
 
 void Ins::read_neighbourhood(string path,string name)
 {
@@ -598,7 +584,7 @@ void Ins::read_neighbourhood(string path,string name)
 	else
 	{
 		cout << "can not find neighborhood file" << endl;
-		create_neighbourhood(path,name,50);
+		create_neighbourhood(path,name);
 	}
 }
 

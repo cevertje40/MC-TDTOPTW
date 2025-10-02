@@ -332,7 +332,7 @@ void solve_dataset(int max_rep = 5)
 			Ins instance(textfile);
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
-			instance.create_neighbourhood(textfile.path, textfile.name,50);
+			instance.create_neighbourhood(textfile.path, textfile.name);
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
 			Tabu tabu(instance, 10000,2);
@@ -403,7 +403,7 @@ void case_study(int max_rep = 5)
 			Ins instance(textfile);
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
-			instance.create_neighbourhood(textfile.path, textfile.name, instance.maxvertices);
+			instance.create_neighbourhood(textfile.path, textfile.name);
 			instance.alter_instance();
 			Tabu tabu(instance, 10000, 2);
 			it->result[rep] = tabu.solve(it->bestknown);
@@ -453,7 +453,7 @@ void debug_instance()
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
-	instance.create_neighbourhood(textfile.path, textfile.name,50);
+	instance.create_neighbourhood(textfile.path, textfile.name);
 	//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
 	Tabu tabu(instance, 10000,2);
@@ -499,7 +499,7 @@ void doe(int max_rep = 10)
 					Ins instance(textfile);
 					instance.read_time_independent_traveltime();
 					instance.read_time_dependent_traveltime();
-					instance.create_neighbourhood(textfile.path, textfile.name,50);
+					instance.create_neighbourhood(textfile.path, textfile.name);
 					Tabu tabu(instance,nimax[par1], umax[par2]);
 					it->result[rep] = tabu.solve(it->bestknown);
 					avggap += it->result[rep].gap;
@@ -558,7 +558,7 @@ void debug_ctop()
 	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b89.txt"};
 	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b5.txt"};
 	Ins instance(textfile);
-	instance.create_neighbourhood(textfile.path, textfile.name,50);
+	instance.create_neighbourhood(textfile.path, textfile.name);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//res = ils.solve();
 	Tabu tabu(instance, 10000,2);
@@ -598,7 +598,7 @@ void ctop_gap(int max_rep=5)
 		{
 			Ins::CTOP textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			instance.create_neighbourhood(textfile.path, textfile.name,150);
+			instance.create_neighbourhood(textfile.path, textfile.name);
 			//Aco acs(instance, 1,1, 0.01, 20, 10000, 0.25, 0.05);
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,100,2,3);
@@ -640,8 +640,8 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(5);
-	ctop_gap(1);
+	solve_dataset(1);
+	//ctop_gap(1);
 	//doe(10);
 	//case_study(10);
 

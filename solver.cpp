@@ -734,8 +734,6 @@ void Tabu::parallel_construct(Sol& sol)
 				{
 					succes = true;
 					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
-					
-					
 					double cap_frac = candidate->weight / ins->t[t].W_max+ candidate->volume / ins->t[t].V_max;
 					double delta_t = traveltime[t];
 					double denom = max(1e-12, delta_t) + max(1e-12, cap_frac);
@@ -807,6 +805,7 @@ template<typename MoveType>
 void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& tabulist) 
 {
 	auto exec_nb = nb.top();
+	//cout << nb.top().score<<" " << nb.top().tour << " " << nb.top().ratio << endl;;
 	exec_nb.execute(s);
 	for (int i = 0; i < exec_nb.move.first.size(); ++i)
 	{
@@ -1000,6 +999,7 @@ Res Tabu::solve(int bestknown)
 				break;
 			}
 		}//end switch
+		
 		//if (no_feasible_moves_in_a_row > 5) //if no feasible moves are found in a row, perturb the solution
 		//{
 			//perturbe(s);
@@ -1034,6 +1034,7 @@ Res Tabu::solve(int bestknown)
 			//cout << "error in move_nb" << endl;
 		//}
 		//update constraint pressure
+		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 
 		{
 			double gain = std::max(0, s.score - prev_score);
@@ -1056,6 +1057,7 @@ Res Tabu::solve(int bestknown)
 		{
 			++noimpr;
 		}
+		
 		++iter;
 		/*
 		if ((iter % 1000) == 0) 
@@ -1073,7 +1075,7 @@ Res Tabu::solve(int bestknown)
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	//gb.write_to_cplex();
-	std::cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 << endl;
+	std::cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 <<"total iterations: "<< iter << endl;
 	std::cout << gb << endl;
 	return Res(gb, cpuTime, bestknown);
 }

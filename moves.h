@@ -77,6 +77,36 @@ public:
 	}
 };
 
+namespace ratio_detail
+{
+	constexpr double EPS = 1e-9;   // decision epsilon
+	constexpr double TAU = 0.01;   // ~1% baseline
+	constexpr double K_NEG = 0.5;
+	constexpr double CAP = 5.0;
+
+	inline double posneg(double d_norm, double ds) {
+		if (d_norm > EPS) {
+			// guard denominator so /fp:fast can’t make it tiny
+			double denom = d_norm + TAU;
+			if (denom < TAU + EPS) denom = TAU + EPS;
+			return ds / denom;
+		}
+		else if (d_norm < -EPS) {
+			double benefit = std::min(CAP, (-d_norm) / (TAU + EPS));
+			return ds * (1.0 + K_NEG * benefit);
+		}
+		else {
+			// treat “almost zero” as neutral
+			return ds;
+		}
+	}
+
+	inline double norm(double delta, double bound) {
+		// prevent divide by ~0 if a bound is bogus
+		return delta / std::max(bound, 1e-9);
+	}
+}
+
 class Moves
 {
 public:
@@ -102,34 +132,22 @@ public:
 		return ds;
 	}
 
-	inline double ratio_scorediff_time(double dt, double ds, double dw, double dv, double t_max, double /*w_max*/, double /*v_max*/)
-	{
-		const double tau = 0.01; // ~1% of route time
-		const double k_pos = 1.0, k_neg = 0.5, cap = 5.0;
-		double dt_norm = dt / std::max(1e-9, t_max);
-		if (dt_norm > 0.0) return ds / (dt_norm + tau);
-		double benefit = std::min(cap, (-dt_norm) / tau);
-		return ds * (1.0 + k_neg * benefit);
+	inline double ratio_scorediff_time(double dt, double ds, double /*dw*/, double /*dv*/,
+		double t_max, double /*w_max*/, double /*v_max*/) {
+		using namespace ratio_detail;
+		return posneg(norm(dt, t_max), ds);
 	}
 
-	inline double  ratio_scorediff_weight(double dt, double ds, double dw, double dv, double /*t_max*/, double w_max, double /*v_max*/)
-	{
-		const double tau = 0.01; // ~1% of route time
-		const double k_pos = 1.0, k_neg = 0.5, cap = 5.0;
-		double dw_norm = dw / std::max(1e-9, w_max);
-		if (dw_norm > 0.0) return ds / (dw_norm + tau);
-		double benefit = std::min(cap, (-dw_norm) / tau);
-		return ds * (1.0 + k_neg * benefit);
+	inline double ratio_scorediff_weight(double /*dt*/, double ds, double dw, double /*dv*/,
+		double /*t_max*/, double w_max, double /*v_max*/) {
+		using namespace ratio_detail;
+		return posneg(norm(dw, w_max), ds);
 	}
 
-	inline double ratio_scorediff_volume(double dt, double ds, double dw, double dv, double /*t_max*/, double /*w_max*/, double v_max)
-	{
-		const double tau = 0.01; // ~1% of route time
-		const double k_pos = 1.0, k_neg = 0.5, cap = 5.0;
-		double dv_norm = dv / std::max(1e-9, v_max);
-		if (dv_norm > 0.0) return ds / (dv_norm + tau);
-		double benefit = std::min(cap, (-dv_norm) / tau);
-		return ds * (1.0 + k_neg * benefit);
+	inline double ratio_scorediff_volume(double /*dt*/, double ds, double /*dw*/, double dv,
+		double /*t_max*/, double /*w_max*/, double v_max) {
+		using namespace ratio_detail;
+		return posneg(norm(dv, v_max), ds);
 	}
 
 	//nb generators

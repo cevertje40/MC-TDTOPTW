@@ -58,7 +58,9 @@ void Ins::read_time_dependent_traveltime()
 			}
 
 			auto& mu = v[i].con[j]->mu;
+			auto& oneplusmu = v[i].con[j]->oneplusmu;
 			auto& nu = v[i].con[j]->nu;
+			oneplusmu.resize(maxtimeslots);
 			mu.resize(maxtimeslots);
 			nu.resize(maxtimeslots);
 			//double mintraveltime = DBL_MAX;
@@ -67,11 +69,13 @@ void Ins::read_time_dependent_traveltime()
 				//mintraveltime = min(mintraveltime, dump[t]);
 				if (t == maxtimeslots - 1) {
 					mu[t] = 0.0;
+					oneplusmu[t] = 1.0;
 					nu[t] = dump[t];
 				}
 				else {
 					double delta_time = time_periods[t + 1] - time_periods[t];
 					mu[t] = (dump[t + 1] - dump[t]) / delta_time;
+					oneplusmu[t] = 1.0 + mu[t];
 					nu[t] = dump[t] - mu[t] * time_periods[t];
 				}
 			}
@@ -280,6 +284,7 @@ Ins::Ins(CTOP textfile)
 				for (int t = 0; t < maxtimeslots; ++t)
 				{
 					c[counter].mu[t] = 0.0;
+					c[counter].oneplusmu[t] = 1.0;
 					c[counter].nu[t] = c[counter].determin;
 				}
 				v[i].con[j] = &c[counter];
@@ -618,37 +623,4 @@ void Ins::unalter_instance()
 {
 	breakdur = 0.75;
 	//read_time_dependent_traveltime();
-}
-
-
-inline int Ins::find_t(double time)
-{
-	int t = (int)floor((time - time_periods[0]) / 0.25);//when you change the time unit this has to change too
-	return min(55,t);
-}
-
-double Ins::travel_time(Connec* c, double start)
-{
-	int t = find_t(start);
-	double traveltime = c->nu[t] + start * c->mu[t];
-	return traveltime;
-}
-
-double Ins::arrival_time(Connec* c, double start)
-{
-	int t = find_t(start);
-	double arrivaltime = c->nu[t] + (start)*c->mu[t] + start;
-	return arrivaltime;
-}
-
-double Ins::departure_time(Connec* c, double arrivaltime)
-{
-	int t = find_t(arrivaltime);
-	double departuretime = (arrivaltime - c->nu[t]) / (1 + c->mu[t]);
-	while ((time_periods[t] > departuretime) || (departuretime > time_periods[t + 1]))
-	{
-		--t;
-		departuretime = (arrivaltime - c->nu[t]) / (1 + c->mu[t]);
-	}
-	return departuretime;
 }

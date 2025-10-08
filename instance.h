@@ -24,6 +24,7 @@ public:
 		int to;// vertex index of arrival vertex
 		double determin;// deterministic time-independent travel time
 		std::vector<double> mu;//for deterministic time-dependent travel time for every timeslot
+		std::vector<double> oneplusmu;//1+mu for faster computation
 		std::vector<double> nu;//for deterministic time-dependent travel time for every timeslot
 		//methods
 		Connec() {}
@@ -93,8 +94,64 @@ public:
 	void unalter_instance();
 	
 	/**acces of c object methods*/
-	int find_t(double time);
-	double travel_time(Connec* c, double start);
-	double arrival_time(Connec* c, double start);
-	double departure_time(Connec* c, double arrivaltime);
+	inline int find_t(double time)
+	{
+		int t = (int)((time - time_periods[0]) / 0.25);//when you change the time unit this has to change too
+		return std::min(55, t);
+	}
+
+	inline double travel_time(Connec* c, double start)
+	{
+		int t = find_t(start);
+		return std::fma(c->nu[t] - 1.0, start, c->mu[t]);
+		/*
+		int t = find_t(start);
+		double traveltime = c->nu[t] + start * c->mu[t];
+		return traveltime;
+		*/
+	}
+
+	inline double arrival_time(Connec* c, double start)
+	{
+		const int t = find_t(start);
+		// arr = a + b*start = nu + (1+mu)*start
+		return std::fma(c->oneplusmu[t], start, c->nu[t]);
+		/*
+		int t = find_t(start);
+		double arrivaltime = c->nu[t] + (start)*c->mu[t] + start;
+		return arrivaltime;
+		*/
+	}
+
+	inline double departure_time(Connec* c, double arrivaltime)
+	{
+		int t = find_t(arrivaltime);             // initial guess, not guaranteed correct
+		for (;;) {
+			// require FIFO: b > 0
+			double start = (arrivaltime - c->nu[t]) / c->oneplusmu[t];
+			if (start < time_periods[t]) {
+				if (t == 0) return time_periods[0];
+				--t; continue;
+			}
+			/*
+			if (start >= time_periods[t + 1]) 
+			{
+				if (t >= 55 - 2) return std::nextafter(time_periods[55 - 1], -INFINITY);
+				++t; continue;
+			}
+			*/
+			return start; // landed in the correct bucket
+		}
+		/*
+		int t = find_t(arrivaltime);
+		double departuretime = (arrivaltime - c->nu[t]) / (c->oneplusmu[t]);
+		while ((time_periods[t] > departuretime) || (departuretime > time_periods[t + 1]))
+		{
+			--t;
+			departuretime = (arrivaltime - c->nu[t]) / (c->oneplusmu[t]);
+		}
+		return departuretime;
+		*/
+	}
+
 };

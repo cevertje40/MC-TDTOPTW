@@ -753,6 +753,8 @@ bool Moves::or_opt(Sol& sol, int mode)
 	return succes;
 }//end or_opt
 
+
+
 boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::*get_ratio)(double, double, double, double, double, double, double))
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
@@ -766,6 +768,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 			//1- INSERT PART
 			Sol::Tour& tour = sol.tours[d];
 			int endj = (int)tour.seq.size();
+			vector<double>wait_suffix = tour.compute_wait_suffix();
 			for (int j = 0; j < endj - 1; ++j)// for all positions in the tour
 			{
 				Ins::Vertex* x = tour.seq[j];//predecessor y
@@ -785,13 +788,14 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 					}
 					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 					{
-						double base_det = x->con[z->index]->determin + z->serv + breakz * ins->breakdur;
-						double ins_det = x->con[y->index]->determin + y->serv+ y->con[z->index]->determin + breakz * ins->breakdur;
-						double dt_lb = max(0.0, ins_det - base_det);
-						double key_ub = (this->*get_ratio)(dt_lb,y->score,y->weight,y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-						if (key_ub > local_bestkey + 1e-9)
+						if ((tour.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tour.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
 						{
-							if ((tour.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tour.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
+							double t0 = tour.deptime[j] + ins->t[d].EDT;
+							double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+							double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+							double dt_lb = max(0.0, ins_lb - base_up);
+							double key_ub = (this->*get_ratio)(dt_lb, y->score, y->weight, y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+							if ((key_ub > local_bestkey + 1e-9)&&(dt_lb <= wait_suffix[j + 1]+tour.max_shift[j + 1] + 1e-9))
 							{
 								//travel time from x to y
 								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
@@ -825,11 +829,11 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 											{
 												bestkey = key;
 											}
-										}
-									}
-								}
-							}//end cap constraints
-						}//end heuristic score check
+										}//end critical
+									}//enjd local key
+								}//end shift
+							}//end heuristic score check
+						}//end cap constraints
 					}//end availability
 				}//for all nb
 			}//end for all positions in sol
@@ -841,6 +845,7 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 				Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
 				tourrem.remove_vertex(h);
+				vector<double> wait_suffix = tourrem.compute_wait_suffix();
 				int endj = (int)tourrem.seq.size();
 				for (int j = 0; j < endj - 1; ++j)// for all positions in tourrem
 				{
@@ -861,13 +866,14 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 						}
 						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
 						{
-							double base_det = x->con[z->index]->determin + z->serv + breakz * ins->breakdur;
-							double ins_det = x->con[y->index]->determin + y->serv+ y->con[z->index]->determin + breakz * ins->breakdur;
-							double dt_lb = max(0.0, ins_det - base_det);
-							double key_ub = (this->*get_ratio)(dt_lb, y->score-r->score,y->weight-r->weight,y->volume-r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-							if (key_ub> local_bestkey + 1e-9)
+							if ((tourrem.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
 							{
-								if ((tourrem.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
+								double t0 = tourrem.deptime[j] + ins->t[d].EDT;
+								double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+								double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+								double dt_lb = max(0.0, ins_lb - base_up);
+								double key_ub = (this->*get_ratio)(dt_lb, y->score - r->score, y->weight - r->weight, y->volume - r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+								if ((key_ub > local_bestkey + 1e-9)&&(dt_lb <= wait_suffix[j + 1] + tourrem.max_shift[j+1]+ 1e-9))
 								{
 									//travel time from x to y
 									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
@@ -901,11 +907,11 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 												{
 													bestkey = key;
 												}
-											}
-										}
-									}
-								}//end cap constraints
-							}//end if score increasing
+											}//end critical
+										}// end local key
+									}//end shift
+								}//end if heuristic check
+							}//end cap constraints
 						}//end availability 
 					}//for all nb
 				}//end for all positions in tourrem
@@ -942,7 +948,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
 						Ins::Vertex* y1 = x1->nb[d][i];//potential insertion at position j
-						if ((sol.available[y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
+						if ((sol.available[y1->index]) && (x1->nbi[d][y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
 						{
 							if ((tourrem.weight + y1->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y1->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
 							{
@@ -958,9 +964,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 								{
 									continue;//infeasible
 								}
-								
 								arrivaltime += y1->serv;
-								double arrivaltimey = arrivaltime;
 								//travel time from y1 to z
 								arrivaltime = ins->arrival_time(y1->con[z1->index], arrivaltime);
 								if (arrivaltime + breakz1 * (ins->breakdur) < z1->LTW[d])
@@ -974,6 +978,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 									//execute the first insertion
 									Sol::Tour tourremins = tourrem;
 									tourremins.insert_vertex(y1, j);
+									vector<double>wait_suffix = tourremins.compute_wait_suffix();
 									int endk = (int)tourremins.seq.size();
 									//check if second vertex can be inserted in this new tour
 									for (int k = 0; k < endk - 1; ++k)// for all positions in tourremins
@@ -985,21 +990,21 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
 											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
-											
 											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) && (sol.score + (y1->score + y2->score - r->score) <= globalbest+1e-9))
 											{
 												//cout << "tabu list stopped move" << endl;
 												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
 											}
-											double base_det = x2->con[z2->index]->determin + z2->serv + breakz2 * ins->breakdur;
-											double ins_det = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin + breakz2 * ins->breakdur;
-											double dt_lb = max(0.0, ins_det - base_det);
-											double key_ub = (this->*get_ratio)(shift1+dt_lb,(y1->score+ y2->score)-r->score,(y1->weight+ y2->weight)-r->weight, (y1->volume+y2->volume)-r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-											if (key_ub > local_bestkey + 1e-9)
+											if ((sol.available[y2->index]) && (x2->nbi[d][y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
 											{
-												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
+												if ((tourremins.weight + y2->weight <= ins->t[d].W_max+ 1e-9) && (tourremins.volume + y2->volume <= ins->t[d].V_max+ 1e-9))//cap constraint check
 												{
-													if ((tourremins.weight + y2->weight <= ins->t[d].W_max+ 1e-9) && (tourremins.volume + y2->volume <= ins->t[d].V_max+ 1e-9))//cap constraint check
+													double t0 = tourremins.deptime[k] + ins->t[d].EDT;
+													double base_up = ins->arrival_time(x2->con[z2->index], t0) - t0;
+													double ins_lb = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
+													double dt_lb = max(0.0, ins_lb - base_up);
+													double key_ub = (this->*get_ratio)(shift1 + dt_lb, (y1->score + y2->score) - r->score, (y1->weight + y2->weight) - r->weight, (y1->volume + y2->volume) - r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+													if ((key_ub > local_bestkey + 1e-9)&&(dt_lb<= wait_suffix[k + 1]+tourremins.max_shift[k + 1] + 1e-9))
 													{
 														//gather departure time
 														double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
@@ -1034,13 +1039,13 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 																	if (key > bestkey+ 1e-9)
 																	{
 																		bestkey = key;
-																	}
-																}
-															}
+																	}//end best key
+																}//end critical
+															}//end local key
 														}//end shift 2
-													}//end cap check 2
-												}//end availability 2
-											}//end score check
+													}//end heuristic score check
+												}//end cap check 2
+											}//end availability 2
 										}//end all nb2
 									}//end for all positions in tourremins
 								}//end if shift succes first insertion
@@ -1060,7 +1065,6 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
 	#pragma omp parallel
 	{//start parallel session
-		
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
@@ -1075,6 +1079,7 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 					Ins::Vertex* r = tourrem.seq[g];//to be removed vertex 1
 					Ins::Vertex* s = tourrem.seq[h];//to be removed vertex 2
 					tourrem.remove_vertices(g, h);
+					vector<double> wait_suffix = tourrem.compute_wait_suffix();
 					int endj = (int)tourrem.seq.size();
 					for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
 					{
@@ -1094,13 +1099,14 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 							}
 							if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
 							{
-								double base_det = x->con[z->index]->determin + z->serv + breakz * ins->breakdur;
-								double ins_det = x->con[y->index]->determin + y->serv + y->con[z->index]->determin + breakz * ins->breakdur;
-								double dt_lb = max(0.0, ins_det - base_det);
-								double key_ub = (this->*get_ratio)(dt_lb, y->score - (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume), ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-								if (key_ub > local_bestkey + 1e-9)
+								if ((tourrem.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
 								{
-									if ((tourrem.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
+									double t0 = tourrem.deptime[j] + ins->t[d].EDT;
+									double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+									double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+									double dt_lb = max(0.0, ins_lb - base_up);
+									double key_ub = (this->*get_ratio)(dt_lb, y->score - (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume), ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+									if ((key_ub > local_bestkey + 1e-9)&&(dt_lb<= wait_suffix[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
 									{
 										//travel time from x to y
 										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
@@ -1133,13 +1139,13 @@ boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& s
 													if (key > bestkey + 1e-9)
 													{
 														bestkey = key;
-													}
-												}
-											}
-										}
-									}//end cap constraints
-								}//end score & nb limit check
-							}//end availability/nb check
+													}//end bestkey
+												}//end critical
+											}//end local key
+										}//end shift
+									}//end heuristic score check
+								}//end cap check
+							}//end availability & nb check
 						}//for all nb
 					}//end for all positions in tourrem
 				}//end for all included regular vertices in sol
@@ -1317,11 +1323,11 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 					Ins::Vertex* x1 = tourrem.seq[j];//predecessor y
 					Ins::Vertex* z1 = tourrem.seq[j + 1];//successor y
 					int breakz1 = tourrem.action[j + 1];
-					int nb_size = (int)x1->nb[d].size();
-					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+					int nb_size1 = (int)x1->nb[d].size();
+					for (int i1 = 0; i1 < nb_size1 - 1; ++i1)//for all neighbours of the included vertex (non-enddepot)
 					{
-						Ins::Vertex* y1 = x1->nb[d][i];//potential insertion at position j
-						if ((sol.available[y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
+						Ins::Vertex* y1 = x1->nb[d][i1];//potential insertion at position j
+						if ((sol.available[y1->index]) && (x1->nbi[d][y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
 						{
 							if ((tourrem.weight + y1->weight <= ins->t[d].W_max) && (tourrem.volume + y1->volume <= ins->t[d].V_max))//cap constraint check
 							{
@@ -1346,8 +1352,8 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 									arrivaltime = z1->LTW[d] - (breakz1 * ins->breakdur);
 								}
 								arrivaltime += z1->serv + breakz1 * ins->breakdur;
-								double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-								if (shift <= tourrem.max_shift[j + 1])//check if first vertex can be inserted
+								double shift1 = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
+								if (shift1 <= tourrem.max_shift[j + 1])//check if first vertex can be inserted
 								{
 									//execute the first insertion
 									Sol::Tour tourremins = tourrem;
@@ -1359,10 +1365,10 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										Ins::Vertex* x2 = tourremins.seq[k];//predecessor y2
 										Ins::Vertex* z2 = tourremins.seq[k + 1];//successor y2
 										int breakz2 = tourremins.action[k + 1];
-										int nb_size = (int)x2->nb[d].size();
-										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+										int nb_size2 = (int)x2->nb[d].size();
+										for (int i2 = 0; i2 < nb_size2 - 1; ++i2)//for all neighbours of the included vertex (non-enddepot)
 										{
-											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
+											Ins::Vertex* y2 = x2->nb[d][i2];//potential insertion at position k
 											if (((tabulist.isTabu(r->index, d))||(tabulist.isTabu(y1->index, d))||(tabulist.isTabu(y2->index, d))) && (sol.score + (y1->score+y2->score - r->score) <= globalbest))
 											{
 												//cout << "tabu list stopped move" << endl;
@@ -1370,7 +1376,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 											}
 											if (((y1->score + y2->score) - r->score > local_bestscore))
 											{
-												if ((sol.available[y2->index]) && (y2->nbi[d][z2->index])&&(y2!=y1))//availability & nb check & two insertions need to be different vertices
+												if ((sol.available[y2->index]) &&(x2->nbi[d][y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
 												{
 													if ((tourremins.weight + y2->weight <= ins->t[d].W_max) && (tourremins.volume + y2->volume <= ins->t[d].V_max))//cap constraint check
 													{
@@ -1394,8 +1400,8 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 															arrivaltime = z2->LTW[d] - (breakz2 * ins->breakdur);
 														}
 														arrivaltime += z2->serv + breakz2 * ins->breakdur;
-														double shift = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
-														if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
+														double shift2 = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
+														if (shift2 <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
 														{
 															local_bestscore = (y1->score + y2->score) - r->score;
 															#pragma omp critical

@@ -665,6 +665,40 @@ void Tour::swap_vertices(int i, int j)
 	}
 }
 
+vector<double> Tour::compute_wait_suffix()
+{
+
+	const int n = (int)seq.size();
+	std::vector<double> wait_at(n, 0.0);
+	std::vector<double> wait_suffix;
+	double t = deptime[0] + ins->t[index].EDT; // depart from start (service at seq[0] already in deptime)
+	for (int j = 0; j < n - 1; ++j)
+	{
+		Ins::Vertex* x = seq[j];
+		Ins::Vertex* z = seq[j + 1];
+		int breakz = action[j + 1];
+
+		double arr = ins->arrival_time(x->con[z->index], t);
+
+		double w = 0.0;
+		if (arr + breakz * ins->breakdur < z->LTW[index])
+		{
+			w = (z->LTW[index] - (arr + breakz * ins->breakdur));
+			arr = z->LTW[index] - breakz * ins->breakdur;
+		}
+		wait_at[j + 1] = w;
+
+		t = arr + z->serv + breakz * ins->breakdur;
+	}
+
+	wait_suffix.assign(n, 0.0);
+	double acc = 0.0;
+	for (int i = n - 1; i >= 0; --i) {
+		acc += wait_at[i];
+		wait_suffix[i] = acc;
+	}
+	return wait_suffix;
+}
 
 bool Tour::check()
 {
@@ -689,7 +723,7 @@ bool Tour::check()
 		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
 		{
 			waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-			//cout << "waiting time for: "<<"i"<<i+1<<" , " <<tours[d].seq[i + 1]->index << " <=> " << waitingtime << endl;
+			cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
 			arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
 		}
 		arrivaltime += current->serv + breakcurrent * ins->breakdur;
@@ -933,9 +967,6 @@ pair<int, int> Tour::repair()
 
 	return { scoredecrease, removed };
 }
-
-
-
 
 void Sol::insert_vertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 {

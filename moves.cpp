@@ -1,4 +1,4 @@
-#include "moves.h"
+﻿#include "moves.h"
 
 using namespace std;
 
@@ -754,7 +754,6 @@ bool Moves::or_opt(Sol& sol, int mode)
 }//end or_opt
 
 
-
 boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::*get_ratio)(double, double, double, double, double, double, double))
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
@@ -921,6 +920,32 @@ boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& s
 	return adm_nb;
 }
 
+inline double base_travel_UB_over_interval(Ins* ins, Ins::Connec* c,
+	double t0, double t1) {
+	if (t1 < t0) { double tmp = t0; t0 = t1; t1 = tmp; }
+	// Evaluate travel time at both ends and at every bucket boundary inside [t0, t1].
+	double ub = 0.0;
+
+	// convenience lambda-equivalent
+	auto tt_at = [&](double t) -> double {
+		return ins->arrival_time(c, t) - t; // UB at real departure t
+		};
+
+	ub = tt_at(t0);
+	double v = tt_at(t1);
+	if (v > ub) ub = v;
+
+	int L = ins->find_t(t0);
+	int R = ins->find_t(t1);
+	// Scan interior boundaries: time_periods[q], q = L+1..R
+	for (int q = L + 1; q <= R; ++q) {
+		double tb = time_periods[q];                // boundary
+		double val = tt_at(tb);                          // left-closed intervals → fine
+		if (val > ub) ub = val;
+	}
+	return ub;
+}
+
 boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
 	double bestkey = -DBL_MAX;
@@ -938,6 +963,8 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 				Sol::Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
 				tourrem.remove_vertex(h);
+				vector<double> wait_suffix_rem = tourrem.compute_wait_suffix(); 
+				const double prune_floor0 = std::max(local_bestkey, bestkey);
 				int endj = (int)tourrem.seq.size();
 				for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
 				{
@@ -952,6 +979,15 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 						{
 							if ((tourrem.weight + y1->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y1->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
 							{
+								
+								double t0_1 = tourrem.deptime[j] + ins->t[d].EDT;
+								double baseUB_1 = ins->arrival_time(x1->con[z1->index], t0_1) - t0_1;        // UB at real depart
+								double insLB_1 = x1->con[y1->index]->determin + y1->serv + y1->con[z1->index]->determin;
+								double dtLB_1 = std::max(0.0, insLB_1 - baseUB_1);
+
+								// feasibility pre-gate using waiting budget on tourrem
+								if (dtLB_1 > wait_suffix_rem[j + 1] + tourrem.max_shift[j + 1] + 1e-9) continue;
+								
 								//gather departure time
 								double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
 								//travel time from x1 to y1
@@ -975,6 +1011,96 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 								double shift1 = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
 								if (shift1 <= tourrem.max_shift[j + 1]+ 1e-9)//check if first vertex can be inserted
 								{
+
+									bool any_second_survives = false;
+
+									// --------- Stage-A for boundaries p != j (map to k != j after insertion) ----------
+									int p_end = (int)tourrem.seq.size() - 1;
+									for (int p = 0; p < p_end; ++p) {
+										if (p == j) continue; // boundary becomes x1|y1 in tourremins -> treat in special-case below
+
+										Ins::Vertex* x2 = tourrem.seq[p];
+										Ins::Vertex* z2 = tourrem.seq[p + 1];
+
+										// Upper-bound the departure time interval at this boundary after first insertion
+										double Wprefix = 0.0;
+										if (p + 1 > j + 1) {
+											// waiting between (j+1) and (p+1) in tourrem
+											Wprefix = wait_suffix_rem[j + 1] - wait_suffix_rem[p + 1];
+											if (Wprefix < 0.0) Wprefix = 0.0;
+										}
+										double delta_at_p = shift1 - Wprefix;
+										if (delta_at_p < 0.0) delta_at_p = 0.0;
+
+										double t_low = tourrem.deptime[p] + ins->t[d].EDT;
+										double t_high = t_low + delta_at_p;
+
+										// Robust base-arc UB over [t_low, t_high]
+										Ins::Connec* cxz = x2->con[z2->index];
+										double baseUB = base_travel_UB_over_interval(ins, cxz, t_low, t_high);
+
+										// Waiting/shift UB from tourrem at boundary p+1 (safe upper bound)
+										double Wup = wait_suffix_rem[p + 1];
+										double Mup = tourrem.max_shift[p + 1];
+
+										// loop neighbours of x2 (skip last = end depot)
+										std::vector<Ins::Vertex*>& neigh = x2->nb[d];
+										int nb2 = (int)neigh.size();
+										for (int ii = 0; ii < nb2 - 1; ++ii) {
+											Ins::Vertex* y2 = neigh[ii];
+
+											// (You may drop tabu here for safety; keeping it only saves work.)
+											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
+												(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9)) {
+												continue;
+											}
+
+											if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
+											if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+
+											// LB on inserted path (determin MUST be a true LB)
+											double insLB = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
+											double dtLB = insLB - baseUB; if (dtLB < 0.0) dtLB = 0.0;
+
+											if (dtLB <= Wup + Mup + 1e-9) { any_second_survives = true; break; }
+										}
+										if (any_second_survives) break;
+									}
+
+									// --------- Stage-A special-case for k == j (between x1 and y1) ----------
+									if (!any_second_survives) {
+										// After inserting y1 at (j), the boundary k==j is x1 | y1.
+										// Departure is exactly t0_1; base arc is x1->y1.
+										Ins::Connec* c_x1y1 = x1->con[y1->index];
+										double baseUB_j = ins->arrival_time(c_x1y1, t0_1) - t0_1; // exact UB at that depart
+
+										double Wup_j = wait_suffix_rem[j + 1];         // safe UB on waiting after y1
+										double Mup_j = tourrem.max_shift[j + 1];       // safe UB on max_shift after y1
+
+										// Neighbours from x1 (skip end depot; also skip y1 itself)
+										std::vector<Ins::Vertex*>& neigh1 = x1->nb[d];
+										int nb1 = (int)neigh1.size();
+										for (int ii = 0; ii < nb1 - 1; ++ii) {
+											Ins::Vertex* y2 = neigh1[ii];
+											if (y2 == y1) continue;
+
+											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
+												(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9)) {
+												continue;
+											}
+
+											if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
+											if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+
+											double insLB = x1->con[y2->index]->determin + y2->serv + y2->con[y1->index]->determin;
+											double dtLB = insLB - baseUB_j; if (dtLB < 0.0) dtLB = 0.0;
+
+											if (dtLB <= Wup_j + Mup_j + 1e-9) { any_second_survives = true; break; }
+										}
+									}
+
+									if (!any_second_survives) continue; // skip building tourremins for this (j,y1)
+
 									//execute the first insertion
 									Sol::Tour tourremins = tourrem;
 									tourremins.insert_vertex(y1, j);
@@ -987,6 +1113,8 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 										Ins::Vertex* z2 = tourremins.seq[k + 1];//successor y2
 										int breakz2 = tourremins.action[k + 1];
 										int nb_size = (int)x2->nb[d].size();
+										double t0 = tourremins.deptime[k] + ins->t[d].EDT;
+										double base_up = ins->arrival_time(x2->con[z2->index], t0) - t0;
 										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 										{
 											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
@@ -999,8 +1127,7 @@ boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& s
 											{
 												if ((tourremins.weight + y2->weight <= ins->t[d].W_max+ 1e-9) && (tourremins.volume + y2->volume <= ins->t[d].V_max+ 1e-9))//cap constraint check
 												{
-													double t0 = tourremins.deptime[k] + ins->t[d].EDT;
-													double base_up = ins->arrival_time(x2->con[z2->index], t0) - t0;
+													
 													double ins_lb = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
 													double dt_lb = max(0.0, ins_lb - base_up);
 													double key_ub = (this->*get_ratio)(shift1 + dt_lb, (y1->score + y2->score) - r->score, (y1->weight + y2->weight) - r->weight, (y1->volume + y2->volume) - r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);

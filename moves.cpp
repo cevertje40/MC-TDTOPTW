@@ -1980,7 +1980,7 @@ bool Moves::two_opt_nb(Sol& sol,int mode)
 		bool improvement = true;
 		while (improvement)
 		{
-			double bestdelta = 0.0;
+			double bestdelta = 1e-9;
 			int besti = -1;
 			int bestj = -1;
 			improvement = false;
@@ -2092,38 +2092,68 @@ bool Moves::shift_nb(Sol& sol, int mode)
 	while (improvement)
 	{
 		improvement = false;
-		double bestdecrease = 0.0001;
+		double bestdecrease = 1e-9;
 		Sol::Tour* bestd = NULL;
-		int besti;
-		int bestj;
-		int bestbreakindex;
+		int besti=-1;
+		int bestj=-1;
+		int bestbreakindex=-1;
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			Sol::Tour* tourd = &sol.tours[d];
 			int end = (int)tourd->seq.size();
 			for (int i = 1; i < end - 2; ++i)
 			{
-				for (int j = 1; j < end - 1; ++j)
+				for (int j = i+1; j < end - 1; ++j)
 				{
-					if (i != j)
+					// --- index mapping: view of sequence after moving i after j ---
+					auto at = [&](int v) -> Ins::Vertex* 
+						{
+						if (v < i)             return tourd->seq[v];
+						if (v >= i && v < j)   return tourd->seq[v + 1];
+						if (v == j)             return tourd->seq[i];
+						/* v > j */             return tourd->seq[v];
+						};
+
+					bool reqbreak = (tourd->breakindex >= i);
+					int breakindex = tourd->breakindex;
+					double departuretime = ins->t[d].EDT + tourd->deptime[i - 1];
+					double arrivaltime=0.0;
+					for (int v = i; v <= j + 1; ++v)
 					{
-						int first = min(i,j);
-						int second = max(i,j);
-						vector<Ins::Vertex*>mask = tourd->seq;
-						mask.insert(mask.begin() + second + 1, mask[first]);
-						mask.erase(mask.begin() + first);
-						bool reqbreak = false;
-						int breakindex = tourd->breakindex;
-						if (tourd->breakindex >= first)
+						Ins::Vertex* o = at(v - 1);
+						Ins::Vertex* p = at(v);
+						arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
+						if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
 						{
-							reqbreak = true;
+							if (arrivaltime > ins->breakend)
+							{
+								arrivaltime = DBL_MAX;
+								break;
+							}
+							reqbreak = false;
+							breakindex = v;
+							arrivaltime += ins->breakdur;
 						}
-						double departuretime = ins->t[d].EDT + tourd->deptime[first - 1];
-						double arrivaltime;
-						for (int v = first; v <= second + 1; ++v)
+						if (arrivaltime < p->LTW[d])
 						{
-							Ins::Vertex* o = mask[v - 1];
-							Ins::Vertex* p = mask[v];
+							arrivaltime = p->LTW[d];
+						}
+						if (arrivaltime > p->UTW[d])
+						{
+							arrivaltime = DBL_MAX;
+							break;
+						}
+						arrivaltime += p->serv;
+						departuretime = arrivaltime;
+					}
+					double localdecreasetotal = tourd->deptime[j + 1] - (arrivaltime - ins->t[d].EDT);
+					if (localdecreasetotal > bestdecrease)
+					{
+						departuretime = arrivaltime;
+						for (int v = j+2; v < end ; ++v)
+						{
+							Ins::Vertex* o = at(v - 1);
+							Ins::Vertex* p = at(v);
 							arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
 							if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
 							{
@@ -2132,8 +2162,8 @@ bool Moves::shift_nb(Sol& sol, int mode)
 									arrivaltime = DBL_MAX;
 									break;
 								}
-								reqbreak = false;
 								breakindex = v;
+								reqbreak = false;
 								arrivaltime += ins->breakdur;
 							}
 							if (arrivaltime < p->LTW[d])
@@ -2148,54 +2178,21 @@ bool Moves::shift_nb(Sol& sol, int mode)
 							arrivaltime += p->serv;
 							departuretime = arrivaltime;
 						}
-						double localdecreasetotal = tourd->deptime[second + 1] - (arrivaltime - ins->t[d].EDT);
-						if (localdecreasetotal > bestdecrease)
+						double globaldecrease = tourd->deptime.back() - (arrivaltime - ins->t[d].EDT);
+						if (globaldecrease > bestdecrease)
 						{
-							departuretime = arrivaltime;
-							for (int v = second+2; v < int(tourd->seq.size()); ++v)
+							bestdecrease = globaldecrease;
+							bestd = tourd;
+							besti = i;
+							bestj = j;
+							bestbreakindex=breakindex;
+							improvement = true;
+							if (mode == 0)
 							{
-								Ins::Vertex* o = mask[v - 1];
-								Ins::Vertex* p = mask[v];
-								arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
-								if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
-								{
-									if (arrivaltime > ins->breakend)
-									{
-										arrivaltime = DBL_MAX;
-										break;
-									}
-									breakindex = v;
-									reqbreak = false;
-									arrivaltime += ins->breakdur;
-								}
-								if (arrivaltime < p->LTW[d])
-								{
-									arrivaltime = p->LTW[d];
-								}
-								if (arrivaltime > p->UTW[d])
-								{
-									arrivaltime = DBL_MAX;
-									break;
-								}
-								arrivaltime += p->serv;
-								departuretime = arrivaltime;
+								goto shift;
 							}
-							double globaldecrease = tourd->deptime.back() - (arrivaltime - ins->t[d].EDT);
-							if (globaldecrease > bestdecrease)
-							{
-								bestdecrease = globaldecrease;
-								bestj = j;
-								bestd = tourd;
-								besti = i;
-								bestbreakindex=breakindex;
-								improvement = true;
-								if (mode == 0)
-								{
-									goto shift;
-								}
-							}//end global check
-						}//end local check
-					}//no shift to same position
+						}//end global check
+					}//end local check
 				}//end for j
 			}//end for i
 		}//end for all tours
@@ -2203,13 +2200,12 @@ bool Moves::shift_nb(Sol& sol, int mode)
 		{
 		shift:
 			Sol remember = sol;
-			Ins::Vertex* candidate = bestd->seq[besti];
-			bestd->seq.erase(bestd->seq.begin()+besti);
-			bestd->seq.insert(bestd->seq.begin()+bestj,candidate);
+			Ins::Vertex* moved = bestd->seq[besti];
+			bestd->seq.erase(bestd->seq.begin() + besti);
+			bestd->seq.insert(bestd->seq.begin() + bestj, moved);
 			bestd->update_break(bestbreakindex);
-			/*
-			double actualdecrease = 0.0;
 			
+			double actualdecrease = 0.0;
 			for (int t = 0; t < (int)sol.tours.size(); ++t)
 			{
 				actualdecrease += remember.tours[t].deptime.back() - sol.tours[t].deptime.back();
@@ -2218,7 +2214,7 @@ bool Moves::shift_nb(Sol& sol, int mode)
 			{
 				cout << "error shift" << endl;
 			}
-			*/
+			
 			if ((bestd->breakindex == int(bestd->seq.size()) - 1) && (ins->t[bestd->index].LAT > ins->breakend + ins->breakdur))
 			{
 				//cout << "break pulled" << endl;
@@ -2228,7 +2224,7 @@ bool Moves::shift_nb(Sol& sol, int mode)
 			//{
 				//cout << "error in shift_nb" << endl;
 			//}
-			succes = false;
+			succes = true;
 		}//end if improvement
 	}//end while improvement
 	return succes;
@@ -2241,7 +2237,7 @@ bool Moves::move_nb(Sol& sol,int mode)//move vertex x from tour d to tour e in o
 	while (improvement)
 	{
 		improvement = false;
-		double bestdecrease = 0.0;
+		double bestdecrease = 1e-9;
 		Sol::Tour *bestd=NULL;
 		Sol::Tour *beste=NULL;
 		int besti;
@@ -2431,7 +2427,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 	while (improvement)
 	{
 		improvement = false;
-		double bestdecrease = 0.0;
+		double bestdecrease = 1e-9;
 		Sol::Tour *bestd=NULL;
 		Sol::Tour *beste=NULL;
 		int besti=-1;

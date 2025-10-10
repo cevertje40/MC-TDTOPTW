@@ -449,7 +449,7 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	Res resdebug;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.3.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();

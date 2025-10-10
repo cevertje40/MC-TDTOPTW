@@ -1011,7 +1011,7 @@ Res Tabu::solve(int bestknown)
 			//cout << "error in replace" << endl;
 		//}
 		//VND
-		shift_nb(s,1);
+		shift_nb(s,0);
 		//or_opt(s, 1);
 		two_opt_nb(s, 1);
 		//if (!s.check())
@@ -1023,7 +1023,7 @@ Res Tabu::solve(int bestknown)
 		//{
 			//cout << "error in swap_nb" << endl;
 		//}
-		swap2_nb(s,0);
+		swap2_nb(s,1);
 		//if (!s.check())
 		//{
 			//cout << "error in swap2_nb" << endl;

@@ -654,7 +654,7 @@ bool Moves::or_opt(Sol& sol, int mode)
 		while (improvement)
 		{
 			improvement = false;
-			double bestdecrease = 0.0001;
+			double bestdecrease = 1e-9;
 			int bestfrom_start;
 			int bestfrom_end;
 			int bestposition;
@@ -666,10 +666,11 @@ bool Moves::or_opt(Sol& sol, int mode)
 				{
 					for (int to = 1; to < size - 1; ++to)
 					{
-						if (to >= from_start && to <= from_end) 
-						{
-							continue;  // Skip invalid insertions
-						}
+						if (to >= from_start && to <= from_end) continue;  // skip invalid insertions
+						
+						if (to == from_start || to == from_end + 1) continue;// skip insert in same position 
+
+
 						// Step 1: Extract the subsequence from the route
 						vector<Ins::Vertex*> subsequence(tour.seq.begin() + from_start, tour.seq.begin() + from_end + 1);
 						Sol::Tour tourtry = tour;
@@ -677,14 +678,15 @@ bool Moves::or_opt(Sol& sol, int mode)
 						tourtry.seq.erase(tourtry.seq.begin() + from_start, tourtry.seq.begin() + from_end + 1);
 						// Step 3: Insert the subsequence at the new position in the route
 						int position = to;
-						if (position > from_start) {
+						if (position > from_start)
+						{
 							// If inserting later in the route, adjust the position since the original segment has been removed
 							position -= (from_end - from_start);
 						}
 						tourtry.seq.insert(tourtry.seq.begin() + position, subsequence.begin(), subsequence.end());
 						double departuretime = ins->t[tour.index].EDT;
 						double arrivaltime=DBL_MAX;
-						int breakindex;
+						int breakindex=-1;
 						bool reqbreak = true;
 						for (int i = 1; i < size; ++i)
 						{
@@ -754,169 +756,184 @@ bool Moves::or_opt(Sol& sol, int mode)
 }//end or_opt
 
 
-boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::*get_ratio)(double, double, double, double, double, double, double))
+boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest,double(Moves::*get_ratio)(double, double, double, double, double, double, double))
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
-	double bestkey = -DBL_MAX;
+
+	const int max_threads =
+	#ifdef _OPENMP
+		omp_get_max_threads();
+	#else
+		1;
+	#endif
+
+	std::vector<boost::heap::priority_queue<One_one_rep_nb>> tls_queues(max_threads);
+
 	#pragma omp parallel
-	{//start parallel session
+	{
+		const int tid =
+		#ifdef _OPENMP
+			omp_get_thread_num();
+		#else
+			0;
+		#endif
+
+		auto& local_q = tls_queues[tid];
+
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			double local_bestkey = -DBL_MAX;
-			//1- INSERT PART
+			// ===== INSERT PART =====
 			Sol::Tour& tour = sol.tours[d];
 			int endj = (int)tour.seq.size();
-			vector<double>wait_suffix = tour.compute_wait_suffix();
-			for (int j = 0; j < endj - 1; ++j)// for all positions in the tour
+			std::vector<double> wait_suffix = tour.compute_wait_suffix();
+
+			for (int j = 0; j < endj - 1; ++j)
 			{
-				Ins::Vertex* x = tour.seq[j];//predecessor y
-				Ins::Vertex* z = tour.seq[j + 1];//successor y
-				int breakz = tour.action[j + 1];//break on z
+				Ins::Vertex* x = tour.seq[j];
+				Ins::Vertex* z = tour.seq[j + 1];
+				int breakz = tour.action[j + 1];
 				int nb_size = (int)x->nb[d].size();
-				//gather departure time
-				double currenttime = tour.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+
+				double currenttime = tour.deptime[j] + ins->t[d].EDT;
+
+				for (int i = 0; i < nb_size - 1; ++i) // skip depot
 				{
-					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-					// Tabu check for y in the current tour (tour index = d)
+					Ins::Vertex* y = x->nb[d][i];
+
 					if ((tabulist.isTabu(y->index, d)) && (sol.score + y->score <= globalbest + 1e-9))
-					{
-						//cout << "tabu list stopped move" << endl;
-						continue; // skip if y is tabu for this tour
+						continue;
+
+					if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index]))
+						continue;
+
+					if (tour.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
+					if (tour.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+
+					double t0      = tour.deptime[j] + ins->t[d].EDT;
+					double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+					double ins_lb  = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+					double dt_lb   = std::max(0.0, ins_lb - base_up);
+
+					double key_ub = (this->*get_ratio)(dt_lb, y->score, y->weight, y->volume,
+													   ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+					if ((key_ub <= local_bestkey + 1e-9) ||
+						(dt_lb   >  wait_suffix[j + 1] + tour.max_shift[j + 1] + 1e-9))
+						continue;
+
+					double at = ins->arrival_time(x->con[y->index], currenttime);
+					if (at < y->LTW[d]) at = y->LTW[d];
+					if (at > y->UTW[d] + 1e-9) continue;
+					at += y->serv;
+					at  = ins->arrival_time(y->con[z->index], at);
+					if (at + breakz * (ins->breakdur) < z->LTW[d]) {
+						at = z->LTW[d] - (breakz * ins->breakdur);
 					}
-					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
-					{
-						if ((tour.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tour.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
-						{
-							double t0 = tour.deptime[j] + ins->t[d].EDT;
-							double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
-							double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
-							double dt_lb = max(0.0, ins_lb - base_up);
-							double key_ub = (this->*get_ratio)(dt_lb, y->score, y->weight, y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-							if ((key_ub > local_bestkey + 1e-9)&&(dt_lb <= wait_suffix[j + 1]+tour.max_shift[j + 1] + 1e-9))
-							{
-								//travel time from x to y
-								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-								if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-								{
-									arrivaltime = y->LTW[d];
-								}
-								if (arrivaltime > y->UTW[d] + 1e-9)
-								{
-									continue;//infeasible
-								}
-								arrivaltime += y->serv;
-								//travel time from y to z
-								arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-								{
-									arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-								}
-								arrivaltime += z->serv + breakz * ins->breakdur;
-								double shift = (arrivaltime - ins->t[d].EDT) - tour.deptime[j + 1];//increase in travel time
-								if (shift <= tour.max_shift[j + 1] + 1e-9)//check of het punt geinsert kan worden
-								{
-									double key = (this->*get_ratio)(shift, y->score, y->weight, y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-									if (key > local_bestkey + 1e-9)
-									{
-										local_bestkey = key;
-										#pragma omp critical
-										{
-											adm_nb.push(One_one_rep_nb(d, -1, j, y, y->score, key, { {},{y} }));
-											if (key > bestkey + 1e-9)
-											{
-												bestkey = key;
-											}
-										}//end critical
-									}//enjd local key
-								}//end shift
-							}//end heuristic score check
-						}//end cap constraints
-					}//end availability
-				}//for all nb
-			}//end for all positions in sol
-			//1- REPLACE PART
+					at += z->serv + breakz * ins->breakdur;
+
+					double shift = (at - ins->t[d].EDT) - tour.deptime[j + 1];
+					if (shift > tour.max_shift[j + 1] + 1e-9) continue;
+
+					double key = (this->*get_ratio)(shift, y->score, y->weight, y->volume,
+													ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+					if (key > local_bestkey + 1e-9) {
+						local_bestkey = key;
+						local_q.push(One_one_rep_nb(d, -1, j, y, y->score, key, { {},{y} }));
+					}
+				}
+			}
+
+			// ===== REPLACE PART =====
 			int endh = (int)sol.tours[d].seq.size();
-			for (int h = 1; h < endh - 1; ++h)// for all  included regular vertices
+			for (int h = 1; h < endh - 1; ++h)
 			{
-				//with replacing: for all existing regular member vertices: remove 1 and revaluate solution
 				Tour tourrem = sol.tours[d];
-				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
+				Ins::Vertex* r = tourrem.seq[h];
 				tourrem.remove_vertex(h);
-				vector<double> wait_suffix = tourrem.compute_wait_suffix();
-				int endj = (int)tourrem.seq.size();
-				for (int j = 0; j < endj - 1; ++j)// for all positions in tourrem
+				std::vector<double> wait_suffix_r = tourrem.compute_wait_suffix();
+
+				int endj2 = (int)tourrem.seq.size();
+				for (int j = 0; j < endj2 - 1; ++j)
 				{
-					Ins::Vertex* x = tourrem.seq[j];//predecessor y
-					Ins::Vertex* z = tourrem.seq[j + 1];//successor y
+					Ins::Vertex* x = tourrem.seq[j];
+					Ins::Vertex* z = tourrem.seq[j + 1];
 					int breakz = tourrem.action[j + 1];
 					int nb_size = (int)x->nb[d].size();
-					//gather departure time
-					double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+
+					double currenttime = tourrem.deptime[j] + ins->t[d].EDT;
+
+					for (int i = 0; i < nb_size - 1; ++i)
 					{
-						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-						// Tabu check for y in the current tour (tour index = d)
-						if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - r->score) <= globalbest + 1e-9))
-						{
-							//cout << "tabu list stopped move" << endl;
-							continue; // skip if y is tabu for this tour
+						Ins::Vertex* y = x->nb[d][i];
+
+						if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) &&
+							(sol.score + (y->score - r->score) <= globalbest + 1e-9))
+							continue;
+
+						if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index]))
+							continue;
+
+						if (tourrem.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
+						if (tourrem.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+
+						double t0      = tourrem.deptime[j] + ins->t[d].EDT;
+						double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+						double ins_lb  = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+						double dt_lb   = std::max(0.0, ins_lb - base_up);
+
+						double key_ub  = (this->*get_ratio)(dt_lb,
+															y->score - r->score,
+															y->weight - r->weight,
+															y->volume - r->volume,
+															ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+						if ((key_ub <= local_bestkey + 1e-9) ||
+							(dt_lb   >  wait_suffix_r[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
+							continue;
+
+						double at = ins->arrival_time(x->con[y->index], currenttime);
+						if (at < y->LTW[d]) at = y->LTW[d];
+						if (at > y->UTW[d] + 1e-9) continue;
+						at += y->serv;
+						at  = ins->arrival_time(y->con[z->index], at);
+						if (at + breakz * (ins->breakdur) < z->LTW[d]) {
+							at = z->LTW[d] - (breakz * ins->breakdur);
 						}
-						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
-						{
-							if ((tourrem.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
-							{
-								double t0 = tourrem.deptime[j] + ins->t[d].EDT;
-								double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
-								double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
-								double dt_lb = max(0.0, ins_lb - base_up);
-								double key_ub = (this->*get_ratio)(dt_lb, y->score - r->score, y->weight - r->weight, y->volume - r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-								if ((key_ub > local_bestkey + 1e-9)&&(dt_lb <= wait_suffix[j + 1] + tourrem.max_shift[j+1]+ 1e-9))
-								{
-									//travel time from x to y
-									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-									if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-									{
-										arrivaltime = y->LTW[d];
-									}
-									if (arrivaltime > y->UTW[d] + 1e-9)
-									{
-										continue;//infeasible
-									}
-									arrivaltime += y->serv;
-									//travel time from y to z
-									arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-									{
-										arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-									}
-									arrivaltime += z->serv + breakz * ins->breakdur;
-									double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-									if (shift <= tourrem.max_shift[j + 1] + 1e-9)//check of het punt geinsert kan worden
-									{
-										double key = (this->*get_ratio)(shift, y->score-r->score, y->weight-r->weight, y->volume-r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-										if (key > local_bestkey + 1e-9)
-										{
-											local_bestkey = key;
-											#pragma omp critical
-											{
-												adm_nb.push(One_one_rep_nb(d, h, j, y, y->score - r->score, key, { {r},{y} }));
-												if (key > bestkey+1e-9)
-												{
-													bestkey = key;
-												}
-											}//end critical
-										}// end local key
-									}//end shift
-								}//end if heuristic check
-							}//end cap constraints
-						}//end availability 
-					}//for all nb
-				}//end for all positions in tourrem
-			}//end for all included regular vertices in sol
-		}//end for all tours
-	}//end omp parallel
+						at += z->serv + breakz * ins->breakdur;
+
+						double shift = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
+						if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
+
+						double key = (this->*get_ratio)(shift,
+														y->score - r->score,
+														y->weight - r->weight,
+														y->volume - r->volume,
+														ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+						if (key > local_bestkey + 1e-9) {
+							local_bestkey = key;
+							local_q.push(One_one_rep_nb(d, h, j, y,
+														y->score - r->score, key, { {r},{y} }));
+						}
+					}
+				}
+			}
+		} // for d
+	} // parallel
+
+	// Serial merge (outside hot path)
+	for (auto& q : tls_queues) 
+	{
+		while (!q.empty()) 
+		{
+			adm_nb.push(q.top());
+			q.pop();
+		}
+	}
+
 	return adm_nb;
 }
 
@@ -946,702 +963,399 @@ inline double base_travel_UB_over_interval(Ins* ins, Ins::Connec* c,
 	return ub;
 }
 
-boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
+boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest,double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
-	double bestkey = -DBL_MAX;
-	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
-	#pragma omp parallel
-	{//start parallel session
-		#pragma omp for nowait
-		for (int d = 0; d < ins->maxtours; ++d)
-		{
-			double local_bestkey = -DBL_MAX;
-			int endh = (int)sol.tours[d].seq.size();
-			for (int h = 1; h < endh - 1; ++h)// for all included regular vertices in sol
-			{
-				//for all existing regular member vertices: remove 1 and revaluate solution
-				Sol::Tour tourrem = sol.tours[d];
-				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
-				tourrem.remove_vertex(h);
-				vector<double> wait_suffix_rem = tourrem.compute_wait_suffix(); 
-				const double prune_floor0 = std::max(local_bestkey, bestkey);
-				int endj = (int)tourrem.seq.size();
-				for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
-				{
-					Ins::Vertex* x1 = tourrem.seq[j];//predecessor y
-					Ins::Vertex* z1 = tourrem.seq[j + 1];//successor y
-					int breakz1 = tourrem.action[j + 1];
-					int nb_size = (int)x1->nb[d].size();
-					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
-					{
-						Ins::Vertex* y1 = x1->nb[d][i];//potential insertion at position j
-						if ((sol.available[y1->index]) && (x1->nbi[d][y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
-						{
-							if ((tourrem.weight + y1->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y1->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
-							{
-								
-								double t0_1 = tourrem.deptime[j] + ins->t[d].EDT;
-								double baseUB_1 = ins->arrival_time(x1->con[z1->index], t0_1) - t0_1;        // UB at real depart
-								double insLB_1 = x1->con[y1->index]->determin + y1->serv + y1->con[z1->index]->determin;
-								double dtLB_1 = std::max(0.0, insLB_1 - baseUB_1);
-
-								// feasibility pre-gate using waiting budget on tourrem
-								if (dtLB_1 > wait_suffix_rem[j + 1] + tourrem.max_shift[j + 1] + 1e-9) continue;
-								
-								//gather departure time
-								double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-								//travel time from x1 to y1
-								double arrivaltime = ins->arrival_time(x1->con[y1->index], currenttime);
-								if (arrivaltime < y1->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-								{
-									arrivaltime = y1->LTW[d];
-								}
-								if (arrivaltime > y1->UTW[d]+1e-9)
-								{
-									continue;//infeasible
-								}
-								arrivaltime += y1->serv;
-								//travel time from y1 to z
-								arrivaltime = ins->arrival_time(y1->con[z1->index], arrivaltime);
-								if (arrivaltime + breakz1 * (ins->breakdur) < z1->LTW[d])
-								{
-									arrivaltime = z1->LTW[d] - (breakz1 * ins->breakdur);
-								}
-								arrivaltime += z1->serv + breakz1 * ins->breakdur;
-								double shift1 = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-								if (shift1 <= tourrem.max_shift[j + 1]+ 1e-9)//check if first vertex can be inserted
-								{
-
-									bool any_second_survives = false;
-
-									// --------- Stage-A for boundaries p != j (map to k != j after insertion) ----------
-									int p_end = (int)tourrem.seq.size() - 1;
-									for (int p = 0; p < p_end; ++p) {
-										if (p == j) continue; // boundary becomes x1|y1 in tourremins -> treat in special-case below
-
-										Ins::Vertex* x2 = tourrem.seq[p];
-										Ins::Vertex* z2 = tourrem.seq[p + 1];
-
-										// Upper-bound the departure time interval at this boundary after first insertion
-										double Wprefix = 0.0;
-										if (p + 1 > j + 1) {
-											// waiting between (j+1) and (p+1) in tourrem
-											Wprefix = wait_suffix_rem[j + 1] - wait_suffix_rem[p + 1];
-											if (Wprefix < 0.0) Wprefix = 0.0;
-										}
-										double delta_at_p = shift1 - Wprefix;
-										if (delta_at_p < 0.0) delta_at_p = 0.0;
-
-										double t_low = tourrem.deptime[p] + ins->t[d].EDT;
-										double t_high = t_low + delta_at_p;
-
-										// Robust base-arc UB over [t_low, t_high]
-										Ins::Connec* cxz = x2->con[z2->index];
-										double baseUB = base_travel_UB_over_interval(ins, cxz, t_low, t_high);
-
-										// Waiting/shift UB from tourrem at boundary p+1 (safe upper bound)
-										double Wup = wait_suffix_rem[p + 1];
-										double Mup = tourrem.max_shift[p + 1];
-
-										// loop neighbours of x2 (skip last = end depot)
-										std::vector<Ins::Vertex*>& neigh = x2->nb[d];
-										int nb2 = (int)neigh.size();
-										for (int ii = 0; ii < nb2 - 1; ++ii) {
-											Ins::Vertex* y2 = neigh[ii];
-
-											// (You may drop tabu here for safety; keeping it only saves work.)
-											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
-												(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9)) {
-												continue;
-											}
-
-											if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
-											if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
-
-											// LB on inserted path (determin MUST be a true LB)
-											double insLB = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
-											double dtLB = insLB - baseUB; if (dtLB < 0.0) dtLB = 0.0;
-
-											if (dtLB <= Wup + Mup + 1e-9) { any_second_survives = true; break; }
-										}
-										if (any_second_survives) break;
-									}
-
-									// --------- Stage-A special-case for k == j (between x1 and y1) ----------
-									if (!any_second_survives) {
-										// After inserting y1 at (j), the boundary k==j is x1 | y1.
-										// Departure is exactly t0_1; base arc is x1->y1.
-										Ins::Connec* c_x1y1 = x1->con[y1->index];
-										double baseUB_j = ins->arrival_time(c_x1y1, t0_1) - t0_1; // exact UB at that depart
-
-										double Wup_j = wait_suffix_rem[j + 1];         // safe UB on waiting after y1
-										double Mup_j = tourrem.max_shift[j + 1];       // safe UB on max_shift after y1
-
-										// Neighbours from x1 (skip end depot; also skip y1 itself)
-										std::vector<Ins::Vertex*>& neigh1 = x1->nb[d];
-										int nb1 = (int)neigh1.size();
-										for (int ii = 0; ii < nb1 - 1; ++ii) {
-											Ins::Vertex* y2 = neigh1[ii];
-											if (y2 == y1) continue;
-
-											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
-												(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9)) {
-												continue;
-											}
-
-											if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
-											if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
-
-											double insLB = x1->con[y2->index]->determin + y2->serv + y2->con[y1->index]->determin;
-											double dtLB = insLB - baseUB_j; if (dtLB < 0.0) dtLB = 0.0;
-
-											if (dtLB <= Wup_j + Mup_j + 1e-9) { any_second_survives = true; break; }
-										}
-									}
-
-									if (!any_second_survives) continue; // skip building tourremins for this (j,y1)
-
-									//execute the first insertion
-									Sol::Tour tourremins = tourrem;
-									tourremins.insert_vertex(y1, j);
-									vector<double>wait_suffix = tourremins.compute_wait_suffix();
-									int endk = (int)tourremins.seq.size();
-									//check if second vertex can be inserted in this new tour
-									for (int k = 0; k < endk - 1; ++k)// for all positions in tourremins
-									{
-										Ins::Vertex* x2 = tourremins.seq[k];//predecessor y2
-										Ins::Vertex* z2 = tourremins.seq[k + 1];//successor y2
-										int breakz2 = tourremins.action[k + 1];
-										int nb_size = (int)x2->nb[d].size();
-										double t0 = tourremins.deptime[k] + ins->t[d].EDT;
-										double base_up = ins->arrival_time(x2->con[z2->index], t0) - t0;
-										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
-										{
-											Ins::Vertex* y2 = x2->nb[d][i];//potential insertion at position k
-											if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) && (sol.score + (y1->score + y2->score - r->score) <= globalbest+1e-9))
-											{
-												//cout << "tabu list stopped move" << endl;
-												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
-											}
-											if ((sol.available[y2->index]) && (x2->nbi[d][y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
-											{
-												if ((tourremins.weight + y2->weight <= ins->t[d].W_max+ 1e-9) && (tourremins.volume + y2->volume <= ins->t[d].V_max+ 1e-9))//cap constraint check
-												{
-													
-													double ins_lb = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
-													double dt_lb = max(0.0, ins_lb - base_up);
-													double key_ub = (this->*get_ratio)(shift1 + dt_lb, (y1->score + y2->score) - r->score, (y1->weight + y2->weight) - r->weight, (y1->volume + y2->volume) - r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-													if ((key_ub > local_bestkey + 1e-9)&&(dt_lb<= wait_suffix[k + 1]+tourremins.max_shift[k + 1] + 1e-9))
-													{
-														//gather departure time
-														double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
-														//travel time from x to y2
-														double arrivaltime = ins->arrival_time(x2->con[y2->index], currenttime);
-														if (arrivaltime < y2->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-														{
-															arrivaltime = y2->LTW[d];
-														}
-														if (arrivaltime > y2->UTW[d]+1e-9)
-														{
-															continue;//infeasible
-														}
-														arrivaltime += y2->serv;
-														//travel time from y2 to z
-														arrivaltime = ins->arrival_time(y2->con[z2->index], arrivaltime);
-														if (arrivaltime + breakz2 * (ins->breakdur) < z2->LTW[d])
-														{
-															arrivaltime = z2->LTW[d] - (breakz2 * ins->breakdur);
-														}
-														arrivaltime += z2->serv + breakz2 * ins->breakdur;
-														double shift2 = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
-														if (shift2 <= tourremins.max_shift[k + 1]+ 1e-9)//check of het punt geinsert kan worden
-														{
-															double key = (this->*get_ratio)(shift1 + shift2, (y1->score + y2->score)-r->score, (y1->weight + y2->weight)-r->weight, (y1->volume + y2->volume)-r->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-															if (key > local_bestkey + 1e-9)
-															{
-																local_bestkey = key;
-																#pragma omp critical
-																{
-																	adm_nb.push(One_two_rep_nb(d, h, j, k, y1, y2, y1->score + y2->score - r->score, key, { {r},{y1,y2} }));
-																	if (key > bestkey+ 1e-9)
-																	{
-																		bestkey = key;
-																	}//end best key
-																}//end critical
-															}//end local key
-														}//end shift 2
-													}//end heuristic score check
-												}//end cap check 2
-											}//end availability 2
-										}//end all nb2
-									}//end for all positions in tourremins
-								}//end if shift succes first insertion
-							}//end cap check 1
-						}//end availability check 1
-					}//end for all nb1
-				}//end for all positions in tourrem 1
-			}//end for all included regular vertices in tour
-		}//end for all tours
-	}//end omp parallel
-	return adm_nb;
-}
-
-boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double(Moves::* get_ratio)(double, double, double, double, double, double, double))
-{
-	double bestkey = -DBL_MAX;
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
+
+	const int max_threads =
+	#ifdef _OPENMP
+		omp_get_max_threads();
+	#else
+		1;
+	#endif
+
+	std::vector<boost::heap::priority_queue<Two_one_rep_nb>> tls_queues(max_threads);
+
 	#pragma omp parallel
-	{//start parallel session
+	{
+		const int tid =
+		#ifdef _OPENMP
+			omp_get_thread_num();
+		#else
+			0;
+		#endif
+
+		auto& local_q = tls_queues[tid];
+
+		// ----------------------- PARALLEL BODY -----------------------
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
+			// IMPORTANT: reset per tour d (matches your original behavior)
 			double local_bestkey = -DBL_MAX;
+
 			int end = (int)sol.tours[d].seq.size();
-			for (int g = 1; g < end - 1; ++g)// for all  included regular vertices in sol
+			for (int g = 1; g < end - 1; ++g)            // first removed regular vertex
 			{
-				for (int h = g+1; h < end - 1; ++h)// for all  inlcuded regular vertices in sol
+				for (int h = g + 1; h < end - 1; ++h)    // second removed regular vertex
 				{
-					//for all existing regular member vertices: remove 2 and revaluate solution
+					// Build tour with 2 removals
 					Sol::Tour tourrem = sol.tours[d];
-					Ins::Vertex* r = tourrem.seq[g];//to be removed vertex 1
-					Ins::Vertex* s = tourrem.seq[h];//to be removed vertex 2
+					Ins::Vertex* r = tourrem.seq[g];
+					Ins::Vertex* s = tourrem.seq[h];
 					tourrem.remove_vertices(g, h);
-					vector<double> wait_suffix = tourrem.compute_wait_suffix();
-					int endj = (int)tourrem.seq.size();
-					for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
+
+					std::vector<double> wait_suffix = tourrem.compute_wait_suffix();
+
+					const int endj = (int)tourrem.seq.size();
+					for (int j = 0; j < endj - 1; ++j) // insertion boundary in tourrem
 					{
-						Ins::Vertex* x = tourrem.seq[j];//predecessor y
-						Ins::Vertex* z = tourrem.seq[j + 1];//successor y
-						int breakz = tourrem.action[j + 1];
-						int nb_size = (int)x->nb[d].size();
-						//gather departure time
-						double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-						for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+						Ins::Vertex* x = tourrem.seq[j];
+						Ins::Vertex* z = tourrem.seq[j + 1];
+						const int breakz = tourrem.action[j + 1];
+
+						// Hoist base values that don't depend on y:
+						const double t0 = tourrem.deptime[j] + ins->t[d].EDT;
+						const double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+
+						const int nb_size = (int)x->nb[d].size();
+						const double currenttime = t0; // identical to above, just clearer
+
+						for (int i = 0; i < nb_size - 1; ++i) // skip last neighbor = end depot
 						{
-							Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-							if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - (r->score+s->score)) <= globalbest + 1e-9))
+							Ins::Vertex* y = x->nb[d][i];
+
+							// Tabu with aspiration against globalbest
+							if (((tabulist.isTabu(r->index, d)) ||
+								(tabulist.isTabu(s->index, d)) ||
+								(tabulist.isTabu(y->index, d))) &&
+								(sol.score + (y->score - (r->score + s->score)) <= globalbest + 1e-9))
 							{
-								//cout << "vertices are tabu" << endl;
-								continue; // skip if y is tabu for this tour and the combination does not improve globalbest
+								continue;
 							}
-							if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
+
+							// Availability & adjacency
+							if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index]))
+								continue;
+
+							// Capacity
+							if (tourrem.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
+							if (tourrem.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+
+							// Time LB/UB gate (cheap)
+							const double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+							const double dt_lb = std::max(0.0, ins_lb - base_up);
+
+							const double key_ub = (this->*get_ratio)(dt_lb,y->score - (r->score + s->score),y->weight - (r->weight + s->weight),y->volume - (r->volume + s->volume),ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+							if ((key_ub <= local_bestkey + 1e-9) ||
+								(dt_lb > wait_suffix[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
 							{
-								if ((tourrem.weight + y->weight <= ins->t[d].W_max + 1e-9) && (tourrem.volume + y->volume <= ins->t[d].V_max + 1e-9))//cap constraint check
-								{
-									double t0 = tourrem.deptime[j] + ins->t[d].EDT;
-									double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
-									double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
-									double dt_lb = max(0.0, ins_lb - base_up);
-									double key_ub = (this->*get_ratio)(dt_lb, y->score - (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume), ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-									if ((key_ub > local_bestkey + 1e-9)&&(dt_lb<= wait_suffix[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
-									{
-										//travel time from x to y
-										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-										if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-										{
-											arrivaltime = y->LTW[d];
-										}
-										if (arrivaltime > y->UTW[d] + 1e-9)
-										{
-											continue;//infeasible
-										}
-										arrivaltime += y->serv;
-										//travel time from y to z
-										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-										{
-											arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-										}
-										arrivaltime += z->serv + breakz * ins->breakdur;
-										double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-										if (shift <= tourrem.max_shift[j + 1] + 1e-9)//check of het punt geinsert kan worden
-										{
-											double key = (this->*get_ratio)(shift, y->score- (r->score + s->score), y->weight - (r->weight + s->weight), y->volume - (r->volume + s->volume), ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
-											if (key > local_bestkey + 1e-9)
-											{
-												local_bestkey = key;
-												#pragma omp critical
-												{
-													adm_nb.push(Two_one_rep_nb(d, g, h, j, y, y->score - (r->score + s->score), key, { {r,s},{y} }));
-													if (key > bestkey + 1e-9)
-													{
-														bestkey = key;
-													}//end bestkey
-												}//end critical
-											}//end local key
-										}//end shift
-									}//end heuristic score check
-								}//end cap check
-							}//end availability & nb check
-						}//for all nb
-					}//end for all positions in tourrem
-				}//end for all included regular vertices in sol
-			}//end for all included regular vertices in sol
-		}//end for all tours
-	}//end pragma parallel
+								continue; // prune
+							}
+
+							// Exact time-feasibility check
+							double at = ins->arrival_time(x->con[y->index], currenttime);
+							if (at < y->LTW[d]) at = y->LTW[d];
+							if (at > y->UTW[d] + 1e-9) continue;
+							at += y->serv;
+
+							at = ins->arrival_time(y->con[z->index], at);
+							if (at + breakz * (ins->breakdur) < z->LTW[d]) {
+								at = z->LTW[d] - (breakz * ins->breakdur);
+							}
+							at += z->serv + breakz * ins->breakdur;
+
+							const double shift = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
+							if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
+
+							// Objective key
+							const double key = (this->*get_ratio)(
+								shift,
+								 y->score - (r->score + s->score),
+								 y->weight - (r->weight + s->weight),
+								 y->volume - (r->volume + s->volume),
+								ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+							if (key > local_bestkey + 1e-9) 
+							{
+								local_bestkey = key;
+								// Push to this thread's queue (no locking)
+								local_q.push(Two_one_rep_nb(d, g, h, j, y,y->score - (r->score + s->score),key, { {r, s}, {y}}));
+							}
+						} // nb
+					} // j
+				} // h
+			} // g
+		} // for d
+		// --------------------- END PARALLEL BODY ---------------------
+	} // omp parallel
+
+	// Serial merge 
+	for (auto& q : tls_queues) 
+	{
+		while (!q.empty()) 
+		{
+			adm_nb.push(q.top());
+			q.pop();
+		}
+	}
+
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_one_rep_nb> Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
+boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest,double(Moves::* get_ratio)(double, double, double, double, double, double, double))
 {
-	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
-	int bestscore = -INT_MAX;// Thread-local gating to avoid races; publish only under critical.
+	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
+
+	const int max_threads =
+	#ifdef _OPENMP
+		omp_get_max_threads();
+	#else
+		1;
+	#endif
+
+	std::vector<boost::heap::priority_queue<One_two_rep_nb>> tls_queues(max_threads);
+
 	#pragma omp parallel
-	{//start parallel session
-		int local_bestscore = -INT_MAX;
+	{
+		const int tid =
+		#ifdef _OPENMP
+			omp_get_thread_num();
+		#else
+			0;
+		#endif
+
+		auto& local_q = tls_queues[tid];
+
+		// ----------------------- PARALLEL BODY -----------------------
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
-			//1- INSERT PART
-			Sol::Tour& tour = sol.tours[d];
-			int endj = (int)tour.seq.size();
-			for (int j = 0; j < endj - 1; ++j)// for all positions in the tour
-			{
-				Ins::Vertex* x = tour.seq[j];//predecessor y
-				Ins::Vertex* z = tour.seq[j + 1];//successor y
-				int breakz = tour.action[j + 1];//break on z
-				int nb_size = (int)x->nb[d].size();
-				for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
-				{
-					Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-					// Tabu check for y in the current tour (tour index = t)
-					if ((tabulist.isTabu(y->index, d))&&(sol.score+y->score<=globalbest))
-					{
-						//cout << "tabu list stopped move" << endl;
-						continue; // skip if y is tabu for this tour
-					}
-					if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
-					{
-						if (y->score > local_bestscore)
-						{
-							if ((tour.weight + y->weight <= ins->t[d].W_max) && (tour.volume + y->volume <= ins->t[d].V_max))//cap constraint check
-							{
-								//gather departure time
-								double currenttime = tour.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-								//travel time from x to y
-								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-								if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-								{
-									arrivaltime = y->LTW[d];
-								}
-								if (arrivaltime > y->UTW[d])
-								{
-									continue;//infeasible
-								}
-								arrivaltime += y->serv;
-								//travel time from y to z
-								arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-								{
-									arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-								}
-								arrivaltime += z->serv + breakz * ins->breakdur;
-								double shift = (arrivaltime - ins->t[d].EDT) - tour.deptime[j + 1];//increase in travel time
-								if (shift <= tour.max_shift[j + 1])//check of het punt geinsert kan worden
-								{
-									local_bestscore = y->score;
-									#pragma omp critical
-									{
-										adm_nb.push(One_one_rep_nb(d, -1, j, y, y->score,y->score,{{},{y}}));
-										if (y->score > bestscore)
-										{
-											bestscore = y->score;
-										}
-									}
-								}
-							}//end cap constraints
-						}//end score or heap min limit
-					}//end availability
-				}//for all nb
-			}//end for all positions in sol
-			//1- REPLACE PART
+			// reset per tour (matches your original behavior)
+			double local_bestkey = -DBL_MAX;
+
 			int endh = (int)sol.tours[d].seq.size();
-			for (int h = 1; h < endh - 1; ++h)// for all  included regular vertices
+			for (int h = 1; h < endh - 1; ++h) // removed vertex r
 			{
-				//with replacing: for all existing regular member vertices: remove 1 and revaluate solution
-				Tour tourrem = sol.tours[d];
-				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
+				// build tour after removing r
+				Sol::Tour tourrem = sol.tours[d];
+				Ins::Vertex* r = tourrem.seq[h];
 				tourrem.remove_vertex(h);
+
+				// suffix waiting (upper bound) on tourrem
+				std::vector<double> wait_suffix_rem = tourrem.compute_wait_suffix();
+
 				int endj = (int)tourrem.seq.size();
-				for (int j = 0; j < endj - 1; ++j)// for all positions in tourrem
+				for (int j = 0; j < endj - 1; ++j) // position for first insertion y1
 				{
-					Ins::Vertex* x = tourrem.seq[j];//predecessor y
-					Ins::Vertex* z = tourrem.seq[j + 1];//successor y
-					int breakz = tourrem.action[j + 1];
-					int nb_size = (int)x->nb[d].size();
-					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+					Ins::Vertex* x1 = tourrem.seq[j];
+					Ins::Vertex* z1 = tourrem.seq[j + 1];
+					int breakz1 = tourrem.action[j + 1];
+
+					int nb1 = (int)x1->nb[d].size();
+					for (int i = 0; i < nb1 - 1; ++i) // skip end depot
 					{
-						Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-						if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - r->score) <= globalbest))
-						{
-							//cout << "tabu list stopped move" << endl;
-							continue; // skip if y is tabu for this tour
+						Ins::Vertex* y1 = x1->nb[d][i];
+
+						if (!(sol.available[y1->index] && x1->nbi[d][y1->index] && y1->nbi[d][z1->index]))
+							continue;
+
+						// capacity with y1 (remember we already removed r)
+						if (tourrem.weight + y1->weight > ins->t[d].W_max + 1e-9) continue;
+						if (tourrem.volume + y1->volume > ins->t[d].V_max + 1e-9) continue;
+
+						// time LB/UB gate for first insertion
+						double t0_1 = tourrem.deptime[j] + ins->t[d].EDT;
+						double baseUB_1 = ins->arrival_time(x1->con[z1->index], t0_1) - t0_1;
+						double insLB_1 = x1->con[y1->index]->determin + y1->serv + y1->con[z1->index]->determin;
+						double dtLB_1 = std::max(0.0, insLB_1 - baseUB_1);
+
+						// feasibility pre-gate using waiting budget on tourrem
+						if (dtLB_1 > wait_suffix_rem[j + 1] + tourrem.max_shift[j + 1] + 1e-9)
+							continue;
+
+						// exact feasibility for first insertion (shift1)
+						double ct = t0_1;
+						double at = ins->arrival_time(x1->con[y1->index], ct);
+						if (at < y1->LTW[d]) at = y1->LTW[d];
+						if (at > y1->UTW[d] + 1e-9) continue;
+						at += y1->serv;
+
+						at = ins->arrival_time(y1->con[z1->index], at);
+						if (at + breakz1 * ins->breakdur < z1->LTW[d])
+							at = z1->LTW[d] - breakz1 * ins->breakdur;
+						at += z1->serv + breakz1 * ins->breakdur;
+
+						double shift1 = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
+						if (shift1 > tourrem.max_shift[j + 1] + 1e-9) continue;
+
+						// ---------------- Stage-A fast pre-gate for second insertion ----------------
+						bool any_second_survives = false;
+
+						// boundaries p != j in tourrem (map to k != j after insertion)
+						int p_end = (int)tourrem.seq.size() - 1;
+						for (int p = 0; p < p_end && !any_second_survives; ++p) {
+							if (p == j) continue;
+
+							Ins::Vertex* x2 = tourrem.seq[p];
+							Ins::Vertex* z2 = tourrem.seq[p + 1];
+
+							// delay reaching boundary p+1 after first insertion (UB)
+							double Wprefix = 0.0;
+							if (p + 1 > j + 1) {
+								Wprefix = wait_suffix_rem[j + 1] - wait_suffix_rem[p + 1];
+								if (Wprefix < 0.0) Wprefix = 0.0;
+							}
+							double delta_at_p = shift1 - Wprefix;
+							if (delta_at_p < 0.0) delta_at_p = 0.0;
+
+							double t_low = tourrem.deptime[p] + ins->t[d].EDT;
+							double t_high = t_low + delta_at_p;
+
+							// base-arc travel-time UB over [t_low, t_high]
+							Ins::Connec* cxz = x2->con[z2->index];
+							double baseUB = base_travel_UB_over_interval(ins, cxz, t_low, t_high);
+
+							double Wup = wait_suffix_rem[p + 1];
+							double Mup = tourrem.max_shift[p + 1];
+
+							// neighbours from x2 (skip end depot)
+							std::vector<Ins::Vertex*>& neigh2 = x2->nb[d];
+							int nb2 = (int)neigh2.size();
+							for (int ii = 0; ii < nb2 - 1; ++ii) {
+								Ins::Vertex* y2 = neigh2[ii];
+
+								// optional tabu (kept as in your code)
+								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
+									(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
+									continue;
+
+								// capacity with y1 + y2
+								if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
+								if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+
+								// LB on inserted path at boundary p
+								double insLB = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
+								double dtLB = insLB - baseUB; if (dtLB < 0.0) dtLB = 0.0;
+
+								if (dtLB <= Wup + Mup + 1e-9) { any_second_survives = true; break; }
+							}
 						}
-						if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability & improvement to current best admissable
+
+						// special-case boundary k == j (between x1 and y1 in tourremins)
+						if (!any_second_survives) {
+							Ins::Connec* c_x1y1 = x1->con[y1->index];
+							double baseUB_j = ins->arrival_time(c_x1y1, t0_1) - t0_1;
+
+							double Wup_j = wait_suffix_rem[j + 1];
+							double Mup_j = tourrem.max_shift[j + 1];
+
+							std::vector<Ins::Vertex*>& neigh1 = x1->nb[d];
+							int nbx = (int)neigh1.size();
+							for (int ii = 0; ii < nbx - 1; ++ii) {
+								Ins::Vertex* y2 = neigh1[ii];
+								if (y2 == y1) continue;
+
+								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
+									(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
+									continue;
+
+								if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
+								if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+
+								double insLB = x1->con[y2->index]->determin + y2->serv + y2->con[y1->index]->determin;
+								double dtLB = insLB - baseUB_j; if (dtLB < 0.0) dtLB = 0.0;
+
+								if (dtLB <= Wup_j + Mup_j + 1e-9) { any_second_survives = true; break; }
+							}
+						}
+
+						if (!any_second_survives) continue; // skip (j,y1) if no second insertion can survive
+
+						// ---------------- Do the actual first insertion; then test all k,y2 ----------------
+						Sol::Tour tourremins = tourrem;
+						tourremins.insert_vertex(y1, j);
+
+						std::vector<double> wait_suffix = tourremins.compute_wait_suffix();
+						int endk = (int)tourremins.seq.size();
+
+						for (int k = 0; k < endk - 1; ++k)
 						{
-							if (y->score - r->score > local_bestscore)
+							Ins::Vertex* x2 = tourremins.seq[k];
+							Ins::Vertex* z2 = tourremins.seq[k + 1];
+							int breakz2 = tourremins.action[k + 1];
+
+							const double t0 = tourremins.deptime[k] + ins->t[d].EDT;
+							const double base_up = ins->arrival_time(x2->con[z2->index], t0) - t0;
+
+							int nb2 = (int)x2->nb[d].size();
+							for (int ii = 0; ii < nb2 - 1; ++ii) // skip end depot
 							{
-								if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
+								Ins::Vertex* y2 = x2->nb[d][ii];
+
+								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
+									(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
+									continue;
+
+								if (!(sol.available[y2->index] && x2->nbi[d][y2->index] && y2->nbi[d][z2->index]) || (y2 == y1))
+									continue;
+
+								if (tourremins.weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
+								if (tourremins.volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+
+								// cheap key_ub + shift gate
+								double ins_lb = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
+								double dt_lb = std::max(0.0, ins_lb - base_up);
+								double key_ub = (this->*get_ratio)(shift1 + dt_lb,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+								if (key_ub <= local_bestkey + 1e-9) continue;
+								if (dt_lb > wait_suffix[k + 1] + tourremins.max_shift[k + 1] + 1e-9) continue;
+
+								// exact second insertion (shift2)
+								double ct2 = t0;
+								double at2 = ins->arrival_time(x2->con[y2->index], ct2);
+								if (at2 < y2->LTW[d]) at2 = y2->LTW[d];
+								if (at2 > y2->UTW[d] + 1e-9) continue;
+								at2 += y2->serv;
+
+								at2 = ins->arrival_time(y2->con[z2->index], at2);
+								if (at2 + breakz2 * ins->breakdur < z2->LTW[d])
+									at2 = z2->LTW[d] - breakz2 * ins->breakdur;
+								at2 += z2->serv + breakz2 * ins->breakdur;
+
+								double shift2 = (at2 - ins->t[d].EDT) - tourremins.deptime[k + 1];
+								if (shift2 > tourremins.max_shift[k + 1] + 1e-9) continue;
+
+								// final key
+								double key = (this->*get_ratio)(shift1 + shift2,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+
+								if (key > local_bestkey + 1e-9) 
 								{
-									//gather departure time
-									double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-									//travel time from x to y
-									double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-									if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-									{
-										arrivaltime = y->LTW[d];
-									}
-									if (arrivaltime > y->UTW[d])
-									{
-										continue;//infeasible
-									}
-									arrivaltime += y->serv;
-									//travel time from y to z
-									arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-									if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-									{
-										arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-									}
-									arrivaltime += z->serv + breakz * ins->breakdur;
-									double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-									if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
-									{
-										local_bestscore = y->score - r->score;
-										#pragma omp critical
-										{
-											adm_nb.push(One_one_rep_nb(d, h, j, y, y->score - r->score, y->score - r->score,{{r},{y}}));
-											if (y->score - r->score > bestscore)
-											{
-												bestscore = y->score - r->score;
-											}
-										}
-									}
-								}//end cap constraints
-							}//end if score increasing
-						}//end availability 
-					}//for all nb
-				}//end for all positions in tourrem
-			}//end for all included regular vertices in sol
-		}//end for all tours
-	}//end omp parallel
+									local_bestkey = key;
+									local_q.push(One_two_rep_nb(d, h, j, k, y1, y2,(y1->score + y2->score) - r->score,key,{ {r}, {y1, y2} }
+									));
+								}
+							} // y2
+						} // k
+					} // y1
+				} // j
+			} // h
+		} // for d
+		// --------------------- END PARALLEL BODY ---------------------
+	} // omp parallel
+
+	// Serial merge (outside hot path)
+	for (auto& q : tls_queues) {
+		while (!q.empty()) {
+			adm_nb.push(q.top()); // copy; deterministic with a stable comparator
+			q.pop();
+		}
+	}
+
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_two_rep_nb> Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
-{
-	int bestscore = -INT_MAX;
-	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
-	#pragma omp parallel
-	{//start parallel session
-		int local_bestscore = -INT_MAX;// Thread-local gating to avoid races; publish only under critical.
-		#pragma omp for nowait
-		for (int d = 0; d < ins->maxtours; ++d)
-		{
-			int endh = (int)sol.tours[d].seq.size();
-			for (int h = 1; h < endh - 1; ++h)// for all included regular vertices in sol
-			{
-				//for all existing regular member vertices: remove 1 and revaluate solution
-				Sol::Tour tourrem = sol.tours[d];
-				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
-				tourrem.remove_vertex(h);
-				int endj = (int)tourrem.seq.size();
-				for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
-				{
-					Ins::Vertex* x1 = tourrem.seq[j];//predecessor y
-					Ins::Vertex* z1 = tourrem.seq[j + 1];//successor y
-					int breakz1 = tourrem.action[j + 1];
-					int nb_size1 = (int)x1->nb[d].size();
-					for (int i1 = 0; i1 < nb_size1 - 1; ++i1)//for all neighbours of the included vertex (non-enddepot)
-					{
-						Ins::Vertex* y1 = x1->nb[d][i1];//potential insertion at position j
-						if ((sol.available[y1->index]) && (x1->nbi[d][y1->index]) && (y1->nbi[d][z1->index]))//availability & nb check
-						{
-							if ((tourrem.weight + y1->weight <= ins->t[d].W_max) && (tourrem.volume + y1->volume <= ins->t[d].V_max))//cap constraint check
-							{
-								//gather departure time
-								double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-								//travel time from x1 to y1
-								double arrivaltime = ins->arrival_time(x1->con[y1->index], currenttime);
-								if (arrivaltime < y1->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-								{
-									arrivaltime = y1->LTW[d];
-								}
-								if (arrivaltime > y1->UTW[d])
-								{
-									continue;//infeasible
-								}
-								arrivaltime += y1->serv;
-								double arrivaltimey = arrivaltime;
-								//travel time from y1 to z
-								arrivaltime = ins->arrival_time(y1->con[z1->index], arrivaltime);
-								if (arrivaltime + breakz1 * (ins->breakdur) < z1->LTW[d])
-								{
-									arrivaltime = z1->LTW[d] - (breakz1 * ins->breakdur);
-								}
-								arrivaltime += z1->serv + breakz1 * ins->breakdur;
-								double shift1 = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-								if (shift1 <= tourrem.max_shift[j + 1])//check if first vertex can be inserted
-								{
-									//execute the first insertion
-									Sol::Tour tourremins = tourrem;
-									tourremins.insert_vertex(y1, j);
-									int endk = (int)tourremins.seq.size();
-									//check if second vertex can be inserted in this new tour
-									for (int k = 0; k < endk - 1; ++k)// for all positions in tourremins
-									{
-										Ins::Vertex* x2 = tourremins.seq[k];//predecessor y2
-										Ins::Vertex* z2 = tourremins.seq[k + 1];//successor y2
-										int breakz2 = tourremins.action[k + 1];
-										int nb_size2 = (int)x2->nb[d].size();
-										for (int i2 = 0; i2 < nb_size2 - 1; ++i2)//for all neighbours of the included vertex (non-enddepot)
-										{
-											Ins::Vertex* y2 = x2->nb[d][i2];//potential insertion at position k
-											if (((tabulist.isTabu(r->index, d))||(tabulist.isTabu(y1->index, d))||(tabulist.isTabu(y2->index, d))) && (sol.score + (y1->score+y2->score - r->score) <= globalbest))
-											{
-												//cout << "tabu list stopped move" << endl;
-												continue; // skip if y1 & y2 are tabu for this tour and the move can not improve the global best score
-											}
-											if (((y1->score + y2->score) - r->score > local_bestscore))
-											{
-												if ((sol.available[y2->index]) &&(x2->nbi[d][y2->index]) && (y2->nbi[d][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
-												{
-													if ((tourremins.weight + y2->weight <= ins->t[d].W_max) && (tourremins.volume + y2->volume <= ins->t[d].V_max))//cap constraint check
-													{
-														//gather departure time
-														double currenttime = tourremins.deptime[k] + ins->t[d].EDT;//service bij x zit hier al in
-														//travel time from x to y2
-														double arrivaltime = ins->arrival_time(x2->con[y2->index], currenttime);
-														if (arrivaltime < y2->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-														{
-															arrivaltime = y2->LTW[d];
-														}
-														if (arrivaltime > y2->UTW[d])
-														{
-															continue;//infeasible
-														}
-														arrivaltime += y2->serv;
-														//travel time from y2 to z
-														arrivaltime = ins->arrival_time(y2->con[z2->index], arrivaltime);
-														if (arrivaltime + breakz2 * (ins->breakdur) < z2->LTW[d])
-														{
-															arrivaltime = z2->LTW[d] - (breakz2 * ins->breakdur);
-														}
-														arrivaltime += z2->serv + breakz2 * ins->breakdur;
-														double shift2 = (arrivaltime - ins->t[d].EDT) - tourremins.deptime[k + 1];//increase in travel time
-														if (shift2 <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
-														{
-															local_bestscore = (y1->score + y2->score) - r->score;
-															#pragma omp critical
-															{
-																adm_nb.push(One_two_rep_nb(d,h,j,k,y1,y2,(y1->score + y2->score) - r->score, (y1->score + y2->score) - r->score,{{r},{y1,y2}}));
-																if ((y1->score + y2->score) - r->score > bestscore)
-																{
-																	bestscore = (y1->score + y2->score) - r->score;
-																}
-															}
-														}//end shift 2
-													}//end cap check 2
-												}//end availability 2
-											}//end score check
-										}//end all nb2
-									}//end for all positions in tourremins
-								}//end if shift succes first insertion
-							}//end cap check 1
-						}//end availability check 1
-					}//end for all nb1
-				}//end for all positions in tourrem 1
-			}//end for all included regular vertices in tour
-		}//end for all tours
-	}//end omp parallel
-	return adm_nb;
-}//end one_two_replace_gen_nb_new
-
-boost::heap::priority_queue<Two_one_rep_nb> Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest)
-{
-	int bestscore = -INT_MAX;
-	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
-	#pragma omp parallel
-	{//start parallel session
-		int local_bestscore = -INT_MAX;// Thread-local gating to avoid races; publish only under critical.
-		#pragma omp for nowait
-		for (int d = 0; d < ins->maxtours; ++d)
-		{
-			int end = (int)sol.tours[d].seq.size();
-			for (int g = 1; g < end - 1; ++g)// for all  included regular vertices in sol
-			{
-				for (int h = g+1; h < end - 1; ++h)// for all  inlcuded regular vertices in sol
-				{
-					//for all existing regular member vertices: remove 2 and revaluate solution
-					Sol::Tour tourrem = sol.tours[d];
-					Ins::Vertex* r = tourrem.seq[g];//to be removed vertex 1
-					Ins::Vertex* s = tourrem.seq[h];//to be removed vertex 2
-					int lostscore = r->score + s->score;
-					tourrem.remove_vertices(g, h);
-					int endj = (int)tourrem.seq.size();
-					for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
-					{
-						Ins::Vertex* x = tourrem.seq[j];//predecessor y
-						Ins::Vertex* z = tourrem.seq[j + 1];//successor y
-						int breakz = tourrem.action[j + 1];
-						int nb_size = (int)x->nb[d].size();
-						for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
-						{
-							Ins::Vertex* y = x->nb[d][i];//potential insertion at position j
-							if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(s->index, d)) || (tabulist.isTabu(y->index, d))) && (sol.score + (y->score - lostscore) <= globalbest))
-							{
-								//cout << "vertices are tabu" << endl;
-								continue; // skip if y is tabu for this tour and the combination does not improve globalbest
-							}
-							if ((sol.available[y->index]) && (x->nbi[d][y->index]) && (y->nbi[d][z->index]))//availability
-							{
-								if ((y->score - lostscore > local_bestscore))
-								{
-									if ((tourrem.weight + y->weight <= ins->t[d].W_max) && (tourrem.volume + y->volume <= ins->t[d].V_max))//cap constraint check
-									{
-										//gather departure time
-										double currenttime = tourrem.deptime[j] + ins->t[d].EDT;//service bij x zit hier al in
-										//travel time from x to y
-										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-										if (arrivaltime < y->LTW[d])//break inserten kan niet dus break kan ltw niet dichter brengen
-										{
-											arrivaltime = y->LTW[d];
-										}
-										if (arrivaltime > y->UTW[d])
-										{
-											continue;//infeasible
-										}
-										arrivaltime += y->serv;
-										//travel time from y to z
-										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[d])
-										{
-											arrivaltime = z->LTW[d] - (breakz * ins->breakdur);
-										}
-										arrivaltime += z->serv + breakz * ins->breakdur;
-										double shift = (arrivaltime - ins->t[d].EDT) - tourrem.deptime[j + 1];//increase in travel time
-										if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
-										{
-											local_bestscore = y->score - lostscore;
-											#pragma omp critical
-											{
-												adm_nb.push(Two_one_rep_nb(d, g, h, j, y, y->score - lostscore, y->score - lostscore, {{r,s},{y} }));
-												if (y->score - lostscore > bestscore)
-												{
-													bestscore = y->score - lostscore;
-												}
-											}
-										}
-									}//end cap constraints
-								}//end score & nb limit check
-							}//end availability/nb check
-						}//for all nb
-					}//end for all positions in tourrem
-				}//end for all included regular vertices in sol
-			}//end for all included regular vertices in sol
-		}//end for all tours
-	}//end pragma parallel
-	return adm_nb;
-}// end two_one_replace_gen_nb
 
 void Moves::pull_break(Sol& sol, int t)
 {

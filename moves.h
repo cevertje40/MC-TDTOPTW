@@ -154,9 +154,6 @@ public:
 	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
-	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
-	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
-	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist,int globalbest);
 	//constructor
 	Moves(Ins& ins) :ins(&ins) {}
 };

@@ -281,6 +281,7 @@ Ins::Ins(CTOP textfile)
 				c[counter].determin = static_cast<int>(std::floor(std::hypot(dx, dy) + 0.5));
 				c[counter].mu.resize(maxtimeslots);
 				c[counter].nu.resize(maxtimeslots);
+				c[counter].oneplusmu.resize(maxtimeslots);
 				for (int t = 0; t < maxtimeslots; ++t)
 				{
 					c[counter].mu[t] = 0.0;

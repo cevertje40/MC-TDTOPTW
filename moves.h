@@ -2,6 +2,7 @@
 #include "instance.h"
 #include "solution.h"
 #include "tabuvector.h"
+#include "ratio.h"
 
 class One_one_rep_nb
 {
@@ -77,36 +78,6 @@ public:
 	}
 };
 
-namespace ratio_detail
-{
-	constexpr double EPS = 1e-9;   // decision epsilon
-	constexpr double TAU = 0.01;   // ~1% baseline
-	constexpr double K_NEG = 0.5;
-	constexpr double CAP = 5.0;
-
-	inline double posneg(double d_norm, double ds) {
-		if (d_norm > EPS) {
-			// guard denominator so /fp:fast can’t make it tiny
-			double denom = d_norm + TAU;
-			if (denom < TAU + EPS) denom = TAU + EPS;
-			return ds / denom;
-		}
-		else if (d_norm < -EPS) {
-			double benefit = std::min(CAP, (-d_norm) / (TAU + EPS));
-			return ds * (1.0 + K_NEG * benefit);
-		}
-		else {
-			// treat “almost zero” as neutral
-			return ds;
-		}
-	}
-
-	inline double norm(double delta, double bound) {
-		// prevent divide by ~0 if a bound is bogus
-		return delta / std::max(bound, 1e-9);
-	}
-}
-
 class Moves
 {
 public:
@@ -126,34 +97,19 @@ public:
 	bool one_two_replace(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool or_opt(Sol& sol, int mode = 1);
 	Ins* ins;
-	//evaluation criteria for nb generators
-	inline double ratio_scorediff(double dt, double ds, double dw, double dv, double /*t_max*/, double /*w_max*/, double /*v_max*/)
-	{
-		return ds;
-	}
 
-	inline double ratio_scorediff_time(double dt, double ds, double /*dw*/, double /*dv*/,
-		double t_max, double /*w_max*/, double /*v_max*/) {
-		using namespace ratio_detail;
-		return posneg(norm(dt, t_max), ds);
-	}
+	enum class RatioKind { SCORE = 0, TIME = 1, VOLUME = 2, WEIGHT = 3 };
 
-	inline double ratio_scorediff_weight(double /*dt*/, double ds, double dw, double /*dv*/,
-		double /*t_max*/, double w_max, double /*v_max*/) {
-		using namespace ratio_detail;
-		return posneg(norm(dw, w_max), ds);
-	}
+	//move templates
+	template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb_kernel(Sol& sol, TabuVector& tabulist, int globalbest);
+	template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb_kernel(Sol& sol, TabuVector& tabulist, int globalbest);
+	template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb_kernel(Sol& sol, TabuVector& tabulist, int globalbest);
+	//dispatchers
+	boost::heap::priority_queue<One_one_rep_nb>one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, RatioKind kind);
+	boost::heap::priority_queue<One_two_rep_nb>one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, RatioKind kind);
+	boost::heap::priority_queue<Two_one_rep_nb>two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, RatioKind kind);
 
-	inline double ratio_scorediff_volume(double /*dt*/, double ds, double /*dw*/, double dv,
-		double /*t_max*/, double /*w_max*/, double v_max) {
-		using namespace ratio_detail;
-		return posneg(norm(dv, v_max), ds);
-	}
 
-	//nb generators
-	boost::heap::priority_queue<One_one_rep_nb> one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
-	boost::heap::priority_queue<One_two_rep_nb> one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
-	boost::heap::priority_queue<Two_one_rep_nb> two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, double (Moves::*get_score)(double, double, double, double, double, double, double));
 	//constructor
 	Moves(Ins& ins) :ins(&ins) {}
 };

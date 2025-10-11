@@ -59,5 +59,8 @@
     <ClInclude Include="tabuvector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ratio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -853,11 +853,7 @@ Res Tabu::solve(int bestknown)
 	gb = s;//set global best to initial solution
 
 	//criteria selector based on constraint pressure
-	ratiofunctions.clear();
-	ratiofunctions.push_back(&Moves::ratio_scorediff);
-	ratiofunctions.push_back(&Moves::ratio_scorediff_time);
-	ratiofunctions.push_back(&Moves::ratio_scorediff_volume);
-	ratiofunctions.push_back(&Moves::ratio_scorediff_weight);
+	
 	enum Crit { SCORE = 0, TIME = 1, VOLUME = 2, WEIGHT = 3, N_CRIT = 4 };
 	struct CritStats { double ema_gain = 0.0; long used = 0; };
 	std::array<CritStats, N_CRIT> crit_stats{};
@@ -928,7 +924,7 @@ Res Tabu::solve(int bestknown)
 			};
 
 		int crit_id = pick_weighted(w);
-		ScoreFunctionPointer f = ratiofunctions[crit_id];
+		auto kind = static_cast<RatioKind>(crit_id);
 		//select neighborhood structure at random
 		int pick=nbpicker(engine);
 		//int pick = 2;//to debug
@@ -939,7 +935,7 @@ Res Tabu::solve(int bestknown)
 			{
 				//auto nb = one_one_replace_gen_nb(s, tabulist, s.score);
 				//auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score,f);
+				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score,kind);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -960,7 +956,7 @@ Res Tabu::solve(int bestknown)
 			{
 				//auto nb = two_one_replace_gen_nb(s, tabulist, s.score);
 				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,f);
+				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,kind);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -981,7 +977,7 @@ Res Tabu::solve(int bestknown)
 			{
 				//auto nb = one_two_replace_gen_nb(s, tabulist, s.score);
 				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
-				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,f);
+				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,kind);
 				if (nb.size() == 0)
 				{
 					//perturbe(s);
@@ -1011,7 +1007,7 @@ Res Tabu::solve(int bestknown)
 			//cout << "error in replace" << endl;
 		//}
 		//VND
-		shift_nb(s,0);
+		//shift_nb(s,0);
 		//or_opt(s, 1);
 		two_opt_nb(s, 1);
 		//if (!s.check())

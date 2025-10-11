@@ -755,8 +755,7 @@ bool Moves::or_opt(Sol& sol, int mode)
 	return succes;
 }//end or_opt
 
-
-boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest,double(Moves::*get_ratio)(double, double, double, double, double, double, double))
+template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb_kernel(Sol& sol, TabuVector& tabulist, int globalbest)
 {
 	boost::heap::priority_queue<One_one_rep_nb> adm_nb;
 
@@ -802,33 +801,36 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 				{
 					Ins::Vertex* y = x->nb[d][i];
 
-					if ((tabulist.isTabu(y->index, d)) && (sol.score + y->score <= globalbest + 1e-9))
-						continue;
+					if (sol.score + y->score <= globalbest + 1e-9)
+					{
+						if (tabulist.isTabu(y->index, d)) continue;
+					}
 
-					if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index]))
-						continue;
+					if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index])) continue;
 
-					if (tour.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
-					if (tour.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+						if (tour.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
+						if (tour.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
 
-					double t0      = tour.deptime[j] + ins->t[d].EDT;
-					double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
-					double ins_lb  = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
-					double dt_lb   = std::max(0.0, ins_lb - base_up);
+						double t0 = tour.deptime[j] + ins->t[d].EDT;
+						double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
+						double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+						double dt_lb = std::max(0.0, ins_lb - base_up);
 
-					double key_ub = (this->*get_ratio)(dt_lb, y->score, y->weight, y->volume,
-													   ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+					double key_ub = RATIO(dt_lb, y->score, y->weight, y->volume,
+						ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
-					if ((key_ub <= local_bestkey + 1e-9) ||
-						(dt_lb   >  wait_suffix[j + 1] + tour.max_shift[j + 1] + 1e-9))
-						continue;
+					if ((key_ub <= local_bestkey + 1e-9) || (dt_lb > wait_suffix[j + 1] + tour.max_shift[j + 1] + 1e-9)) continue;
 
 					double at = ins->arrival_time(x->con[y->index], currenttime);
+
 					if (at < y->LTW[d]) at = y->LTW[d];
+
 					if (at > y->UTW[d] + 1e-9) continue;
+
 					at += y->serv;
-					at  = ins->arrival_time(y->con[z->index], at);
-					if (at + breakz * (ins->breakdur) < z->LTW[d]) {
+					at = ins->arrival_time(y->con[z->index], at);
+					if (at + breakz * (ins->breakdur) < z->LTW[d])
+					{
 						at = z->LTW[d] - (breakz * ins->breakdur);
 					}
 					at += z->serv + breakz * ins->breakdur;
@@ -836,10 +838,10 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 					double shift = (at - ins->t[d].EDT) - tour.deptime[j + 1];
 					if (shift > tour.max_shift[j + 1] + 1e-9) continue;
 
-					double key = (this->*get_ratio)(shift, y->score, y->weight, y->volume,
-													ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+					double key = RATIO(shift, y->score, y->weight, y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
-					if (key > local_bestkey + 1e-9) {
+					if (key > local_bestkey + 1e-9)
+					{
 						local_bestkey = key;
 						local_q.push(One_one_rep_nb(d, -1, j, y, y->score, key, { {},{y} }));
 					}
@@ -869,12 +871,12 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 					{
 						Ins::Vertex* y = x->nb[d][i];
 
-						if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) &&
-							(sol.score + (y->score - r->score) <= globalbest + 1e-9))
-							continue;
-
-						if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index]))
-							continue;
+						if (sol.score + (y->score - r->score) <= globalbest + 1e-9)
+						{
+							if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y->index, d))) continue;
+						}
+						
+						if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index])) continue;
 
 						if (tourrem.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
 						if (tourrem.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
@@ -884,11 +886,7 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 						double ins_lb  = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
 						double dt_lb   = std::max(0.0, ins_lb - base_up);
 
-						double key_ub  = (this->*get_ratio)(dt_lb,
-															y->score - r->score,
-															y->weight - r->weight,
-															y->volume - r->volume,
-															ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+						double key_ub  = RATIO(dt_lb,y->score - r->score,y->weight - r->weight,y->volume - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
 						if ((key_ub <= local_bestkey + 1e-9) ||
 							(dt_lb   >  wait_suffix_r[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
@@ -899,7 +897,8 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 						if (at > y->UTW[d] + 1e-9) continue;
 						at += y->serv;
 						at  = ins->arrival_time(y->con[z->index], at);
-						if (at + breakz * (ins->breakdur) < z->LTW[d]) {
+						if (at + breakz * (ins->breakdur) < z->LTW[d]) 
+						{
 							at = z->LTW[d] - (breakz * ins->breakdur);
 						}
 						at += z->serv + breakz * ins->breakdur;
@@ -907,16 +906,12 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 						double shift = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
 						if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
 
-						double key = (this->*get_ratio)(shift,
-														y->score - r->score,
-														y->weight - r->weight,
-														y->volume - r->volume,
-														ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+						double key = RATIO(shift,y->score - r->score,y->weight - r->weight,y->volume - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
-						if (key > local_bestkey + 1e-9) {
+						if (key > local_bestkey + 1e-9) 
+						{
 							local_bestkey = key;
-							local_q.push(One_one_rep_nb(d, h, j, y,
-														y->score - r->score, key, { {r},{y} }));
+							local_q.push(One_one_rep_nb(d, h, j, y,y->score - r->score, key, { {r},{y} }));
 						}
 					}
 				}
@@ -937,8 +932,24 @@ boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& so
 	return adm_nb;
 }
 
-inline double base_travel_UB_over_interval(Ins* ins, Ins::Connec* c,
-	double t0, double t1) {
+boost::heap::priority_queue<One_one_rep_nb>Moves::one_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, RatioKind kind)
+{
+	switch (kind) 
+	{
+		case RatioKind::SCORE:
+			return one_one_replace_gen_nb_kernel<&ratio_scorediff>(sol, tabulist, globalbest);
+		case RatioKind::TIME:
+			return one_one_replace_gen_nb_kernel<&ratio_scorediff_time>(sol, tabulist, globalbest);
+		case RatioKind::VOLUME:
+			return one_one_replace_gen_nb_kernel<&ratio_scorediff_volume>(sol, tabulist, globalbest);
+		case RatioKind::WEIGHT:
+		default:
+			return one_one_replace_gen_nb_kernel<&ratio_scorediff_weight>(sol, tabulist, globalbest);
+	}
+}
+
+inline double base_travel_UB_over_interval(Ins* ins, Ins::Connec* c,double t0, double t1) 
+{
 	if (t1 < t0) { double tmp = t0; t0 = t1; t1 = tmp; }
 	// Evaluate travel time at both ends and at every bucket boundary inside [t0, t1].
 	double ub = 0.0;
@@ -963,7 +974,7 @@ inline double base_travel_UB_over_interval(Ins* ins, Ins::Connec* c,
 	return ub;
 }
 
-boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest,double(Moves::* get_ratio)(double, double, double, double, double, double, double))
+template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb_kernel(Sol& sol, TabuVector& tabulist, int globalbest)
 {
 	boost::heap::priority_queue<Two_one_rep_nb> adm_nb;
 
@@ -1026,14 +1037,12 @@ boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& so
 							Ins::Vertex* y = x->nb[d][i];
 
 							// Tabu with aspiration against globalbest
-							if (((tabulist.isTabu(r->index, d)) ||
-								(tabulist.isTabu(s->index, d)) ||
-								(tabulist.isTabu(y->index, d))) &&
-								(sol.score + (y->score - (r->score + s->score)) <= globalbest + 1e-9))
+							if ((sol.score + (y->score - (r->score + s->score)) <= globalbest + 1e-9))
 							{
-								continue;
+								if ((tabulist.isTabu(r->index, d)) ||(tabulist.isTabu(s->index, d)) ||	(tabulist.isTabu(y->index, d)))	continue;
+								
 							}
-
+							
 							// Availability & adjacency
 							if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index]))
 								continue;
@@ -1046,10 +1055,9 @@ boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& so
 							const double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
 							const double dt_lb = std::max(0.0, ins_lb - base_up);
 
-							const double key_ub = (this->*get_ratio)(dt_lb,y->score - (r->score + s->score),y->weight - (r->weight + s->weight),y->volume - (r->volume + s->volume),ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+							const double key_ub = RATIO(dt_lb,y->score - (r->score + s->score),y->weight - (r->weight + s->weight),y->volume - (r->volume + s->volume),ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
-							if ((key_ub <= local_bestkey + 1e-9) ||
-								(dt_lb > wait_suffix[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
+							if ((key_ub <= local_bestkey + 1e-9) ||	(dt_lb > wait_suffix[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
 							{
 								continue; // prune
 							}
@@ -1070,7 +1078,7 @@ boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& so
 							if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
 
 							// Objective key
-							const double key = (this->*get_ratio)(
+							const double key = RATIO(
 								shift,
 								 y->score - (r->score + s->score),
 								 y->weight - (r->weight + s->weight),
@@ -1104,7 +1112,23 @@ boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& so
 	return adm_nb;
 }
 
-boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest,double(Moves::* get_ratio)(double, double, double, double, double, double, double))
+boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, RatioKind kind)
+{
+	switch (kind) 
+	{
+		case RatioKind::SCORE:
+			return two_one_replace_gen_nb_kernel<&ratio_scorediff>(sol, tabulist, globalbest);
+		case RatioKind::TIME:
+			return two_one_replace_gen_nb_kernel<&ratio_scorediff_time>(sol, tabulist, globalbest);
+		case RatioKind::VOLUME:
+			return two_one_replace_gen_nb_kernel<&ratio_scorediff_volume>(sol, tabulist, globalbest);
+		case RatioKind::WEIGHT:
+		default:
+			return two_one_replace_gen_nb_kernel<&ratio_scorediff_weight>(sol, tabulist, globalbest);
+	}
+}
+
+template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb_kernel(Sol& sol, TabuVector& tabulist, int globalbest)
 {
 	boost::heap::priority_queue<One_two_rep_nb> adm_nb;
 
@@ -1132,6 +1156,9 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 		#pragma omp for nowait
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
+			const auto& Td = ins->t[d];
+			const double EDT = Td.EDT;
+			const double Wmax = Td.W_max, Vmax = Td.V_max, Tmax = Td.T_max;
 			// reset per tour (matches your original behavior)
 			double local_bestkey = -DBL_MAX;
 
@@ -1226,11 +1253,12 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 							for (int ii = 0; ii < nb2 - 1; ++ii) {
 								Ins::Vertex* y2 = neigh2[ii];
 
-								// optional tabu (kept as in your code)
-								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
-									(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
-									continue;
-
+								// optional tabu
+								if ((sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
+								{
+									if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) continue;
+								}
+								 
 								// capacity with y1 + y2
 								if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
 								if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
@@ -1257,9 +1285,10 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 								Ins::Vertex* y2 = neigh1[ii];
 								if (y2 == y1) continue;
 
-								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
-									(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
-									continue;
+								if (sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9)
+								{
+									if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) continue;
+								}
 
 								if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
 								if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
@@ -1294,9 +1323,10 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 							{
 								Ins::Vertex* y2 = x2->nb[d][ii];
 
-								if (((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) &&
-									(sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9))
-									continue;
+								if (sol.score + (y1->score + y2->score - r->score) <= globalbest + 1e-9)
+								{
+									if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) continue;
+								}
 
 								if (!(sol.available[y2->index] && x2->nbi[d][y2->index] && y2->nbi[d][z2->index]) || (y2 == y1))
 									continue;
@@ -1307,7 +1337,7 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 								// cheap key_ub + shift gate
 								double ins_lb = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
 								double dt_lb = std::max(0.0, ins_lb - base_up);
-								double key_ub = (this->*get_ratio)(shift1 + dt_lb,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+								double key_ub = RATIO(shift1 + dt_lb,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
 								if (key_ub <= local_bestkey + 1e-9) continue;
 								if (dt_lb > wait_suffix[k + 1] + tourremins.max_shift[k + 1] + 1e-9) continue;
@@ -1328,7 +1358,7 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 								if (shift2 > tourremins.max_shift[k + 1] + 1e-9) continue;
 
 								// final key
-								double key = (this->*get_ratio)(shift1 + shift2,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+								double key = RATIO(shift1 + shift2,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
 
 								if (key > local_bestkey + 1e-9) 
 								{
@@ -1348,7 +1378,7 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 	// Serial merge (outside hot path)
 	for (auto& q : tls_queues) {
 		while (!q.empty()) {
-			adm_nb.push(q.top()); // copy; deterministic with a stable comparator
+			adm_nb.push(q.top()); // copy
 			q.pop();
 		}
 	}
@@ -1356,7 +1386,21 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 	return adm_nb;
 }
 
-
+boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& sol, TabuVector& tabulist, int globalbest, RatioKind kind)
+{
+	switch (kind) 
+	{
+		case RatioKind::SCORE:
+			return one_two_replace_gen_nb_kernel<&ratio_scorediff>(sol, tabulist, globalbest);
+		case RatioKind::TIME:
+			return one_two_replace_gen_nb_kernel<&ratio_scorediff_time>(sol, tabulist, globalbest);
+		case RatioKind::VOLUME:
+			return one_two_replace_gen_nb_kernel<&ratio_scorediff_volume>(sol, tabulist, globalbest);
+		case RatioKind::WEIGHT:
+		default:
+			return one_two_replace_gen_nb_kernel<&ratio_scorediff_weight>(sol, tabulist, globalbest);
+	}
+}
 void Moves::pull_break(Sol& sol, int t)
 {
 	int end = (int)sol.tours[t].seq.size();
@@ -2199,12 +2243,12 @@ bool Moves::shift_nb(Sol& sol, int mode)
 		if (improvement)
 		{
 		shift:
-			Sol remember = sol;
+			//Sol remember = sol;
 			Ins::Vertex* moved = bestd->seq[besti];
 			bestd->seq.erase(bestd->seq.begin() + besti);
 			bestd->seq.insert(bestd->seq.begin() + bestj, moved);
 			bestd->update_break(bestbreakindex);
-			
+			/*
 			double actualdecrease = 0.0;
 			for (int t = 0; t < (int)sol.tours.size(); ++t)
 			{
@@ -2214,7 +2258,7 @@ bool Moves::shift_nb(Sol& sol, int mode)
 			{
 				cout << "error shift" << endl;
 			}
-			
+			*/
 			if ((bestd->breakindex == int(bestd->seq.size()) - 1) && (ins->t[bestd->index].LAT > ins->breakend + ins->breakdur))
 			{
 				//cout << "break pulled" << endl;

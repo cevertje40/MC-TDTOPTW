@@ -474,7 +474,7 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 	const int K = std::min(K_max, std::max(K_min, int(std::ceil(beta * std::sqrt(std::max(1, N))))));
 	cout << "K nb is: " << K << endl;
 	const int depot = maxvertices - 1;
-
+	
 #pragma omp parallel for
 	for (int i = 0; i < maxvertices - 1; ++i) {
 		v[i].nb.resize(maxtours);

@@ -449,7 +449,7 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	Res resdebug;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.3.3.3.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
@@ -576,7 +576,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set4.txt";
+		filename = "set6.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -642,7 +642,7 @@ int main()
 	//debug_instance();
 	//debug_ctop();
 	solve_dataset(1);
-	//ctop_gap(1);
+	//ctop_gap(2);
 	//doe(10);
 	//case_study(10);
 

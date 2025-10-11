@@ -1153,12 +1153,13 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 		auto& local_q = tls_queues[tid];
 
 		// ----------------------- PARALLEL BODY -----------------------
-		#pragma omp for nowait
+		#pragma omp for schedule(guided)
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			const auto& Td = ins->t[d];
 			const double EDT = Td.EDT;
 			const double Wmax = Td.W_max, Vmax = Td.V_max, Tmax = Td.T_max;
+			const double breakdur = ins->breakdur, breakstart = ins->breakstart, breakend = ins->breakend;
 			// reset per tour (matches your original behavior)
 			double local_bestkey = -DBL_MAX;
 
@@ -1169,7 +1170,8 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 				Sol::Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];
 				tourrem.remove_vertex(h);
-
+				const double W_free_after_rem = Wmax - (sol.tours[d].weight - r->weight);
+				const double V_free_after_rem = Vmax - (sol.tours[d].volume - r->volume);
 				// suffix waiting (upper bound) on tourrem
 				std::vector<double> wait_suffix_rem = tourrem.compute_wait_suffix();
 
@@ -1189,11 +1191,11 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 							continue;
 
 						// capacity with y1 (remember we already removed r)
-						if (tourrem.weight + y1->weight > ins->t[d].W_max + 1e-9) continue;
-						if (tourrem.volume + y1->volume > ins->t[d].V_max + 1e-9) continue;
+						if (y1->weight > W_free_after_rem + 1e-9) continue;
+						if (y1->volume > V_free_after_rem + 1e-9) continue;
 
 						// time LB/UB gate for first insertion
-						double t0_1 = tourrem.deptime[j] + ins->t[d].EDT;
+						double t0_1 = tourrem.deptime[j] + EDT;
 						double baseUB_1 = ins->arrival_time(x1->con[z1->index], t0_1) - t0_1;
 						double insLB_1 = x1->con[y1->index]->determin + y1->serv + y1->con[z1->index]->determin;
 						double dtLB_1 = std::max(0.0, insLB_1 - baseUB_1);
@@ -1210,16 +1212,17 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 						at += y1->serv;
 
 						at = ins->arrival_time(y1->con[z1->index], at);
-						if (at + breakz1 * ins->breakdur < z1->LTW[d])
-							at = z1->LTW[d] - breakz1 * ins->breakdur;
-						at += z1->serv + breakz1 * ins->breakdur;
+						if (at + breakz1 * breakdur < z1->LTW[d])
+							at = z1->LTW[d] - breakz1 * breakdur;
+						at += z1->serv + breakz1 * breakdur;
 
-						double shift1 = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
+						double shift1 = (at - EDT) - tourrem.deptime[j + 1];
 						if (shift1 > tourrem.max_shift[j + 1] + 1e-9) continue;
 
 						// ---------------- Stage-A fast pre-gate for second insertion ----------------
 						bool any_second_survives = false;
-
+						const double W_free_after_y1 = W_free_after_rem - y1->weight;
+						const double V_free_after_y1 = V_free_after_rem - y1->volume;
 						// boundaries p != j in tourrem (map to k != j after insertion)
 						int p_end = (int)tourrem.seq.size() - 1;
 						for (int p = 0; p < p_end && !any_second_survives; ++p) {
@@ -1237,7 +1240,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 							double delta_at_p = shift1 - Wprefix;
 							if (delta_at_p < 0.0) delta_at_p = 0.0;
 
-							double t_low = tourrem.deptime[p] + ins->t[d].EDT;
+							double t_low = tourrem.deptime[p] + EDT;
 							double t_high = t_low + delta_at_p;
 
 							// base-arc travel-time UB over [t_low, t_high]
@@ -1260,8 +1263,8 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 								}
 								 
 								// capacity with y1 + y2
-								if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
-								if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+								if (y2->weight > W_free_after_y1 + 1e-9) continue;
+								if (y2->volume > V_free_after_y1 + 1e-9) continue;
 
 								// LB on inserted path at boundary p
 								double insLB = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
@@ -1290,8 +1293,8 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 									if ((tabulist.isTabu(r->index, d)) || (tabulist.isTabu(y1->index, d)) || (tabulist.isTabu(y2->index, d))) continue;
 								}
 
-								if (tourrem.weight + y1->weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
-								if (tourrem.volume + y1->volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+								if (y2->weight > W_free_after_y1 + 1e-9) continue;
+								if (y2->volume > V_free_after_y1 + 1e-9) continue;
 
 								double insLB = x1->con[y2->index]->determin + y2->serv + y2->con[y1->index]->determin;
 								double dtLB = insLB - baseUB_j; if (dtLB < 0.0) dtLB = 0.0;
@@ -1315,7 +1318,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 							Ins::Vertex* z2 = tourremins.seq[k + 1];
 							int breakz2 = tourremins.action[k + 1];
 
-							const double t0 = tourremins.deptime[k] + ins->t[d].EDT;
+							const double t0 = tourremins.deptime[k] + EDT;
 							const double base_up = ins->arrival_time(x2->con[z2->index], t0) - t0;
 
 							int nb2 = (int)x2->nb[d].size();
@@ -1331,13 +1334,13 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 								if (!(sol.available[y2->index] && x2->nbi[d][y2->index] && y2->nbi[d][z2->index]) || (y2 == y1))
 									continue;
 
-								if (tourremins.weight + y2->weight > ins->t[d].W_max + 1e-9) continue;
-								if (tourremins.volume + y2->volume > ins->t[d].V_max + 1e-9) continue;
+								if (y2->weight > W_free_after_y1 + 1e-9) continue;
+								if (y2->volume > V_free_after_y1 + 1e-9) continue;
 
 								// cheap key_ub + shift gate
 								double ins_lb = x2->con[y2->index]->determin + y2->serv + y2->con[z2->index]->determin;
 								double dt_lb = std::max(0.0, ins_lb - base_up);
-								double key_ub = RATIO(shift1 + dt_lb,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+								double key_ub = RATIO(shift1 + dt_lb,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,Tmax, Wmax, Vmax);
 
 								if (key_ub <= local_bestkey + 1e-9) continue;
 								if (dt_lb > wait_suffix[k + 1] + tourremins.max_shift[k + 1] + 1e-9) continue;
@@ -1350,15 +1353,15 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 								at2 += y2->serv;
 
 								at2 = ins->arrival_time(y2->con[z2->index], at2);
-								if (at2 + breakz2 * ins->breakdur < z2->LTW[d])
-									at2 = z2->LTW[d] - breakz2 * ins->breakdur;
-								at2 += z2->serv + breakz2 * ins->breakdur;
+								if (at2 + breakz2 * breakdur < z2->LTW[d])
+									at2 = z2->LTW[d] - breakz2 * breakdur;
+								at2 += z2->serv + breakz2 * breakdur;
 
-								double shift2 = (at2 - ins->t[d].EDT) - tourremins.deptime[k + 1];
+								double shift2 = (at2 - EDT) - tourremins.deptime[k + 1];
 								if (shift2 > tourremins.max_shift[k + 1] + 1e-9) continue;
 
 								// final key
-								double key = RATIO(shift1 + shift2,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+								double key = RATIO(shift1 + shift2,(y1->score + y2->score) - r->score,(y1->weight + y2->weight) - r->weight,(y1->volume + y2->volume) - r->volume,Tmax, Wmax, Vmax);
 
 								if (key > local_bestkey + 1e-9) 
 								{

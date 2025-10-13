@@ -1406,6 +1406,7 @@ boost::heap::priority_queue<One_two_rep_nb>Moves::one_two_replace_gen_nb(Sol& so
 			return one_two_replace_gen_nb_kernel<&ratio_scorediff_weight>(sol, tabulist, globalbest);
 	}
 }
+
 void Moves::pull_break(Sol& sol, int t)
 {
 	int end = (int)sol.tours[t].seq.size();

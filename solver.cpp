@@ -1,4 +1,4 @@
-#include "solver.h"
+﻿#include "solver.h"
 
 using namespace std;
 
@@ -666,140 +666,179 @@ void Tabu::perturbe(Sol& sol)
 
 void Tabu::parallel_construct(Sol& sol)
 {
-	//only use candidates that you can reach from the start depot and still return to the end depot
-	vector<Ins::Vertex*>candidates;
-	for (int i = 1; i < ins->maxvertices-1; ++i)
+	// 0) Per-tour depot-reachable lists, sorted by score
+	std::vector<std::vector<Ins::Vertex*>> dep_reach(ins->maxtours);
+	for (int d = 0; d < ins->maxtours; ++d) 
 	{
-		if (ins->v[0].con[i]->determin+ins->v[i].serv+ins->v[i].con[ins->maxvertices-1]->determin <= ins->t[0].T_max)
+		for (int i = 1; i < ins->maxvertices - 1; ++i) 
 		{
-			candidates.push_back(&ins->v[i]);
+			const double lb = ins->v[0].con[i]->determin+ ins->v[i].serv+ ins->v[i].con[ins->maxvertices - 1]->determin;
+			if (lb <= ins->t[d].T_max + 1e-9)
+				dep_reach[d].push_back(&ins->v[i]);
 		}
+		std::sort(dep_reach[d].begin(), dep_reach[d].end(),[](Ins::Vertex* a, Ins::Vertex* b) { return a->score > b->score; });
 	}
-	//sort candidates based on score
-	sort(candidates.begin(), candidates.end(),[](Ins::Vertex* a, Ins::Vertex* b) 
-	{
-			return (double)a->score  > (double)b->score ;
-	});
-	for (int i = 0; i < candidates.size(); ++i)
-	{
-		//calculate traveltime for candidate under consideration
-		vector<double>traveltime(ins->maxtours, 0.0);//traveltime per route
-		int besttour = -1;
-		double besttraveltime = DBL_MAX;
-		double bestkey = DBL_MAX;
-		int bestbrk = 0;
-		bool succes = false;
-		for (int t = 0; t < ins->maxtours; ++t)
-		{
-			Sol::Tour& tour = sol.tours[t];
-			double currenttime = tour.deptime.back() + ins->t[t].EDT;
-			Ins::Vertex* last = tour.seq.back();
-			Ins::Vertex* candidate = candidates[i];
-			if ((tour.weight + candidate->weight <= ins->t[t].W_max) && (tour.volume + candidate->volume <= ins->t[t].V_max))
-			{
-				double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
-				int brk = -1;
-				//check if break is needed
-				if ((tour.breakindex == -1) && ((arrivaltime >= ins->breakstart) || (candidate->LTW[t] - ins->breakdur >= ins->breakstart)))
-				{
-					arrivaltime += ins->breakdur;
-					brk = 1;
-				}
-				else
-				{
-					brk = 0;
-				}
-				//tw checks
-				if (arrivaltime < candidate->LTW[t])
-				{
-					arrivaltime = candidate->LTW[t];//waiting if you arrive to early	
-				}
-				if (arrivaltime > candidate->UTW[t])
-				{
-					continue;//discard candidate
-				}
-				//add service time
-				arrivaltime += candidate->serv;
-				//return to end depot check
-				double enddepottime = ins->arrival_time(candidate->con[ins->maxvertices - 1], arrivaltime);
-				if ((tour.breakindex == -1) && (brk == 0))//no break taken yet and you are not going to break at candidate
-				{
-					enddepottime += ins->breakdur;//take break at end depot
-				}
-				if (enddepottime > ins->t[t].LAT)//enddepot heeft geen service time
-				{
-					continue;//discard candidate
-				}
-				else
-				{
-					succes = true;
-					traveltime[t] = ((arrivaltime - brk * ins->breakdur) - currenttime);//exclude break as this would be unfair when no break is necessary for some candidates
-					double cap_frac = candidate->weight / ins->t[t].W_max+ candidate->volume / ins->t[t].V_max;
-					double delta_t = traveltime[t];
-					double denom = max(1e-12, delta_t) + max(1e-12, cap_frac);
-					double key = candidate->score / denom;  // higher is better
-					
-					if (key < bestkey)
-					{
-						besttour = t;
-						besttraveltime = arrivaltime - ins->t[t].EDT;//include the possible break time
-						bestkey = key;
-						bestbrk = brk;
-					}
 
-					/*
-					if (traveltime[t] < besttraveltime)//candidates are already sorted from high score to low score
-					{
-						besttour = t;
-						besttraveltime = arrivaltime - ins->t[t].EDT;//include the possible break time
-						bestbrk = brk;
-					}
-					*/
-				}//end else
-			}//end cap constraints
-		}//end for all tours
-		//insert candidate with highest score in a route with the lowest traveltime increase
-		if (succes)
+	// Helper: try to append cand to the end of tour d; return new deptime, break flag
+	auto try_append = [&](int d, Ins::Vertex* cand, double& new_deptime, int& brk) -> bool 
 		{
-			Sol::Tour& tour = sol.tours[besttour];
-			tour.seq.push_back(candidates[i]);
-			tour.deptime.push_back(besttraveltime);
-			sol.available[candidates[i]->index] = false;
-			tour.score += candidates[i]->score;
-			sol.score += candidates[i]->score;
-			tour.max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
-			tour.volume += candidates[i]->volume;
-			tour.weight += candidates[i]->weight;
-			tour.action.push_back(bestbrk);
-			if (bestbrk == 1)
+			if (!sol.available[cand->index]) return false;
+
+			Sol::Tour& tour = sol.tours[d];
+			if (tour.weight + cand->weight > ins->t[d].W_max + 1e-9) return false;
+			if (tour.volume + cand->volume > ins->t[d].V_max + 1e-9) return false;
+
+			double currenttime = tour.deptime.back() + ins->t[d].EDT;
+			Ins::Vertex* last = tour.seq.back();
+
+			double arr = ins->arrival_time(last->con[cand->index], currenttime);
+			int need_break = -1;
+			if ((tour.breakindex == -1) &&((arr >= ins->breakstart) || (cand->LTW[d] - ins->breakdur >= ins->breakstart))) 
 			{
-				tour.breakindex = int(tour.seq.size()) - 1;
+				arr += ins->breakdur;
+				need_break = 1;
+			}
+			else 
+			{
+				need_break = 0;
+			}
+			if (arr < cand->LTW[d]) arr = cand->LTW[d];
+			if (arr > cand->UTW[d] + 1e-9) return false;
+
+			arr += cand->serv;
+
+			double enddep = ins->arrival_time(cand->con[ins->maxvertices - 1], arr);
+			if ((tour.breakindex == -1) && (need_break == 0)) enddep += ins->breakdur;
+			if (enddep > ins->t[d].LAT + 1e-9) return false;
+
+			new_deptime = arr - ins->t[d].EDT; // includes break if taken
+			brk = need_break;
+			return true;
+		};
+
+	// 1) Phase A: seed each tour with one vertex (round-robin)
+	std::vector<size_t> ptr(ins->maxtours, 0);   // per-tour scan pointer
+	bool seeded_any = true;
+	const int K = 12; // small scan window per pass to stay fast
+
+	while (seeded_any) {
+		seeded_any = false;
+
+		for (int d = 0; d < ins->maxtours; ++d) 
+		{
+			Sol::Tour& tour = sol.tours[d];
+
+			double best_key = -DBL_MAX;
+			Ins::Vertex* best_v = nullptr;
+			double best_deptime = 0.0;
+			int best_brk = 0;
+
+			int examined = 0;
+			auto& L = dep_reach[d];
+			// advance ptr[d] past already assigned vertices
+			while (ptr[d] < L.size() && !sol.available[L[ptr[d]]->index]) ++ptr[d];
+
+			for (size_t k = ptr[d]; k < L.size() && examined < K; ++k) 
+			{
+				Ins::Vertex* cand = L[k];
+				if (!sol.available[cand->index]) continue;
+
+				double ndt; int brk;
+				if (!try_append(d, cand, ndt, brk)) continue;
+
+				// key: score / (Δt + capacity fraction)
+				double delta_t = ndt - tour.deptime.back();
+				double cap_frac = cand->weight / ins->t[d].W_max + cand->volume / ins->t[d].V_max;
+				double denom = std::max(1e-12, delta_t) + std::max(1e-12, cap_frac);
+				double key = cand->score / denom;
+
+				if (key > best_key) 
+				{
+					best_key = key; best_v = cand; best_deptime = ndt; best_brk = brk; 
+				}
+				++examined;
+			}
+
+			if (best_v) 
+			{
+				// commit the seed
+				tour.seq.push_back(best_v);
+				tour.deptime.push_back(best_deptime);
+				tour.max_shift.push_back(0);
+				tour.action.push_back(best_brk);
+				if (best_brk == 1) tour.breakindex = int(tour.seq.size()) - 1;
+				tour.weight += best_v->weight;
+				tour.volume += best_v->volume;
+				tour.score += best_v->score;
+				sol.score += best_v->score;
+				sol.available[best_v->index] = false;
+				seeded_any = true;
 			}
 		}
 	}
-	//add end depot to all routes
-	for (int t = 0; t < ins->maxtours; ++t)
+
+	// 2) Phase B: greedily append remaining vertices
+	std::vector<Ins::Vertex*> pool;
+	pool.reserve(ins->maxvertices);
+	for (int i = 1; i < ins->maxvertices - 1; ++i)
+		if (sol.available[i]) pool.push_back(&ins->v[i]);
+	std::sort(pool.begin(), pool.end(), [](Ins::Vertex* a, Ins::Vertex* b) { return a->score > b->score; });
+
+	for (Ins::Vertex* cand : pool) {
+		int best_d = -1; double best_key = -DBL_MAX;
+		double best_deptime = 0.0; int best_brk = 0;
+
+		for (int d = 0; d < ins->maxtours; ++d) 
+		{
+			double ndt; int brk;
+			if (!try_append(d, cand, ndt, brk)) continue;
+
+			double delta_t = ndt - sol.tours[d].deptime.back();
+			double cap_frac = cand->weight / ins->t[d].W_max + cand->volume / ins->t[d].V_max;
+			double denom = std::max(1e-12, delta_t) + std::max(1e-12, cap_frac);
+			double key = cand->score / denom;
+
+			if (key > best_key) { best_key = key; best_d = d; best_deptime = ndt; best_brk = brk; }
+		}
+
+		if (best_d >= 0) 
+		{
+			auto& tour = sol.tours[best_d];
+			tour.seq.push_back(cand);
+			tour.deptime.push_back(best_deptime);
+			tour.max_shift.push_back(0);
+			tour.action.push_back(best_brk);
+			if (best_brk == 1) tour.breakindex = int(tour.seq.size()) - 1;
+			tour.weight += cand->weight;
+			tour.volume += cand->volume;
+			tour.score += cand->score;
+			sol.score += cand->score;
+			sol.available[cand->index] = false;
+		}
+	}
+
+	// 3) Close tours with end depot
+	for (int t = 0; t < ins->maxtours; ++t) 
 	{
 		Sol::Tour& tour = sol.tours[t];
 		double currenttime = ins->t[t].EDT + tour.deptime.back();
 		double arrivaltime = ins->arrival_time(tour.seq.back()->con[ins->maxvertices - 1], currenttime);
 		tour.deptime.push_back(arrivaltime - ins->t[t].EDT);
 		tour.seq.push_back(&ins->v[ins->maxvertices - 1]);
-		tour.max_shift.push_back(0);//dummy, will be updated in max_shift function
-		if (tour.breakindex == -1)
-		{
+		tour.max_shift.push_back(0);
+		if (tour.breakindex == -1) {
 			tour.action.push_back(1);
 			tour.deptime.back() += ins->breakdur;
 			tour.breakindex = int(tour.seq.size()) - 1;
 		}
-		else
-		{
+		else {
 			tour.action.push_back(0);
 		}
 		tour.calc_maxshift();
 	}
+	cout << "start solution with score: " << sol.score << endl;
 	//sol.check();
-}//end parallel construct
+}
 
 template<typename MoveType>
 void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& tabulist) 

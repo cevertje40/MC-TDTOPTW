@@ -576,7 +576,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set6.txt";
+		filename = "set4.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -642,7 +642,7 @@ int main()
 	//debug_instance();
 	//debug_ctop();
 	//solve_dataset(1);
-	ctop_gap();
+	ctop_gap(1);
 	//doe(10);
 	//case_study(10);
 

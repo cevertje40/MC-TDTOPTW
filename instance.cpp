@@ -409,7 +409,7 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 void Ins::create_neighbourhood(std::string path, std::string name)
 {
 	const int N = maxvertices - 2;                 // regular vertices
-	const int depot = maxvertices - 1;
+	const int enddepot = maxvertices - 1;
 
 	// Global bounds & shaping
 	const int   K_min = 50;
@@ -434,8 +434,8 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 		};
 
 	// Resize depot containers (we’ll fill later)
-	v[depot].nb.resize(maxtours);
-	v[depot].nbi.resize(maxtours);
+	v[enddepot].nb.resize(maxtours);
+	v[enddepot].nbi.resize(maxtours);
 
 	// ---------- Per-tour loop ----------
 	for (int d = 0; d < maxtours; ++d)
@@ -452,7 +452,7 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 			std::vector<Cand> b1_all;
 			b1_all.reserve(N);
 
-			// Build feasibility pool for u (reachable j with j→D feasible)
+			// Build feasibility pool for u (reachable j with j→v feasible)
 			for (int j = 1; j < maxvertices - 1; ++j) {
 				if (j == u) continue;
 
@@ -463,11 +463,11 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 
 				// depart j after service and reach depot in time?
 				double dep_j = arr_j + v[j].serv;
-				if (dep_j + v[j].con[depot]->determin > v[depot].UTW[d]) continue;
+				if (dep_j + v[j].con[enddepot]->determin > v[enddepot].UTW[d]) continue;
 
 				// Primary metric B1
 				const double tt_uj = v[u].con[j]->determin;
-				const double tt_jD = v[j].con[depot]->determin;
+				const double tt_jD = v[j].con[enddepot]->determin;
 				const double scorej = (double)v[j].score;
 				double s1 = (tt_uj + 0.5 * tt_jD + eps) / (scorej + eps);
 				b1_all.push_back({ j, s1 });
@@ -490,9 +490,10 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 			v[i].nb.resize(maxtours);
 			v[i].nbi.resize(maxtours);
 
-			// --------- Feasibility pool (same as before) ---------
+			// --------- Feasibility pool ---------
 			std::vector<int> pool; pool.reserve(N);
-			for (int j = 1; j < maxvertices - 1; ++j) {
+			for (int j = 1; j < maxvertices - 1; ++j) 
+			{
 				if (j == i) continue;
 
 				double arr_j = v[i].LTW[d] + v[i].serv + v[i].con[j]->determin;
@@ -500,20 +501,36 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 				if (arr_j > v[j].UTW[d]) continue;
 
 				double dep_j = arr_j + v[j].serv;
-				if (dep_j + v[j].con[depot]->determin > v[depot].UTW[d]) continue;
+				if (dep_j + v[j].con[enddepot]->determin > v[enddepot].UTW[d]) continue;
 
 				pool.push_back(j);
 			}
 
-			const int Nreach = (int)pool.size();
-			int K_target = clampK((int)std::ceil(beta * std::sqrt(std::max(1, Nreach)) + gamma * std::log1p(Nreach)));
-
-			if (Nreach == 0) {
+			//start depot has all vertices as neighbours
+			if (i == 0)
+			{
 				v[i].nb[d].clear();
-				v[i].nb[d].push_back(&v[depot]);
+				v[i].nb[d].reserve(pool.size() + 1);
+				for (int j : pool) v[i].nb[d].push_back(&v[j]);
+				v[i].nb[d].push_back(&v[enddepot]); // always include end depot
+
 				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
 				v[i].nbi[d].reset();
-				v[i].nbi[d][depot] = true;
+				for (auto* pj : v[i].nb[d]) v[i].nbi[d][pj->index] = true;
+				v[i].nbi[d][i] = true; // self for swap
+				continue; // skip trimming/bucketing/mutuals for depot
+			}
+			
+			const int Nreach = (int)pool.size();
+			int K_target = clampK((int)std::ceil(beta * std::sqrt(std::max(1, Nreach)) + gamma * std::log1p(Nreach)));
+			//K_target = maxvertices;//to test
+			if (Nreach == 0) 
+			{
+				v[i].nb[d].clear();
+				v[i].nb[d].push_back(&v[enddepot]);
+				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+				v[i].nbi[d].reset();
+				v[i].nbi[d][enddepot] = true;
 				v[i].nbi[d][i] = true;
 				continue;
 			}
@@ -531,7 +548,7 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 
 			for (int j : pool) {
 				const double tt_ij = v[i].con[j]->determin;
-				const double tt_jD = v[j].con[depot]->determin;
+				const double tt_jD = v[j].con[enddepot]->determin;
 				const double scorej = (double)v[j].score;
 
 				// B1
@@ -547,24 +564,14 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 				if (arr_j < v[j].LTW[d]) arr_j = v[j].LTW[d];
 				double slack = std::max(0.0, v[j].UTW[d] - arr_j);
 				b3.push_back({ j, -slack });
-
-				// B4 depot safety
-				double s4 = (0.2 * tt_ij + tt_jD + eps) / (scorej + eps);
-				b4.push_back({ j, s4 });
-
-				// B5 pure prize (negative to sort descending prize)
-				b5.push_back({ j, -scorej });
 			}
 
 			auto cap = [&](int portion) { return std::min(portion, (int)pool.size()); };
 			int k1 = cap((int)std::round(0.90 * K_target));
 			int k2 = cap((int)std::round(0.08 * K_target));
 			int k3 = cap((int)std::round(0.02 * K_target));
-			int k4 = 0;//cap((int)std::round(0.15 * K_target));
-			int k5 = 0;//std::max(2, cap((int)std::round(0.05 * K_target)));
 
 			keep_top(b1, k1); keep_top(b2, k2); keep_top(b3, k3);
-			keep_top(b4, k4); keep_top(b5, k5);
 
 			// --------- Union & dedupe of buckets ---------
 			std::vector<Cand> uni;
@@ -579,7 +586,7 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 				if (!list.empty() && std::binary_search(list.begin(), list.end(), i)) {
 					// Push with B1 score so later trimming uses the same metric
 					const double tt_ij = v[i].con[j]->determin;
-					const double tt_jD = v[j].con[depot]->determin;
+					const double tt_jD = v[j].con[enddepot]->determin;
 					const double scorej = (double)v[j].score;
 					double s1 = (tt_ij + 0.5 * tt_jD + eps) / (scorej + eps);
 					uni.push_back({ j, s1 });
@@ -612,7 +619,7 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 			v[i].nb[d].clear();
 			v[i].nb[d].reserve(uni.size() + 1);
 			for (const auto& c : uni) v[i].nb[d].push_back(&v[c.j]);
-			v[i].nb[d].push_back(&v[depot]); // always include depot
+			v[i].nb[d].push_back(&v[enddepot]); // always include end depot
 
 			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
 			v[i].nbi[d].reset();
@@ -620,12 +627,12 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 			v[i].nbi[d][i] = true; // self for swap
 		}
 
-		// depot neighborhood for this tour
-		v[depot].nb[d].clear();
-		v[depot].nb[d].push_back(&v[depot]);
-		v[depot].nbi[d].resize(maxvertices);  
-		v[depot].nbi[d].reset();
-		v[depot].nbi[d].set(depot);           
+		//end depot neighborhood for this tour
+		v[enddepot].nb[d].clear();
+		v[enddepot].nb[d].push_back(&v[enddepot]);
+		v[enddepot].nbi[d].resize(maxvertices);  
+		v[enddepot].nbi[d].reset();
+		v[enddepot].nbi[d].set(enddepot);           
 	}
 
 	// Write to file

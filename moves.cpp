@@ -787,7 +787,10 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 			Sol::Tour& tour = sol.tours[d];
 			int endj = (int)tour.seq.size();
 			std::vector<double> wait_suffix = tour.compute_wait_suffix();
-
+			const auto& Td = ins->t[d];
+			const double EDT = Td.EDT;
+			const double Wmax = Td.W_max, Vmax = Td.V_max, Tmax = Td.T_max;
+			const double breakdur = ins->breakdur;
 			for (int j = 0; j < endj - 1; ++j)
 			{
 				Ins::Vertex* x = tour.seq[j];
@@ -795,7 +798,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 				int breakz = tour.action[j + 1];
 				int nb_size = (int)x->nb[d].size();
 
-				double currenttime = tour.deptime[j] + ins->t[d].EDT;
+				double currenttime = tour.deptime[j] + EDT;
 
 				for (int i = 0; i < nb_size - 1; ++i) // skip depot
 				{
@@ -808,16 +811,15 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 
 					if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index])) continue;
 
-						if (tour.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
-						if (tour.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+						if (tour.weight + y->weight > Wmax + 1e-9) continue;
+						if (tour.volume + y->volume > Vmax + 1e-9) continue;
 
-						double t0 = tour.deptime[j] + ins->t[d].EDT;
+						double t0 = tour.deptime[j] + EDT;
 						double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
 						double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
 						double dt_lb = std::max(0.0, ins_lb - base_up);
 
-					double key_ub = RATIO(dt_lb, y->score, y->weight, y->volume,
-						ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+					double key_ub = RATIO(dt_lb, y->score, y->weight, y->volume,Tmax, Wmax, Vmax);
 
 					if ((key_ub <= local_bestkey + 1e-9) || (dt_lb > wait_suffix[j + 1] + tour.max_shift[j + 1] + 1e-9)) continue;
 
@@ -829,16 +831,16 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 
 					at += y->serv;
 					at = ins->arrival_time(y->con[z->index], at);
-					if (at + breakz * (ins->breakdur) < z->LTW[d])
+					if (at + breakz * breakdur < z->LTW[d])
 					{
-						at = z->LTW[d] - (breakz * ins->breakdur);
+						at = z->LTW[d] - (breakz * breakdur);
 					}
-					at += z->serv + breakz * ins->breakdur;
+					at += z->serv + breakz * breakdur;
 
-					double shift = (at - ins->t[d].EDT) - tour.deptime[j + 1];
+					double shift = (at - EDT) - tour.deptime[j + 1];
 					if (shift > tour.max_shift[j + 1] + 1e-9) continue;
 
-					double key = RATIO(shift, y->score, y->weight, y->volume, ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+					double key = RATIO(shift, y->score, y->weight, y->volume, Tmax, Wmax, Vmax);
 
 					if (key > local_bestkey + 1e-9)
 					{
@@ -865,7 +867,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 					int breakz = tourrem.action[j + 1];
 					int nb_size = (int)x->nb[d].size();
 
-					double currenttime = tourrem.deptime[j] + ins->t[d].EDT;
+					double currenttime = tourrem.deptime[j] + EDT;
 
 					for (int i = 0; i < nb_size - 1; ++i)
 					{
@@ -878,15 +880,15 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 						
 						if (!(sol.available[y->index] && x->nbi[d][y->index] && y->nbi[d][z->index])) continue;
 
-						if (tourrem.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
-						if (tourrem.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+						if (tourrem.weight + y->weight > Wmax + 1e-9) continue;
+						if (tourrem.volume + y->volume > Vmax + 1e-9) continue;
 
-						double t0      = tourrem.deptime[j] + ins->t[d].EDT;
+						double t0      = tourrem.deptime[j] + EDT;
 						double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
 						double ins_lb  = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
 						double dt_lb   = std::max(0.0, ins_lb - base_up);
 
-						double key_ub  = RATIO(dt_lb,y->score - r->score,y->weight - r->weight,y->volume - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+						double key_ub  = RATIO(dt_lb,y->score - r->score,y->weight - r->weight,y->volume - r->volume,Tmax, Wmax, Vmax);
 
 						if ((key_ub <= local_bestkey + 1e-9) ||
 							(dt_lb   >  wait_suffix_r[j + 1] + tourrem.max_shift[j + 1] + 1e-9))
@@ -897,16 +899,16 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 						if (at > y->UTW[d] + 1e-9) continue;
 						at += y->serv;
 						at  = ins->arrival_time(y->con[z->index], at);
-						if (at + breakz * (ins->breakdur) < z->LTW[d]) 
+						if (at + breakz * (breakdur) < z->LTW[d]) 
 						{
-							at = z->LTW[d] - (breakz * ins->breakdur);
+							at = z->LTW[d] - (breakz * breakdur);
 						}
-						at += z->serv + breakz * ins->breakdur;
+						at += z->serv + breakz * breakdur;
 
-						double shift = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
+						double shift = (at - EDT) - tourrem.deptime[j + 1];
 						if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
 
-						double key = RATIO(shift,y->score - r->score,y->weight - r->weight,y->volume - r->volume,ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+						double key = RATIO(shift,y->score - r->score,y->weight - r->weight,y->volume - r->volume,Tmax, Wmax, Vmax);
 
 						if (key > local_bestkey + 1e-9) 
 						{
@@ -1004,7 +1006,10 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 		{
 			// IMPORTANT: reset per tour d (matches your original behavior)
 			double local_bestkey = -DBL_MAX;
-
+			const auto& Td = ins->t[d];
+			const double EDT = Td.EDT;
+			const double Wmax = Td.W_max, Vmax = Td.V_max, Tmax = Td.T_max;
+			const double breakdur = ins->breakdur;
 			int end = (int)sol.tours[d].seq.size();
 			for (int g = 1; g < end - 1; ++g)            // first removed regular vertex
 			{
@@ -1026,7 +1031,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 						const int breakz = tourrem.action[j + 1];
 
 						// Hoist base values that don't depend on y:
-						const double t0 = tourrem.deptime[j] + ins->t[d].EDT;
+						const double t0 = tourrem.deptime[j] + EDT;
 						const double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
 
 						const int nb_size = (int)x->nb[d].size();
@@ -1048,8 +1053,8 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 								continue;
 
 							// Capacity
-							if (tourrem.weight + y->weight > ins->t[d].W_max + 1e-9) continue;
-							if (tourrem.volume + y->volume > ins->t[d].V_max + 1e-9) continue;
+							if (tourrem.weight + y->weight > Wmax + 1e-9) continue;
+							if (tourrem.volume + y->volume > Vmax + 1e-9) continue;
 
 							// Time LB/UB gate (cheap)
 							const double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
@@ -1069,21 +1074,18 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 							at += y->serv;
 
 							at = ins->arrival_time(y->con[z->index], at);
-							if (at + breakz * (ins->breakdur) < z->LTW[d]) {
-								at = z->LTW[d] - (breakz * ins->breakdur);
+							if (at + breakz * (breakdur) < z->LTW[d]) {
+								at = z->LTW[d] - (breakz * breakdur);
 							}
-							at += z->serv + breakz * ins->breakdur;
+							at += z->serv + breakz * breakdur;
 
-							const double shift = (at - ins->t[d].EDT) - tourrem.deptime[j + 1];
+							const double shift = (at - EDT) - tourrem.deptime[j + 1];
 							if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
 
 							// Objective key
 							const double key = RATIO(
 								shift,
-								 y->score - (r->score + s->score),
-								 y->weight - (r->weight + s->weight),
-								 y->volume - (r->volume + s->volume),
-								ins->t[d].T_max, ins->t[d].W_max, ins->t[d].V_max);
+								 y->score - (r->score + s->score),y->weight - (r->weight + s->weight),y->volume - (r->volume + s->volume),Tmax, Wmax, Vmax);
 
 							if (key > local_bestkey + 1e-9) 
 							{
@@ -1159,7 +1161,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 			const auto& Td = ins->t[d];
 			const double EDT = Td.EDT;
 			const double Wmax = Td.W_max, Vmax = Td.V_max, Tmax = Td.T_max;
-			const double breakdur = ins->breakdur, breakstart = ins->breakstart, breakend = ins->breakend;
+			const double breakdur = ins->breakdur;
 			// reset per tour (matches your original behavior)
 			double local_bestkey = -DBL_MAX;
 

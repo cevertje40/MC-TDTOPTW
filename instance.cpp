@@ -1,4 +1,4 @@
-#include "instance.h"
+﻿#include "instance.h"
 
 using namespace std;
 
@@ -406,122 +406,212 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 	output.close(); 
 }
 
-
-enum class NbScoreKey {
-	TimePerReward,              // A
-	DepotTimePerReward,         // B
-	SlackAware,                 // C
-	DeadlineBias,               // D
-	Composite                   // E
-};
-
-struct NbScoreParams {
-	double alpha = 0.6; // composite blend
-	double phi = 0.25; // slack penalty weight
-	double psi = 0.2;  // deadline penalty weight
-	double SLmin = 0.0001; // slack scale (hours)
-};
-
-inline double nb_score(
-	const Ins::Vertex& vi, const Ins::Vertex& vj,
-	int d, int endIdx, double LATd,
-	NbScoreKey key, const NbScoreParams& P)
-{
-	const double det_ij = vi.con[vj.index]->determin;
-	const double det_jv = vj.con[endIdx]->determin;
-	const double serv_j = vj.serv;
-	const double score_j = max(1.0, (double)vj.score);
-
-	const double T_ij = det_ij + serv_j;
-	const double T_ijv = det_ij + serv_j + det_jv;
-
-	const double slack = max(0.0, vj.UTW[d] - vj.LTW[d]);
-	const double slack_factor = 1.0 + P.phi * (1.0 - min(1.0, slack / P.SLmin));
-	const double urgency = (LATd > 0.0) ? max(0.0, (LATd - vj.UTW[d])) / LATd : 0.0;
-
-	switch (key) {
-	case NbScoreKey::TimePerReward:        // A
-		return T_ij / score_j;
-
-	case NbScoreKey::DepotTimePerReward:   // B
-		return T_ijv / score_j;
-
-	case NbScoreKey::SlackAware:           // C
-		return (T_ij / score_j) * slack_factor;
-
-	case NbScoreKey::DeadlineBias:         // D
-		return (T_ij / score_j) * (1.0 + P.psi * urgency);
-
-	case NbScoreKey::Composite:            // E
-	default: {
-		const double blend = P.alpha * T_ij + (1.0 - P.alpha) * T_ijv;
-		return (blend / score_j) * slack_factor;
-	}
-	}
-}
-
-
-
-struct Cand { int j; double s; };
-
 void Ins::create_neighbourhood(std::string path, std::string name)
 {
-	const int N = maxvertices - 2; // regular vertices count
-	// one unified rule for all instances:
-	const int K_min = 50;
-	const int K_max = 150;
-	const double beta = 3.0;
-	const int K = std::min(K_max, std::max(K_min, int(std::ceil(beta * std::sqrt(std::max(1, N))))));
-	cout << "K nb is: " << K << endl;
+	const int N = maxvertices - 2;                 // regular vertices
 	const int depot = maxvertices - 1;
-	
-#pragma omp parallel for
-	for (int i = 0; i < maxvertices - 1; ++i) {
-		v[i].nb.resize(maxtours);
-		v[i].nbi.resize(maxtours);
 
-		for (int d = 0; d < maxtours; ++d) {
-			std::vector<Cand> cands;
-			cands.reserve(std::min(N, K * 5)); // cheap guess; grows if needed
+	// Global bounds & shaping
+	const int   K_min = 50;
+	const int   K_max = 200;                       // a bit higher for large sets
+	const double beta = 3.0;
+	const double gamma = 2.0;
+	const double eps = 1e-9;
 
-			// build candidates (time-feasible arcs only)
+	struct Cand { int j; double s; };              // smaller s is better
+
+	auto clampK = [&](int k) { return std::min(K_max, std::max(K_min, k)); };
+
+	auto keep_top = [](std::vector<Cand>& v, int k) 
+		{
+		if ((int)v.size() > k) {
+			std::nth_element(v.begin(), v.begin() + k, v.end(),
+				[](const Cand& a, const Cand& b) { return a.s < b.s; });
+			v.resize(k);
+		}
+		std::sort(v.begin(), v.end(),
+			[](const Cand& a, const Cand& b) { return a.s < b.s; });
+		};
+
+	// Resize depot containers (we’ll fill later)
+	v[depot].nb.resize(maxtours);
+	v[depot].nbi.resize(maxtours);
+
+	// ---------- Per-tour loop ----------
+	for (int d = 0; d < maxtours; ++d)
+	{
+		// -------- Phase 1: precompute top-M (B1) successors for each origin u --------
+		const int M_MUTUAL = 20;                   // j keeps i if i is in j’s top-M by B1
+
+		// For membership tests we’ll keep sorted vectors (binary_search)
+		std::vector<std::vector<int>> topM_out(maxvertices);
+
+		#pragma omp parallel for schedule(guided)
+		for (int u = 0; u < maxvertices - 1; ++u)  // skip depot as origin
+		{
+			std::vector<Cand> b1_all;
+			b1_all.reserve(N);
+
+			// Build feasibility pool for u (reachable j with j→D feasible)
+			for (int j = 1; j < maxvertices - 1; ++j) {
+				if (j == u) continue;
+
+				// earliest arrival at j leaving u at LTW(u)+serv(u)
+				double arr_j = v[u].LTW[d] + v[u].serv + v[u].con[j]->determin;
+				if (arr_j < v[j].LTW[d]) arr_j = v[j].LTW[d];
+				if (arr_j > v[j].UTW[d]) continue;
+
+				// depart j after service and reach depot in time?
+				double dep_j = arr_j + v[j].serv;
+				if (dep_j + v[j].con[depot]->determin > v[depot].UTW[d]) continue;
+
+				// Primary metric B1
+				const double tt_uj = v[u].con[j]->determin;
+				const double tt_jD = v[j].con[depot]->determin;
+				const double scorej = (double)v[j].score;
+				double s1 = (tt_uj + 0.5 * tt_jD + eps) / (scorej + eps);
+				b1_all.push_back({ j, s1 });
+			}
+
+			keep_top(b1_all, std::min(M_MUTUAL, (int)b1_all.size()));
+
+			// store sorted list of j for membership checks
+			auto& out = topM_out[u];
+			out.reserve(b1_all.size());
+			for (auto& c : b1_all) out.push_back(c.j);
+			std::sort(out.begin(), out.end());
+		}
+
+		// -------- Phase 2: build neighborhoods with diversified buckets + mutuals --------
+		#pragma omp parallel for schedule(guided)
+		for (int i = 0; i < maxvertices - 1; ++i)  // skip depot as origin
+		{
+			// Make sure containers exist
+			v[i].nb.resize(maxtours);
+			v[i].nbi.resize(maxtours);
+
+			// --------- Feasibility pool (same as before) ---------
+			std::vector<int> pool; pool.reserve(N);
 			for (int j = 1; j < maxvertices - 1; ++j) {
 				if (j == i) continue;
 
-				// earliest arrival at j if we leave i at LTW(i) + serv(i)
 				double arr_j = v[i].LTW[d] + v[i].serv + v[i].con[j]->determin;
 				if (arr_j < v[j].LTW[d]) arr_j = v[j].LTW[d];
-				if (arr_j > v[j].UTW[d]) continue; // cannot reach j in time
+				if (arr_j > v[j].UTW[d]) continue;
 
-				// earliest depart j after service
 				double dep_j = arr_j + v[j].serv;
-				// reach depot in time?
-				double eta_depot = dep_j + v[j].con[depot]->determin;
-				if (eta_depot > v[depot].UTW[d]) continue;
+				if (dep_j + v[j].con[depot]->determin > v[depot].UTW[d]) continue;
 
-				// scoring (simple, instance-agnostic)
-				// smaller is better; we�ll sort ascending
+				pool.push_back(j);
+			}
+
+			const int Nreach = (int)pool.size();
+			int K_target = clampK((int)std::ceil(beta * std::sqrt(std::max(1, Nreach)) + gamma * std::log1p(Nreach)));
+
+			if (Nreach == 0) {
+				v[i].nb[d].clear();
+				v[i].nb[d].push_back(&v[depot]);
+				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+				v[i].nbi[d].reset();
+				v[i].nbi[d][depot] = true;
+				v[i].nbi[d][i] = true;
+				continue;
+			}
+
+			// --------- Buckets (B1..B5) as before ---------
+			std::vector<Cand> b1, b2, b3, b4, b5;
+			b1.reserve(std::min(Nreach, K_target * 3));
+			b2.reserve(std::min(Nreach, K_target * 2));
+			b3.reserve(std::min(Nreach, K_target * 2));
+			b4.reserve(std::min(Nreach, K_target * 2));
+			b5.reserve(std::min(Nreach, K_target));
+
+			const double LTWi = v[i].LTW[d];
+			const double servi = v[i].serv;
+
+			for (int j : pool) {
 				const double tt_ij = v[i].con[j]->determin;
 				const double tt_jD = v[j].con[depot]->determin;
-				const double eps = 1e-6;
-				double s = (tt_ij + 0.5 * tt_jD + eps) / (v[j].score + eps);
+				const double scorej = (double)v[j].score;
 
-				cands.push_back({ j, s });
+				// B1
+				double s1 = (tt_ij + 0.5 * tt_jD + eps) / (scorej + eps);
+				b1.push_back({ j, s1 });
+
+				// B2
+				double s2 = (tt_ij + eps) / (scorej + eps);
+				b2.push_back({ j, s2 });
+
+				// B3 (time-window slack): store negative so larger slack first
+				double arr_j = LTWi + servi + tt_ij;
+				if (arr_j < v[j].LTW[d]) arr_j = v[j].LTW[d];
+				double slack = std::max(0.0, v[j].UTW[d] - arr_j);
+				b3.push_back({ j, -slack });
+
+				// B4 depot safety
+				double s4 = (0.2 * tt_ij + tt_jD + eps) / (scorej + eps);
+				b4.push_back({ j, s4 });
+
+				// B5 pure prize (negative to sort descending prize)
+				b5.push_back({ j, -scorej });
 			}
 
-			// keep top-K
-			if ((int)cands.size() > K) {
-				std::nth_element(cands.begin(), cands.begin() + K, cands.end(),
-					[](const Cand& a, const Cand& b) { return a.s < b.s; });
-				cands.resize(K);
-			}
-			std::sort(cands.begin(), cands.end(),
-				[](const Cand& a, const Cand& b) { return a.s < b.s; });
+			auto cap = [&](int portion) { return std::min(portion, (int)pool.size()); };
+			int k1 = cap((int)std::round(0.90 * K_target));
+			int k2 = cap((int)std::round(0.08 * K_target));
+			int k3 = cap((int)std::round(0.02 * K_target));
+			int k4 = 0;//cap((int)std::round(0.15 * K_target));
+			int k5 = 0;//std::max(2, cap((int)std::round(0.05 * K_target)));
 
-			// materialize nb + nbi
+			keep_top(b1, k1); keep_top(b2, k2); keep_top(b3, k3);
+			keep_top(b4, k4); keep_top(b5, k5);
+
+			// --------- Union & dedupe of buckets ---------
+			std::vector<Cand> uni;
+			uni.reserve(b1.size() + b2.size() + b3.size() + b4.size() + b5.size());
+			auto add_all = [&](const std::vector<Cand>& src) { uni.insert(uni.end(), src.begin(), src.end()); };
+			add_all(b1); add_all(b2); add_all(b3); add_all(b4); add_all(b5);
+
+			// --------- Mutual neighbor additions ---------
+			// Add any j where i ∈ topM_out[j]
+			for (int j : pool) {
+				const auto& list = topM_out[j];
+				if (!list.empty() && std::binary_search(list.begin(), list.end(), i)) {
+					// Push with B1 score so later trimming uses the same metric
+					const double tt_ij = v[i].con[j]->determin;
+					const double tt_jD = v[j].con[depot]->determin;
+					const double scorej = (double)v[j].score;
+					double s1 = (tt_ij + 0.5 * tt_jD + eps) / (scorej + eps);
+					uni.push_back({ j, s1 });
+				}
+			}
+
+			// Consolidate: best score per j
+			std::sort(uni.begin(), uni.end(), [](const Cand& a, const Cand& b) {
+				if (a.j != b.j) return a.j < b.j;
+				return a.s < b.s;
+				});
+			int w = 0;
+			for (int r = 0; r < (int)uni.size(); ) {
+				int jj = uni[r].j;
+				double best = uni[r].s;
+				int r2 = r + 1;
+				while (r2 < (int)uni.size() && uni[r2].j == jj) {
+					if (uni[r2].s < best) best = uni[r2].s;
+					++r2;
+				}
+				uni[w++] = { jj, best };
+				r = r2;
+			}
+			uni.resize(w);
+
+			// Final trimming by B1 to K_target
+			keep_top(uni, std::min(K_target, (int)uni.size()));
+
+			// --------- Materialize nb + nbi ---------
 			v[i].nb[d].clear();
-			v[i].nb[d].reserve(cands.size() + 1);
-			for (const auto& c : cands) v[i].nb[d].push_back(&v[c.j]);
+			v[i].nb[d].reserve(uni.size() + 1);
+			for (const auto& c : uni) v[i].nb[d].push_back(&v[c.j]);
 			v[i].nb[d].push_back(&v[depot]); // always include depot
 
 			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
@@ -529,19 +619,16 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 			for (auto* pj : v[i].nb[d]) v[i].nbi[d][pj->index] = true;
 			v[i].nbi[d][i] = true; // self for swap
 		}
-	}
 
-	// depot neighborhood (as you had)
-	v[depot].nb.resize(maxtours);
-	v[depot].nbi.resize(maxtours);
-	for (int d = 0; d < maxtours; ++d) {
+		// depot neighborhood for this tour
 		v[depot].nb[d].clear();
 		v[depot].nb[d].push_back(&v[depot]);
-		v[depot].nbi[d] = boost::dynamic_bitset<>(maxvertices);
-		v[depot].nbi[d][depot] = true;
+		v[depot].nbi[d].resize(maxvertices);  
+		v[depot].nbi[d].reset();
+		v[depot].nbi[d].set(depot);           
 	}
 
-	// write to file (unchanged)
+	// Write to file
 	std::ofstream file(path + "nb" + name);
 	for (int i = 0; i < maxvertices; ++i) {
 		for (int d = 0; d < maxtours; ++d) {
@@ -553,6 +640,7 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 	}
 	file.close();
 }
+
 
 void Ins::read_neighbourhood(string path,string name)
 {

@@ -723,7 +723,7 @@ bool Tour::check()
 		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
 		{
 			waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-			cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
+			//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
 			arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
 		}
 		arrivaltime += current->serv + breakcurrent * ins->breakdur;

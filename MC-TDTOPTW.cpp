@@ -576,11 +576,11 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set4.txt";
+		filename = "set6.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
-	output << "solution methods for the CTOP \n";
+	output << "solution methods for the CTOP: " << filename << "\n" << endl;
 	output << "filename,bestscore,score,cpu,gap\n";
 	output.close();
 	vector<Instance> dataset = read_dataset(filename);
@@ -642,7 +642,7 @@ int main()
 	//debug_instance();
 	//debug_ctop();
 	//solve_dataset(1);
-	ctop_gap(1);
+	ctop_gap(10);
 	//doe(10);
 	//case_study(10);
 

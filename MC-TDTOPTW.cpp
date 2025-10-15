@@ -404,12 +404,12 @@ void case_study(int max_rep = 5)
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
 			instance.create_neighbourhood(textfile.path, textfile.name);
-			instance.alter_instance();
+			//instance.alter_instance();
 			Tabu tabu(instance, 10000, 2);
 			it->result[rep] = tabu.solve(it->bestknown);
-			instance.unalter_instance();
-			cout << "after repair" << endl;
-			it->result[rep].removed=it->result[rep].sol.repair();
+			//instance.unalter_instance();
+			//cout << "after repair" << endl;
+			//it->result[rep].removed=it->result[rep].sol.repair();
 			cout << it->result[rep].sol << endl;
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
@@ -449,7 +449,7 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	Res resdebug;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.3.3.3.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.1.1.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
@@ -541,6 +541,9 @@ void doe(int max_rep = 10)
 
 				double gap_stdev = sqrt(sq_sum / max_rep);
 				globalgap_sq += gap_stdev;
+				output.open("output.txt", ios::out | ios::app);
+				output << it->filename << ","<< nimax[par1] << "," << umax[par2] << ","<< gap_mean <<","<< gap_stdev << "\n";
+
 			}
 			globalgap /= dataset.size();
 			globalgap_sq /= dataset.size();
@@ -576,7 +579,7 @@ void ctop_gap(int max_rep=5)
 	getline(std::cin, filename);
 	if (filename.size() == 0)
 	{
-		filename = "set6.txt";
+		filename = "set2.txt";
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
@@ -641,10 +644,10 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(1);
-	ctop_gap(10);
+	//solve_dataset(5);
+	//ctop_gap(1);
 	//doe(10);
-	//case_study(10);
+	case_study(10);
 
 
 }

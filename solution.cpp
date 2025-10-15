@@ -693,7 +693,8 @@ vector<double> Tour::compute_wait_suffix()
 
 	wait_suffix.assign(n, 0.0);
 	double acc = 0.0;
-	for (int i = n - 1; i >= 0; --i) {
+	for (int i = n - 1; i >= 0; --i) 
+	{
 		acc += wait_at[i];
 		wait_suffix[i] = acc;
 	}

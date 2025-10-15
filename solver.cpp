@@ -623,7 +623,7 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it): Moves(ins),max_noimpr(max_
 
 void Tabu::perturbe(Sol& sol)
 {
-	constexpr double removalRate = 0.2; // Remove up to 20% of vertices from a tour
+	constexpr double removalRate = 0.05; // Remove up to 20% of vertices from a tour
 	std::uniform_real_distribution<double> prob(0.0, 1.0);
 	std::uniform_int_distribution<> offset(1, 2); // how far from the worst to go
 	for (int d = 0; d < ins->maxtours; ++d)
@@ -721,7 +721,8 @@ void Tabu::parallel_construct(Sol& sol)
 	bool seeded_any = true;
 	const int K = 12; // small scan window per pass to stay fast
 
-	while (seeded_any) {
+	while (seeded_any) 
+	{
 		seeded_any = false;
 
 		for (int d = 0; d < ins->maxtours; ++d) 
@@ -898,7 +899,7 @@ Res Tabu::solve(int bestknown)
 	std::array<CritStats, N_CRIT> crit_stats{};
 	const double EMA_RHO = 0.1; //	learning rate for exponential moving average of gains
 	const double THRESH = 0.80;   // start biasing after 80% utilization
-	const double GAMMA = 5.0;    // bias strength
+	const double GAMMA = 5;    // bias strength
 	const double EPS_GAIN = 1e-6;// to avoid zero gains
 
 	uniform_int_distribution<> nbpicker(1,3);//random move selector
@@ -912,6 +913,10 @@ Res Tabu::solve(int bestknown)
 	int no_feasible_moves_in_a_row = 0;
 	while (noimpr < max_noimpr)
 	{
+		if (gb.score == ins->maxscore)
+		{
+			break;
+		}
 		int prev_score = s.score;
 		bool moved = false;
 		//select criterion based on constraint pressure
@@ -925,7 +930,8 @@ Res Tabu::solve(int bestknown)
 
 		auto perf = [&](int crit)->double { return crit_stats[crit].ema_gain + EPS_GAIN; };
 
-		std::array<double, N_CRIT> w = {
+		std::array<double, N_CRIT> w = 
+		{
 			perf(SCORE) * ctx_mult(SCORE),
 			perf(TIME) * ctx_mult(TIME),
 			perf(VOLUME) * ctx_mult(VOLUME),
@@ -950,12 +956,14 @@ Res Tabu::solve(int bestknown)
 		auto pick_weighted = [&](const std::array<double, N_CRIT>& ww)->int {
 			double sum = 0.0;
 			for (double x : ww) sum += x;
-			if (!(sum > 0.0)) {
+			if (!(sum > 0.0)) 
+			{
 				return std::uniform_int_distribution<int>(0, N_CRIT - 1)(engine);
 			}
 			double u = std::uniform_real_distribution<double>(0.0, sum)(engine);
 			double acc = 0.0;
-			for (int i = 0; i < N_CRIT; ++i) {
+			for (int i = 0; i < N_CRIT; ++i) 
+			{
 				acc += ww[i];
 				if (u < acc) return i;
 			}

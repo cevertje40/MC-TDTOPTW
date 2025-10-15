@@ -1035,7 +1035,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 						const double base_up = ins->arrival_time(x->con[z->index], t0) - t0;
 
 						const int nb_size = (int)x->nb[d].size();
-						const double currenttime = t0; // identical to above, just clearer
+						const double currenttime = t0; 
 
 						for (int i = 0; i < nb_size - 1; ++i) // skip last neighbor = end depot
 						{
@@ -1074,7 +1074,8 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 							at += y->serv;
 
 							at = ins->arrival_time(y->con[z->index], at);
-							if (at + breakz * (breakdur) < z->LTW[d]) {
+							if (at + breakz * (breakdur) < z->LTW[d]) 
+							{
 								at = z->LTW[d] - (breakz * breakdur);
 							}
 							at += z->serv + breakz * breakdur;
@@ -1083,9 +1084,7 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 							if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
 
 							// Objective key
-							const double key = RATIO(
-								shift,
-								 y->score - (r->score + s->score),y->weight - (r->weight + s->weight),y->volume - (r->volume + s->volume),Tmax, Wmax, Vmax);
+							const double key = RATIO(shift,y->score - (r->score + s->score),y->weight - (r->weight + s->weight),y->volume - (r->volume + s->volume),Tmax, Wmax, Vmax);
 
 							if (key > local_bestkey + 1e-9) 
 							{

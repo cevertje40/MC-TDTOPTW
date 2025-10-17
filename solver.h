@@ -1,5 +1,7 @@
 ﻿#pragma once
 #include "moves.h"
+#include "elitepool.h"
+
 
 class Res
 {

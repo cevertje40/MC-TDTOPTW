@@ -4,6 +4,7 @@
 #include "tabuvector.h"
 #include "ratio.h"
 
+
 class One_one_rep_nb
 {
 public:

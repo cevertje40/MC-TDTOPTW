@@ -34,6 +34,13 @@ public:
 
     void setDuration(int duration) { tabu_duration = duration; }
 
+    // O(1) fast clear: expire everything by jumping the clock past all expiries.
+    void clear() 
+    {
+        const int bump = tabu_duration + 1; // strictly past any "added this iter" expiry
+        current_iteration += bump;
+    }
+
     //Print tabu vectors
     void printTabuVector() const {
         for (int tour_index = 0; tour_index < num_tours; ++tour_index) {

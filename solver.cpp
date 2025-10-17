@@ -623,7 +623,7 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it): Moves(ins),max_noimpr(max_
 
 void Tabu::perturbe(Sol& sol)
 {
-	constexpr double removalRate = 0.05; // Remove up to 20% of vertices from a tour
+	constexpr double removalRate = 0.02; // Remove up to 20% of vertices from a tour
 	std::uniform_real_distribution<double> prob(0.0, 1.0);
 	std::uniform_int_distribution<> offset(1, 2); // how far from the worst to go
 	for (int d = 0; d < ins->maxtours; ++d)
@@ -881,7 +881,6 @@ inline Pressures compute_pressures(const Sol& s) {
 	return { t_p, w_p, v_p };
 }
 
-
 Res Tabu::solve(int bestknown)
 {
 	using clock = std::chrono::steady_clock;
@@ -891,6 +890,8 @@ Res Tabu::solve(int bestknown)
 	//s.write_to_file();
 	parallel_construct(s);
 	gb = s;//set global best to initial solution
+	ElitePool elites;
+	elites.consider(s, ins->maxvertices);
 
 	//criteria selector based on constraint pressure
 	
@@ -1043,12 +1044,16 @@ Res Tabu::solve(int bestknown)
 			}
 		}//end switch
 		
-		//if (no_feasible_moves_in_a_row > 5) //if no feasible moves are found in a row, perturb the solution
-		//{
-			//perturbe(s);
-			//no_feasible_moves_in_a_row = 0;
-			//s.check();
-		//}
+		if (no_feasible_moves_in_a_row > 5) 
+		{
+			elites.consider(s, ins->maxvertices);
+			int idx = elites.pick_idx(s, ins->maxvertices, engine);
+			if (idx >= 0) { s = elites.get(idx); elites.mark_used(idx); }
+			else { s = gb; }
+			tabulist.clear();
+			no_feasible_moves_in_a_row = 0;
+			continue;
+		}
 		//if (!s.check())
 		//{
 			//cout << "error in replace" << endl;
@@ -1100,7 +1105,8 @@ Res Tabu::solve(int bestknown)
 		{
 			++noimpr;
 		}
-		
+		if ((iter & 15) == 0) elites.consider(s, ins->maxvertices);
+		elites.tick();
 		++iter;
 		/*
 		if ((iter % 1000) == 0) 

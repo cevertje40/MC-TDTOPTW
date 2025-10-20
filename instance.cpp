@@ -10,7 +10,7 @@ void Ins::read_time_independent_traveltime()
 	titt.open(filepath + "titt" + to_string(maxvertices) + ".TXT", ifstream::in);
 	if (titt.is_open())
 	{
-		cout << "reading time-independent travel time" << endl;
+		//cout << "reading time-independent travel time" << endl;
 		//assign connections to vertex objects and read free flow travel time
 		for (int i = 0; i < maxvertices; ++i)
 		{
@@ -44,7 +44,7 @@ void Ins::read_time_dependent_traveltime()
 		cout << term::fg(term::Color::red) << "could not open time-dependent travel time file" << endl;
 		return;
 	}
-	cout << "reading time-dependent travel time" << endl;
+	//cout << "reading time-dependent travel time" << endl;
 	for (int i = 0; i < maxvertices; ++i) {
 		for (int j = 0; j < maxvertices; ++j) {
 			string line;
@@ -210,7 +210,7 @@ Ins::Ins(CTOP textfile)
 			str >> v[i].serv;
 			str >> v[i].score;
 			maxscore += v[i].score;
-			v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
+			//v[i].serv = 0.0;//set service time equal to 0 for set1-3, comment out for set4-6
 			v[i].LTW.resize(maxtours);
 			v[i].UTW.resize(maxtours);
 			for (int tour = 0; tour < maxtours; ++tour)
@@ -408,6 +408,7 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 
 void Ins::create_neighbourhood(std::string path, std::string name)
 {
+
 	const int N = maxvertices - 2;                 // regular vertices
 	const int enddepot = maxvertices - 1;
 
@@ -523,7 +524,6 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 			
 			const int Nreach = (int)pool.size();
 			int K_target = clampK((int)std::ceil(beta * std::sqrt(std::max(1, Nreach)) + gamma * std::log1p(Nreach)));
-			//K_target = maxvertices;//to test
 			if (Nreach == 0) 
 			{
 				v[i].nb[d].clear();
@@ -646,6 +646,28 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 		}
 	}
 	file.close();
+	/*
+	for (int i = 0; i < maxvertices - 1; ++i)  // skip depot as origin
+	{
+		// Make sure containers exist
+		v[i].nb.resize(maxtours);
+		v[i].nbi.resize(maxtours);
+		for (int d = 0; d < maxtours; ++d)
+		{
+			v[i].nb[d].clear();
+			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+			v[i].nbi[d].reset();
+			for (int j = 0; j < maxvertices; ++j)
+			{
+				if (i != j)
+				{
+					v[i].nb[d].push_back(&v[j]);
+				}
+				v[i].nbi[d][j] = true;
+			}
+		}
+	}
+	*/
 }
 
 

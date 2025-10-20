@@ -7,10 +7,12 @@ double ElitePool::arc_distance_frac(const std::unordered_set<std::uint64_t>& A,c
 {
     if (A.empty() && B.empty()) return 0.0;
     std::size_t inter = 0;
-    if (A.size() < B.size()) {
+    if (A.size() < B.size()) 
+    {
         for (auto x : A) if (B.count(x)) ++inter;
     }
-    else {
+    else 
+    {
         for (auto x : B) if (A.count(x)) ++inter;
     }
     const double uni = double(A.size() + B.size() - inter);
@@ -38,7 +40,8 @@ void ElitePool::consider(const Sol& s, int maxV)
     fill_arcs(s, maxV, cand.arcs);
 
     // Reject if too similar to an equal/better elite
-    for (const auto& q : pool_) {
+    for (const auto& q : pool_) 
+    {
         const double d = arc_distance_frac(cand.arcs, q.arcs);
         if (d < cfg_.min_dist&& cand.score <= q.score) return;
     }
@@ -90,6 +93,21 @@ int ElitePool::pick_idx(const Sol& current, int maxV, std::mt19937& eng) const
     std::discrete_distribution<int> dd(weights.begin(), weights.end());
     int pos = dd(eng);
     return cand[pos].idx;
+}
+
+int ElitePool::pick_farthest_idx(const Sol& current, int maxV) const 
+{
+    if (pool_.empty()) return -1;
+    std::unordered_set<uint64_t> A; fill_arcs(current, maxV, A);
+    int best_i = -1; double best_d = -1.0;
+
+    for (int i = 0; i < (int)pool_.size(); ++i) 
+    {
+        if (pool_[i].cooldown > 0) continue;
+        double d = arc_distance_frac(A, pool_[i].arcs);
+        if (d > best_d) { best_d = d; best_i = i; }
+    }
+    return best_i;
 }
 
 void ElitePool::mark_used(int idx)

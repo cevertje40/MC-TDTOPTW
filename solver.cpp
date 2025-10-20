@@ -912,6 +912,8 @@ Res Tabu::solve(int bestknown)
 	int nonb2 = 0;//non improving counter for move 2
 	int nonb3 = 0;//non improving counter for move 3
 	int no_feasible_moves_in_a_row = 0;
+	int restart_count = 0;
+	double restart_dist_sum = 0.0;
 	while (noimpr < max_noimpr)
 	{
 		if (gb.score == ins->maxscore)
@@ -1046,12 +1048,26 @@ Res Tabu::solve(int bestknown)
 		
 		if (no_feasible_moves_in_a_row > 5) 
 		{
-			elites.consider(s, ins->maxvertices);
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
-			if (idx >= 0) { s = elites.get(idx); elites.mark_used(idx); }
-			else { s = gb; }
+			//int idx = elites.pick_farthest_idx(s, ins->maxvertices);
+			if (idx >= 0) 
+			{ 
+				std::unordered_set<uint64_t> A; ElitePool::fill_arcs(s, ins->maxvertices, A);
+				std::unordered_set<uint64_t> B; ElitePool::fill_arcs(elites.get(idx), ins->maxvertices, B);
+				double dist = ElitePool::arc_distance_frac(A, B);
+				restart_dist_sum += dist;
+				++restart_count;
+				s = elites.get(idx);
+				elites.mark_used(idx); 
+				
+			}
+			else 
+			{ 
+				s = gb; 
+			}
 			tabulist.clear();
 			no_feasible_moves_in_a_row = 0;
+			
 			continue;
 		}
 		//if (!s.check())
@@ -1105,27 +1121,20 @@ Res Tabu::solve(int bestknown)
 		{
 			++noimpr;
 		}
-		if ((iter & 15) == 0) elites.consider(s, ins->maxvertices);
+		if ((iter & 2) == 0) elites.consider(s, ins->maxvertices);
 		elites.tick();
 		++iter;
-		/*
-		if ((iter % 1000) == 0) 
+		if ((iter % 2000) == 0 && restart_count > 0) 
 		{
-			std::cout << std::fixed << std::setprecision(2)
-				<< "[P] T=" << P.time_p << " W=" << P.weight_p << " V=" << P.volume_p
-				<< " | used S=" << crit_stats[SCORE].used
-				<< " T=" << crit_stats[TIME].used
-				<< " V=" << crit_stats[VOLUME].used
-				<< " W=" << crit_stats[WEIGHT].used << "\n";
+			std::cout<< s.score  << " [Restart] count=" << restart_count<< " avg_dist=" << (restart_dist_sum / restart_count) << "\n";
 		}
-		*/
 		//cout << debug_iter << endl;
 	}//end while smaller than max_noimpr
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	//gb.write_to_cplex();
-	std::cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 <<"total iterations: "<< iter << endl;
-	std::cout << gb << endl;
+	std::cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 <<" total iterations: "<< iter << endl;
+	//std::cout << gb << endl;
 	return Res(gb, cpuTime, bestknown);
 }
 

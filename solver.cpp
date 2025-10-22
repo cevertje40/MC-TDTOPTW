@@ -1070,6 +1070,7 @@ Res Tabu::solve(int bestknown)
 			
 			continue;
 		}
+		s.check();
 		//if (!s.check())
 		//{
 			//cout << "error in replace" << endl;
@@ -1128,7 +1129,8 @@ Res Tabu::solve(int bestknown)
 		{
 			std::cout<< s.score  << " [Restart] count=" << restart_count<< " avg_dist=" << (restart_dist_sum / restart_count) << "\n";
 		}
-		//cout << debug_iter << endl;
+		s.check();
+		//cout << iter << endl;
 	}//end while smaller than max_noimpr
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();

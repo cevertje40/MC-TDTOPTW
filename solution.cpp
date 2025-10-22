@@ -1,4 +1,4 @@
-#include "solution.h"
+﻿#include "solution.h"
 
 using namespace std;
 
@@ -340,18 +340,147 @@ void Tour::update_break(int newbreakindex)
 	calc_maxshift();
 }
 
-void Tour::update_break()//potentially reposition break and update travel time and maxshift
+void Tour::update_break()  // reposition break, update times and max_shift
 {
+	/*
+	const int n = (int)seq.size();
+	// reset actions
+	std::fill(action.begin(), action.end(), 0);
+	breakindex = -1;
+
+	// --- forward pass WITHOUT break: record arr0 (arrival before any wait), svc (start-of-service) ---
+	std::vector<double> arr0(n, 0.0);
+	std::vector<double> svc(n, 0.0);
+
+	double t = ins->t[index].EDT;
+	deptime[0] = 0.0;
+
+	for (int u = 0; u < n - 1; ++u) {
+		Ins::Vertex* o = seq[u];
+		Ins::Vertex* p = seq[u + 1];
+		double a = ins->arrival_time(o->con[p->index], t); // arrival BEFORE waiting
+		arr0[u + 1] = a;
+
+		double s = (a < p->LTW[index] ? p->LTW[index] : a); // apply LTW wait
+		svc[u + 1] = s;
+
+		double leave = s + p->serv;   // (no break in this phase)
+		deptime[u + 1] = leave - ins->t[index].EDT;
+		t = leave;
+	}
+
+	// max_shift on the no-break schedule
+	calc_maxshift();
+
+	// --- usable waiting AFTER breakstart at each vertex (this is the key fix) ---
+	//     wait_after_start[j] = max(0, svc[j] - max(arr0[j], breakstart))
+	std::vector<double> wait_after_start(n, 0.0);
+	for (int j = 1; j < n; ++j) {
+		double usable = svc[j] - std::max(arr0[j], ins->breakstart);
+		if (usable < 0.0) usable = 0.0;
+		wait_after_start[j] = usable;
+	}
+
+	// --- earliest feasible position to start a break (start-only semantics) ---
+	//     use your original idea, but with arr0 instead of current-time t
+	int earliestbreakindex = n - 1; // default to end depot
+	for (int u = 0; u < n - 1; ++u) {
+		// We can start a break at p=seq[u+1] if either:
+		// - we arrive after breakstart, OR
+		// - we could wait-to-LTW and start break at LTW - breakdur (>= breakstart).
+		//   That is: max(arr0[u+1], LTW[p] - B) >= breakstart
+		double lhs = std::max(arr0[u + 1], seq[u + 1]->LTW[index] - ins->breakdur);
+		if (lhs >= ins->breakstart - 1e-9) {
+			earliestbreakindex = u + 1;
+			break;
+		}
+	}
+
+	// --- choose the first position that can absorb the break ---
+	bool placed = false;
+	for (int u = earliestbreakindex; u <= n - 1; ++u) {     // end depot included
+		// IMPORTANT: use usable waiting after breakstart, not total early wait
+		if (max_shift[u] + wait_after_start[u] + 1e-9 >= ins->breakdur) {
+			action[u] = 1;
+			breakindex = u;
+			placed = true;
+			break;
+		}
+	}
+	if (!placed) {
+		// fallback: put break on end depot (your original special case)
+		action.back() = 1;
+		breakindex = n - 1;
+	}
+
+	// --- recompute forward from breakindex-1 with the inserted break flags ---
+	double currenttime = (breakindex > 0)
+		? deptime[breakindex - 1] + ins->t[index].EDT
+		: ins->t[index].EDT;
+
+	for (int u = std::max(0, breakindex - 1); u < n - 1; ++u) {
+		Ins::Vertex* o = seq[u];
+		Ins::Vertex* p = seq[u + 1];
+
+		double arr = ins->arrival_time(o->con[p->index], currenttime);
+
+		// If there is a break at p, you can start it upon arrival, but if p is not the end depot
+		// and you arrive before breakstart, the extra waiting-to-breakstart happens here.
+		if (action[u + 1]) {
+			if (p->index != ins->maxvertices - 1 && arr < ins->breakstart)
+				arr = ins->breakstart;                    // eat only "usable" wait
+			arr += ins->breakdur;                         // break finishes
+		}
+
+		if (arr < p->LTW[index]) arr = p->LTW[index];     // LTW wait after break if needed
+
+		arr += p->serv;
+		// update max_shift relative to the old time
+		max_shift[u + 1] = (deptime[u + 1] + max_shift[u + 1]) - (arr - ins->t[index].EDT);
+		if (max_shift[u + 1] < 0.0) max_shift[u + 1] = 0.0;
+
+		deptime[u + 1] = arr - ins->t[index].EDT;
+		currenttime = arr;
+	}
+
+	// --- tiny safety: recompute end-depot time from its predecessor ---
+	{
+		double tp = ins->t[index].EDT + deptime[n - 2];
+		double arr = ins->arrival_time(seq[n - 2]->con[seq[n - 1]->index], tp);
+		if (action[n - 1]) arr += ins->breakdur;          // if break at depot
+		deptime[n - 1] = arr - ins->t[index].EDT;
+	}
+
+	// --- end-depot slack and backward max_shift cap (unchanged from your code) ---
+	if (breakindex == n - 1) 
+	{
+		// break at end depot
+		max_shift.back() = (ins->t[index].T_max - deptime.back());
+		double arrive_cap = ins->t[index].LAT - ins->breakdur;
+		if (ins->t[index].EDT + ins->t[index].T_max > ins->breakend + ins->breakdur) {
+			max_shift.back() = (ins->breakend + ins->breakdur) - (deptime.back() + ins->t[index].EDT);
+			arrive_cap = ins->breakend;
+		}
+		update_maxshift(0, n - 2, arrive_cap);
+	}
+	else 
+	{
+		// break before depot → cap by the successor’s latest arrival-before-service
+		double cap_at_next = (ins->t[index].EDT + deptime[breakindex + 1] + max_shift[breakindex + 1])
+			- (seq[breakindex + 1]->serv + action[breakindex + 1] * ins->breakdur);
+		update_maxshift(0, breakindex, cap_at_next);
+	}
+	*/
 	//evaluate tour without break
-	int end = (int) seq.size();
+	int end = (int)seq.size();
 	for (int vv = 0; vv < action.size(); ++vv)
 	{
 		action[vv] = 0;
 	}
 	double currenttime = ins->t[index].EDT;
-	int earliestbreakindex = (int) seq.size()-1;//default to end depot
+	int earliestbreakindex = (int)seq.size() - 1;//default to end depot
 	bool earliestbreaktofind = true;
-	vector<double>waitingtime(seq.size(),0.0);
+	vector<double>waitingtime(seq.size(), 0.0);
 	for (int u = 0; u < end - 1; ++u)
 	{
 		//gather departure time and corresponding time slot
@@ -361,12 +490,12 @@ void Tour::update_break()//potentially reposition break and update travel time a
 		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
 		if ((earliestbreaktofind) && (max(p->LTW[index] - ins->breakdur, arrivaltime) >= ins->breakstart))//arrival time need to be higher than breakstart not dep-serv
 		{//determine earliest feasible point to insert a break
-			earliestbreakindex = u+1;
+			earliestbreakindex = u + 1;
 			earliestbreaktofind = false;
 		}
 		if (arrivaltime < p->LTW[index])
 		{
-			waitingtime[u+1] = p->LTW[index] - arrivaltime;
+			waitingtime[u + 1] = p->LTW[index] - arrivaltime;
 			arrivaltime = p->LTW[index];
 
 		}
@@ -378,9 +507,9 @@ void Tour::update_break()//potentially reposition break and update travel time a
 	calc_maxshift();
 	//schedule the break 
 	bool breakindexnotfound = true;
-	for (int u = earliestbreakindex; u <= end-1; ++u)//end depot included
+	for (int u = earliestbreakindex; u <= end - 1; ++u)//end depot included
 	{
-		if (max_shift[u]+waitingtime[u] >= ins->breakdur)
+		if (max_shift[u] + waitingtime[u] >= ins->breakdur)
 		{
 			action[u] = 1;
 			breakindex = u;
@@ -392,19 +521,19 @@ void Tour::update_break()//potentially reposition break and update travel time a
 	if (breakindexnotfound)
 	{//put break on enddepot if the route is too short
 		action.back() = 1;
-		breakindex =(int) seq.size() - 1;
+		breakindex = (int)seq.size() - 1;
 		//cout << "forced break on end depot" << endl;
-		
+
 	}
 	if (breakindex == seq.size() - 1)
 	{
 		//update redeparture time at end depot
 		currenttime = deptime[breakindex - 1] + ins->t[index].EDT;
-		Ins::Vertex* o = seq[breakindex-1];
+		Ins::Vertex* o = seq[breakindex - 1];
 		Ins::Vertex* p = seq[breakindex];
 		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
 		arrivaltime += ins->breakdur;
-		deptime.back()= arrivaltime - ins->t[index].EDT;
+		deptime.back() = arrivaltime - ins->t[index].EDT;
 		//update max_shift of end depot and all preceding vertices
 		max_shift.back() = (ins->t[index].T_max - deptime.back());
 		arrivaltime = ins->t[index].LAT - ins->breakdur;
@@ -439,6 +568,7 @@ void Tour::update_break()//potentially reposition break and update travel time a
 		double arrivaltime = (deptime[breakindex + 1] + ins->t[index].EDT + max_shift[breakindex + 1]) - (seq[breakindex + 1]->serv + action[breakindex + 1] * ins->breakdur);//service time eraftrekken
 		update_maxshift(0, breakindex, arrivaltime);//update maxshift for all positions before breakindex
 	}
+	
 }
 
 void Tour::update_maxshift(int start, int end, double arrivaltime)
@@ -667,35 +797,55 @@ void Tour::swap_vertices(int i, int j)
 
 vector<double> Tour::compute_wait_suffix()
 {
-
 	const int n = (int)seq.size();
-	std::vector<double> wait_at(n, 0.0);
-	std::vector<double> wait_suffix;
-	double t = deptime[0] + ins->t[index].EDT; // depart from start (service at seq[0] already in deptime)
+	std::vector<double> wait_at(n, 0.0);      // actual waiting to satisfy LTW
+	std::vector<double> usable_at(n, 0.0);    // part of waiting that can absorb ripple
+	std::vector<double> wait_suffix(n, 0.0);
+
+	const double EDT = ins->t[index].EDT;
+	const double B = ins->breakdur;
+	const double BSTART = ins->breakstart;
+
+	// depart from start; service at seq[0] already included in deptime[0]
+	double t = deptime[0] + EDT;
+
 	for (int j = 0; j < n - 1; ++j)
 	{
 		Ins::Vertex* x = seq[j];
 		Ins::Vertex* z = seq[j + 1];
-		int breakz = action[j + 1];
+		const int breakz = action[j + 1];
 
-		double arr = ins->arrival_time(x->con[z->index], t);
+		// raw arrival before any waiting or break addition
+		double arr_raw = ins->arrival_time(x->con[z->index], t);
 
+		// actual schedule: enforce LTW (accounting for break if it is at z)
+		double arr = arr_raw;
 		double w = 0.0;
-		if (arr + breakz * ins->breakdur < z->LTW[index])
-		{
-			w = (z->LTW[index] - (arr + breakz * ins->breakdur));
-			arr = z->LTW[index] - breakz * ins->breakdur;
+		if (arr + breakz * B < z->LTW[index]) {
+			w = z->LTW[index] - (arr + breakz * B);
+			arr = z->LTW[index] - breakz * B;
 		}
 		wait_at[j + 1] = w;
 
-		t = arr + z->serv + breakz * ins->breakdur;
+		// usable waiting: if a break is here, the portion before breakstart can’t absorb ripple
+		if (breakz == 1) {
+			// time we’d need just to reach breakstart (if we arrived too early)
+			double unusable = std::max(0.0, BSTART - arr_raw);
+			usable_at[j + 1] = std::max(0.0, w - unusable);
+		}
+		else {
+			usable_at[j + 1] = w;
+		}
+
+		// advance to next vertex time (service + possible break at z)
+		t = arr + z->serv + breakz * B;
 	}
 
-	wait_suffix.assign(n, 0.0);
+	// suffix sum of usable waiting
 	double acc = 0.0;
 	for (int i = n - 1; i >= 0; --i) 
 	{
-		acc += wait_at[i];
+		acc += usable_at[i];
 		wait_suffix[i] = acc;
 	}
 	return wait_suffix;
@@ -720,57 +870,98 @@ bool Tour::check()
 		Ins::Vertex* current = seq[i + 1];
 		int breakcurrent = action[i + 1];
 		double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-		double waitingtime = 0;
-		if (arrivaltime + breakcurrent * ins->breakdur < current->LTW[index])
+		double waitingtime = 0.0;
+		double startbreak = 0.0;
+		double endbreak = 0.0;
+		double startservice = 0.0;
+		double endservice = 0.0;
+		if (breakcurrent) 
 		{
-			waitingtime = current->LTW[index] - (arrivaltime + breakcurrent * (ins->breakdur));
-			//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
-			arrivaltime = current->LTW[index] - (breakcurrent * ins->breakdur);
+			if ((arrivaltime < ins->breakstart)&&(current->index != ins->maxvertices - 1))
+			{//break can not start before breakstart
+				waitingtime += ins->breakstart - arrivaltime;
+				startbreak = ins->breakstart;
+			}
+			else
+			{//break can start upon arrival or before breakstart at enddepot
+				startbreak = arrivaltime;
+			}
+			if (startbreak > ins->breakend + 1e-6)
+			{
+				cout << "tour: " << index << "FAILURE!!! break end time exceed breakend for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+				tourok = false;
+			}
+			endbreak = startbreak + ins->breakdur;
+			if (endbreak < current->LTW[index])
+			{
+				waitingtime += current->LTW[index] - endbreak;
+				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
+				startservice = current->LTW[index];
+			}
+			else
+			{
+				startservice = endbreak;
+			}
 		}
-		arrivaltime += current->serv + breakcurrent * ins->breakdur;
-		//cout<<i+1<<" calc traveltime: " << arrivaltime-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
-		currenttime = arrivaltime;
+		else
+		{
+			if (arrivaltime < current->LTW[index])
+			{
+				waitingtime += current->LTW[index] - arrivaltime;
+				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
+				startservice = current->LTW[index];
+			}
+			else
+			{
+				startservice = arrivaltime;
+			}
+		}
+		
+		if (startservice < current->LTW[index]- 1e-6)
+		{
+			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! LTW fail for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+			tourok = false;
+		}
+
+		if (startservice > current->UTW[index]+ 1e-6)
+		{
+			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! UTW fail for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+			tourok = false;
+		}
+		endservice = startservice + current->serv;
+		//cout<<i+1<<" calc traveltime: " << endservice-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
+		currenttime = endservice;
 	}//end for i
 	length = currenttime - ins->t[index].EDT;
-	if (fabs(length - deptime.back()) > 0.01)
+	if (length > ins->t[index].T_max + 1e-6)
+	{
+		cout << term::fg(term::Color::red) << "tour: " << index << "length " << length << " above max: " << ins->t[index].T_max << endl;
+		tourok = false;
+
+	}
+	if (fabs(length - deptime.back()) > 1e-6)
 	{
 		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated length: " << length << " stored length: " << deptime.back() << "max length" << ins->t[index].T_max << endl;
 		tourok = false;
 	}
-	//b. TW check
-	for (int i = 0; i <= end; ++i)//utw of end depot serves as T_max check
-	{
-		Ins::Vertex* current = seq[i];
-		int breakcurrent = action[i];
-		if (deptime[i] + ins->t[index].EDT - seq[i]->serv + 0.01 < current->LTW[index])//service time zit al in traveltime
-		{
-			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! LTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
-			tourok = false;
-		}
-		if (((deptime[i] + ins->t[index].EDT) - seq[i]->serv) - 0.01 > current->UTW[index])
-		{
-			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! UTW fail for solutionnr: " << i << " /vertex index: " << current->index << endl;
-			tourok = false;
-		}
-	}//end for i
 	//c. weight checks
-	if (fabs(weightcheck - weight) > 0.01)
+	if (fabs(weightcheck - weight) > 1e-6)
 	{
 		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
 		tourok = false;
 	}
-	if (weight-ins->t[index].W_max>0.01)
+	if (weight-ins->t[index].W_max> 1e-6)
 	{
 		tourok = false;
 		cout << term::fg(term::Color::red) << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
 	}
 	//d. volume checks
-	if (fabs(volumecheck - volume) > 0.01)
+	if (fabs(volumecheck - volume) > 1e-6)
 	{
 		cout << term::fg(term::Color::yellow) << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
 		tourok = false;
 	}
-	if (volume - ins->t[index].V_max>0.01)
+	if (volume - ins->t[index].V_max> 1e-6)
 	{
 		tourok = false;
 		cout << term::fg(term::Color::red) << "tour: " << index << " volume " << volume << " above max: " << ins->t[index].V_max << endl;
@@ -788,43 +979,6 @@ bool Tour::check()
 				tourok = false;
 			}
 			++amountbreaks;
-			Ins::Vertex* vert = seq[i];
-			//check if break starts within allowed time frame, break is taken before service as break can be taken before opening of vertex
-			if (((ins->t[index].EDT + deptime[i] - seq[i]->serv) - (ins->breakdur) >= ins->breakstart) && ((ins->t[index].EDT + deptime[i] - seq[i]->serv) - ins->breakdur <= ins->breakend))
-			{
-				breakcheck = true;
-				//cout<<"break ok"<<endl;
-				//break is scheduled on time
-			}
-			else
-			{
-				if (seq[i]->index == ins->maxvertices - 1)
-				{
-					if (ins->t[index].EDT + deptime[i - 1] < ins->breakstart)
-					{//route is not long enough to require a break on a regular vertex
-						breakcheck = true;
-					}
-					else
-					{
-						cout << term::fg(term::Color::red) << "tour: " << index << " break wrongly planned at end vertex" << endl;
-						tourok = false;
-					}
-				}
-				else
-				{//mistakes to break scheduling found
-
-					if ((ins->t[index].EDT + deptime[i] - seq[i]->serv) - (ins->breakdur) < ins->breakstart)
-					{
-						cout << term::fg(term::Color::red) << "tour: " << index << "break too early" << endl;
-						tourok = false;
-					}
-					else
-					{
-						cout << term::fg(term::Color::red) << "tour: " << index << "break too late" << endl;
-						tourok = false;
-					}
-				}
-			}
 		}
 	}
 	//f. amount of breaks check

@@ -440,7 +440,8 @@ void Tour::update_break()  // reposition break, update times and max_shift
 
 		double arr = ins->arrival_time(o->con[p->index], currenttime);
 
-		if (action[u + 1]) {
+		if (action[u + 1]) 
+		{
 			const bool endp = (p->index == ins->maxvertices - 1);
 			// start-only rule:
 			//  - Non-depot: if early, wait to breakstart, then add B
@@ -476,7 +477,8 @@ void Tour::update_break()  // reposition break, update times and max_shift
 		// break at end depot
 		max_shift.back() = (ins->t[index].T_max - deptime.back());
 		double arrive_cap = ins->t[index].LAT - B;
-		if (ins->t[index].EDT + ins->t[index].T_max > ins->breakend + B) {
+		if (ins->t[index].EDT + ins->t[index].T_max > ins->breakend + B) 
+		{
 			// If breakend is tighter, reflect that in the cap (still non-failing)
 			max_shift.back() = (ins->breakend + B) - (deptime.back() + ins->t[index].EDT);
 			arrive_cap = ins->breakend;
@@ -485,110 +487,9 @@ void Tour::update_break()  // reposition break, update times and max_shift
 	} else 
 	{
 		// break before depot → cap by the successor’s latest arrival-before-service
-		double cap_at_next = (ins->t[index].EDT + deptime[breakindex + 1] + max_shift[breakindex + 1])
-			- (seq[breakindex + 1]->serv + (action[breakindex + 1] ? B : 0.0));
+		double cap_at_next = (ins->t[index].EDT + deptime[breakindex + 1] + max_shift[breakindex + 1]) - (seq[breakindex + 1]->serv + (action[breakindex + 1] ? B : 0.0));
 		update_maxshift(0, breakindex, cap_at_next);
 	}
-	
-	/*
-	//evaluate tour without break
-	int end = (int)seq.size();
-	for (int vv = 0; vv < action.size(); ++vv)
-	{
-		action[vv] = 0;
-	}
-	double currenttime = ins->t[index].EDT;
-	int earliestbreakindex = (int)seq.size() - 1;//default to end depot
-	bool earliestbreaktofind = true;
-	vector<double>waitingtime(seq.size(), 0.0);
-	for (int u = 0; u < end - 1; ++u)
-	{
-		//gather departure time and corresponding time slot
-		Ins::Vertex* o = seq[u];
-		Ins::Vertex* p = seq[u + 1];
-		//travel time from van o to p
-		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-		if ((earliestbreaktofind) && (max(p->LTW[index] - ins->breakdur, arrivaltime) >= ins->breakstart))//arrival time need to be higher than breakstart not dep-serv
-		{//determine earliest feasible point to insert a break
-			earliestbreakindex = u + 1;
-			earliestbreaktofind = false;
-		}
-		if (arrivaltime < p->LTW[index])
-		{
-			waitingtime[u + 1] = p->LTW[index] - arrivaltime;
-			arrivaltime = p->LTW[index];
-
-		}
-		arrivaltime += p->serv;
-		deptime[u + 1] = arrivaltime - ins->t[index].EDT;
-		currenttime = arrivaltime;
-	}//end for
-	//calc max_shift to check where there is room to insert a break
-	calc_maxshift();
-	//schedule the break 
-	bool breakindexnotfound = true;
-	for (int u = earliestbreakindex; u <= end - 1; ++u)//end depot included
-	{
-		if (max_shift[u] + waitingtime[u] >= ins->breakdur)
-		{
-			action[u] = 1;
-			breakindex = u;
-			deptime[u] += ins->breakdur;
-			breakindexnotfound = false;
-			break;
-		}
-	}
-	if (breakindexnotfound)
-	{//put break on enddepot if the route is too short
-		action.back() = 1;
-		breakindex = (int)seq.size() - 1;
-		//cout << "forced break on end depot" << endl;
-
-	}
-	if (breakindex == seq.size() - 1)
-	{
-		//update redeparture time at end depot
-		currenttime = deptime[breakindex - 1] + ins->t[index].EDT;
-		Ins::Vertex* o = seq[breakindex - 1];
-		Ins::Vertex* p = seq[breakindex];
-		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-		arrivaltime += ins->breakdur;
-		deptime.back() = arrivaltime - ins->t[index].EDT;
-		//update max_shift of end depot and all preceding vertices
-		max_shift.back() = (ins->t[index].T_max - deptime.back());
-		arrivaltime = ins->t[index].LAT - ins->breakdur;
-		if (ins->t[index].EDT + ins->t[index].T_max > ins->breakend + ins->breakdur)
-		{
-			max_shift.back() = (ins->breakend + ins->breakdur) - (deptime.back() + ins->t[index].EDT);
-			arrivaltime = ins->breakend;
-		}
-		update_maxshift(0, breakindex - 1, arrivaltime);
-	}
-	else
-	{
-		//update traveltime and max_shift for vertices after breakindex-1
-		currenttime = deptime[breakindex - 1] + ins->t[index].EDT;
-		for (int u = breakindex - 1; u < end - 1; ++u)
-		{
-			Ins::Vertex* o = seq[u];
-			Ins::Vertex* p = seq[u + 1];
-			//calc travel time from van o to p
-			double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-			//LTW check
-			if (arrivaltime + (action[u + 1] * ins->breakdur) < p->LTW[index])
-			{
-				arrivaltime = p->LTW[index] - (action[u + 1] * ins->breakdur);
-			}
-			arrivaltime += p->serv + (action[u + 1] * ins->breakdur);
-			max_shift[u + 1] = (deptime[u + 1] + max_shift[u + 1]) - (arrivaltime - ins->t[index].EDT);
-			deptime[u + 1] = arrivaltime - ins->t[index].EDT;
-			currenttime = arrivaltime;
-		}
-		//update max_shift for vertices before breakindex
-		double arrivaltime = (deptime[breakindex + 1] + ins->t[index].EDT + max_shift[breakindex + 1]) - (seq[breakindex + 1]->serv + action[breakindex + 1] * ins->breakdur);//service time eraftrekken
-		update_maxshift(0, breakindex, arrivaltime);//update maxshift for all positions before breakindex
-	}
-	*/
 }
 
 void Tour::update_maxshift(int start, int end, double arrivaltime)
@@ -853,7 +754,6 @@ vector<double> Tour::compute_wait_suffix()
 		acc += usable;
 		wait_suffix[j] = acc;
 	}
-	// wait_suffix[0] stays 0
 	return wait_suffix;
 }
 

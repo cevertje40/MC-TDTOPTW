@@ -894,7 +894,6 @@ Res Tabu::solve(int bestknown)
 	elites.consider(s, ins->maxvertices);
 
 	//criteria selector based on constraint pressure
-	
 	enum Crit { SCORE = 0, TIME = 1, VOLUME = 2, WEIGHT = 3, N_CRIT = 4 };
 	struct CritStats { double ema_gain = 0.0; long used = 0; };
 	std::array<CritStats, N_CRIT> crit_stats{};
@@ -984,8 +983,6 @@ Res Tabu::solve(int bestknown)
 		{
 			case 1:
 			{
-				//auto nb = one_one_replace_gen_nb(s, tabulist, s.score);
-				//auto nb = one_one_replace_gen_nb(s,tabulist,gb.score);
 				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score,kind);
 				if (nb.size() == 0)
 				{
@@ -1005,8 +1002,6 @@ Res Tabu::solve(int bestknown)
 			}
 			case 2:
 			{
-				//auto nb = two_one_replace_gen_nb(s, tabulist, s.score);
-				//auto nb = two_one_replace_gen_nb(s,tabulist,gb.score);
 				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,kind);
 				if (nb.size() == 0)
 				{
@@ -1026,8 +1021,6 @@ Res Tabu::solve(int bestknown)
 			}
 			case 3:
 			{
-				//auto nb = one_two_replace_gen_nb(s, tabulist, s.score);
-				//auto nb = one_two_replace_gen_nb(s,tabulist,gb.score);
 				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,kind);
 				if (nb.size() == 0)
 				{
@@ -1046,14 +1039,12 @@ Res Tabu::solve(int bestknown)
 				break;
 			}
 		}//end switch
+		/*
 		if (!s.check())
 		{
 			cout << "error in replace: " << pick << endl;
-			cout << "old" << endl;
-			cout << backup << endl;
-			cout << "new" << endl;
-			cout << s << endl;
 		}
+		*/
 		if (no_feasible_moves_in_a_row > 5) 
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
@@ -1083,25 +1074,33 @@ Res Tabu::solve(int bestknown)
 		//shift_nb(s,0);
 		//or_opt(s, 1);
 		two_opt_nb(s, 1);
+		/*
 		if (!s.check())
 		{
 			cout << "error in two-opt" << endl;
 		}
+		*/
 		swap_nb(s, 1);
+		/*
 		if (!s.check())
 		{
 			cout << "error in swap_nb" << endl;
 		}
+		*/
 		swap2_nb(s,1);
+		/*
 		if (!s.check())
 		{
 			cout << "error in swap2_nb" << endl;
 		}
+		*/
 		move_nb(s,1);
+		/*
 		if (!s.check())
 		{
 			cout << "error in move_nb" << endl;
 		}
+		*/
 		//update constraint pressure
 		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 
@@ -1129,16 +1128,18 @@ Res Tabu::solve(int bestknown)
 		if ((iter & 2) == 0) elites.consider(s, ins->maxvertices);
 		elites.tick();
 		++iter;
+		/*
 		if ((iter % 2000) == 0 && restart_count > 0) 
 		{
 			std::cout<< s.score  << " [Restart] count=" << restart_count<< " avg_dist=" << (restart_dist_sum / restart_count) << "\n";
 		}
+		*/
 		//cout << iter << endl;
 	}//end while smaller than max_noimpr
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	//gb.write_to_cplex();
-	std::cout<<"it with no nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 <<" total iterations: "<< iter << endl;
+	std::cout<<"iter without replacement nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 <<" total iterations: "<< iter << endl;
 	//std::cout << gb << endl;
 	return Res(gb, cpuTime, bestknown);
 }

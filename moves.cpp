@@ -830,13 +830,23 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 					if (at > y->UTW[d] + 1e-9) continue;
 
 					at += y->serv;
-					at = ins->arrival_time(y->con[z->index], at);
-					if (at + breakz * breakdur < z->LTW[d])
-					{
-						at = z->LTW[d] - (breakz * breakdur);
-					}
-					at += z->serv + breakz * breakdur;
 
+					at = ins->arrival_time(y->con[z->index], at);
+
+					if (breakz)
+					{
+						const bool endp = (z->index == ins->maxvertices - 1);
+						// - Non-depot: if arrive early, wait to breakstart, then add B
+						// - Depot: allowed to start upon arrival even if < breakstart
+						if (!endp && at < ins->breakstart) at = ins->breakstart;
+						// Must still start the break not after breakend
+						if (at > ins->breakend + 1e-9) continue;  // no legal break start here
+						at += breakdur;  // finish break at z
+					}
+
+					if (at < z->LTW[d]) at = z->LTW[d];
+					at += z->serv;
+					
 					double shift = (at - EDT) - tour.deptime[j + 1];
 					if (shift > tour.max_shift[j + 1] + 1e-9) continue;
 
@@ -899,12 +909,19 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 						if (at > y->UTW[d] + 1e-9) continue;
 						at += y->serv;
 						at  = ins->arrival_time(y->con[z->index], at);
-						if (at + breakz * (breakdur) < z->LTW[d]) 
+						if (breakz)
 						{
-							at = z->LTW[d] - (breakz * breakdur);
+							const bool endp = (z->index == ins->maxvertices - 1);
+							// - Non-depot: if arrive early, wait to breakstart, then add B
+							// - Depot: allowed to start upon arrival even if < breakstart
+							if (!endp && at < ins->breakstart) at = ins->breakstart;
+							// Must still start the break not after breakend
+							if (at > ins->breakend + 1e-9) continue;  // no legal break start here
+							at += breakdur;  // finish break at z
 						}
-						at += z->serv + breakz * breakdur;
-
+						if (at < z->LTW[d]) at = z->LTW[d];
+						at += z->serv;
+						
 						double shift = (at - EDT) - tourrem.deptime[j + 1];
 						if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
 
@@ -1074,11 +1091,21 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 							at += y->serv;
 
 							at = ins->arrival_time(y->con[z->index], at);
-							if (at + breakz * (breakdur) < z->LTW[d]) 
+							if (breakz) 
 							{
-								at = z->LTW[d] - (breakz * breakdur);
+								const bool endp = (z->index == ins->maxvertices - 1);
+
+								// - Non-depot: if arrive early, wait to breakstart, then add B
+								// - Depot: allowed to start upon arrival even if < breakstart
+								if (!endp && at < ins->breakstart) at = ins->breakstart;
+								// Must still start the break not after breakend
+								if (at > ins->breakend + 1e-9) continue;  // no legal break start here
+								at += breakdur;  // finish break at z
 							}
-							at += z->serv + breakz * breakdur;
+
+							// LTW at z is enforced AFTER the break (or immediately if no break at z)
+							if (at < z->LTW[d]) at = z->LTW[d];
+							at += z->serv;
 
 							const double shift = (at - EDT) - tourrem.deptime[j + 1];
 							if (shift > tourrem.max_shift[j + 1] + 1e-9) continue;
@@ -1213,9 +1240,24 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 						at += y1->serv;
 
 						at = ins->arrival_time(y1->con[z1->index], at);
-						if (at + breakz1 * breakdur < z1->LTW[d])
-							at = z1->LTW[d] - breakz1 * breakdur;
-						at += z1->serv + breakz1 * breakdur;
+						if (breakz1) 
+						{
+							const bool endp = (z1->index == ins->maxvertices - 1);
+
+							// Start-only rule:
+							// - Non-depot: if arrive early, wait to breakstart, then add B
+							// - Depot: allowed to start upon arrival even if < breakstart
+							if (!endp && at < ins->breakstart) at = ins->breakstart;
+
+							// Must still start the break not after breakend
+							if (at > ins->breakend + 1e-9) continue;  // no legal break start here
+
+							at += breakdur;  // finish break at z
+						}
+
+						// LTW at z is enforced AFTER the break (or immediately if no break at z)
+						if (at < z1->LTW[d]) at = z1->LTW[d];
+						at += z1->serv;
 
 						double shift1 = (at - EDT) - tourrem.deptime[j + 1];
 						if (shift1 > tourrem.max_shift[j + 1] + 1e-9) continue;
@@ -1354,9 +1396,23 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 								at2 += y2->serv;
 
 								at2 = ins->arrival_time(y2->con[z2->index], at2);
-								if (at2 + breakz2 * breakdur < z2->LTW[d])
-									at2 = z2->LTW[d] - breakz2 * breakdur;
-								at2 += z2->serv + breakz2 * breakdur;
+								if (breakz2) 
+								{
+									const bool endp = (z2->index == ins->maxvertices - 1);
+
+									// - Non-depot: if arrive early, wait to breakstart, then add B
+									// - Depot: allowed to start upon arrival even if < breakstart
+									if (!endp && at2 < ins->breakstart) at2 = ins->breakstart;
+
+									// Must still start the break not after breakend
+									if (at2 > ins->breakend + 1e-9) continue;  // no legal break start here
+
+									at2 += breakdur;  // finish break at z
+								}
+
+								// LTW at z is enforced AFTER the break (or immediately if no break at z)
+								if (at2 < z2->LTW[d]) at2 = z2->LTW[d];
+								at2 += z2->serv;
 
 								double shift2 = (at2 - EDT) - tourremins.deptime[k + 1];
 								if (shift2 > tourremins.max_shift[k + 1] + 1e-9) continue;

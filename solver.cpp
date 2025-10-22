@@ -920,6 +920,7 @@ Res Tabu::solve(int bestknown)
 		{
 			break;
 		}
+		Sol backup = s;;//backup current solution
 		int prev_score = s.score;
 		bool moved = false;
 		//select criterion based on constraint pressure
@@ -1045,7 +1046,14 @@ Res Tabu::solve(int bestknown)
 				break;
 			}
 		}//end switch
-		
+		if (!s.check())
+		{
+			cout << "error in replace: " << pick << endl;
+			cout << "old" << endl;
+			cout << backup << endl;
+			cout << "new" << endl;
+			cout << s << endl;
+		}
 		if (no_feasible_moves_in_a_row > 5) 
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
@@ -1070,34 +1078,30 @@ Res Tabu::solve(int bestknown)
 			
 			continue;
 		}
-		s.check();
-		//if (!s.check())
-		//{
-			//cout << "error in replace" << endl;
-		//}
+		
 		//VND
 		//shift_nb(s,0);
 		//or_opt(s, 1);
 		two_opt_nb(s, 1);
-		//if (!s.check())
-		//{
-			//cout << "error in two-opt" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in two-opt" << endl;
+		}
 		swap_nb(s, 1);
-		//if (!s.check())
-		//{
-			//cout << "error in swap_nb" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in swap_nb" << endl;
+		}
 		swap2_nb(s,1);
-		//if (!s.check())
-		//{
-			//cout << "error in swap2_nb" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in swap2_nb" << endl;
+		}
 		move_nb(s,1);
-		//if (!s.check())
-		//{
-			//cout << "error in move_nb" << endl;
-		//}
+		if (!s.check())
+		{
+			cout << "error in move_nb" << endl;
+		}
 		//update constraint pressure
 		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 
@@ -1129,7 +1133,6 @@ Res Tabu::solve(int bestknown)
 		{
 			std::cout<< s.score  << " [Restart] count=" << restart_count<< " avg_dist=" << (restart_dist_sum / restart_count) << "\n";
 		}
-		s.check();
 		//cout << iter << endl;
 	}//end while smaller than max_noimpr
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();

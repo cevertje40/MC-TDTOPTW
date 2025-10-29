@@ -615,7 +615,7 @@ Res Ils::solve(int bestknown)
 }
 
 
-Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it): Moves(ins),max_noimpr(max_noimpr), nb_tabu_it(nb_tabu_it)
+Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it, double ema_rho, double thresh, double gamma) : Moves(ins), max_noimpr(max_noimpr), nb_tabu_it(nb_tabu_it), EMA_RHO(ema_rho), THRESH(thresh), GAMMA(gamma)
 {
 	gb = Sol(ins);//best sol
 	s = Sol(ins);//iter sol

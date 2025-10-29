@@ -70,31 +70,19 @@ class Tabu : public Moves
 private:
 	int max_noimpr;
 	int nb_tabu_it;
+	double EMA_RHO; //	learning rate for exponential moving average of gains
+	double THRESH;  // start biasing after 80% utilization
+	double GAMMA;  // bias strength
 	void parallel_construct(Sol& sol);
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
 	
 
 public:
-	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it);
+	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
 	void perturbe(Sol& sol);
 	Res solve(int bestknown = 1);
 	std::string name = "Tabu";
 };
-
-class HALNS : public Moves
-{
-	int max_it;//maximum number of iterations
-	int T_init;//controls switch to current best when noimpr
-	Sol s;//current iteration solution
-	Sol gb;//global best solution
-	void remove(Sol& sol, int criteria,int amount);//todo
-	void insert(Sol& sol, int criteria);//todo
-public:
-	HALNS(Ins& ins, int max_it, int T_init);
-	Res solve(int bestknown = 1);
-	std::string name = "HALNS";
-};
-
 
 

@@ -2335,7 +2335,7 @@ bool Moves::shift_nb(Sol& sol, int mode)
 	return succes;
 }
 
-bool Moves::move_nb(Sol& sol,int mode)//move vertex x from tour d to tour e in order to save travel time
+bool Moves::relocate_nb(Sol& sol,int mode)//move vertex x from tour d to tour e in order to save travel time
 {
 	bool improvement = true;
 	bool succes = false;

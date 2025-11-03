@@ -292,7 +292,7 @@ Res Aco::solve(int bestknown)
 				//two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
 				swap2_nb(s[ant], 1);
-				move_nb(s[ant], 1);
+				relocate_nb(s[ant], 1);
 				insert_nb(s[ant], 1);
 				one_one_replace_nb(s[ant], 1);
 				//two_one_replace_nb(s[ant], 1);
@@ -561,7 +561,7 @@ Res Ils::solve(int bestknown)
 		two_opt_nb(s,1);
 		swap_nb(s,1);
 		swap2_nb(s,1);
-		move_nb(s,1);
+		relocate_nb(s,1);
 		insert_nb(s,1);
 		one_one_replace_nb(s, 1);
 		//two_one_replace_nb(s, 1);
@@ -913,6 +913,8 @@ Res Tabu::solve(int bestknown)
 	int no_feasible_moves_in_a_row = 0;
 	int restart_count = 0;
 	double restart_dist_sum = 0.0;
+
+
 	while (noimpr < max_noimpr)
 	{
 		if (gb.score == ins->maxscore)
@@ -1070,37 +1072,33 @@ Res Tabu::solve(int bestknown)
 			continue;
 		}
 		
-		//VND
-		//shift_nb(s,0);
-		//or_opt(s, 1);
-		two_opt_nb(s, 1);
-		/*
-		if (!s.check())
+		// --- RVND: randomize LS order, restart when any op improves ---
+		enum class LsOp { TwoOpt, Swap, Swap2, Relocate };
+		std::array<LsOp, 4> ops = { LsOp::TwoOpt, LsOp::Swap, LsOp::Swap2, LsOp::Relocate };
+
+		bool improved_any = true;
+		while (improved_any) 
 		{
-			cout << "error in two-opt" << endl;
+			improved_any = false;
+			std::shuffle(ops.begin(), ops.end(), engine);
+
+			for (auto op : ops) 
+			{
+				bool improved = false;
+				switch (op) 
+				{
+					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;   // or moves.two_opt_nb(s,1)
+					case LsOp::Swap:     improved = swap_nb(s, 1);       break;
+					case LsOp::Swap2:    improved = swap2_nb(s, 1);      break;
+					case LsOp::Relocate: improved = relocate_nb(s, 1);   break;
+				}
+				if (improved) 
+				{                     // RVND "restart-on-improvement"
+					improved_any = true;
+					break;
+				}
+			}
 		}
-		*/
-		swap_nb(s, 1);
-		/*
-		if (!s.check())
-		{
-			cout << "error in swap_nb" << endl;
-		}
-		*/
-		swap2_nb(s,1);
-		/*
-		if (!s.check())
-		{
-			cout << "error in swap2_nb" << endl;
-		}
-		*/
-		move_nb(s,1);
-		/*
-		if (!s.check())
-		{
-			cout << "error in move_nb" << endl;
-		}
-		*/
 		//update constraint pressure
 		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 

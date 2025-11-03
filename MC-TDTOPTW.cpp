@@ -335,7 +335,7 @@ void solve_dataset(int max_rep = 5)
 			instance.create_neighbourhood(textfile.path, textfile.name);
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
-			Tabu tabu(instance, 10000,2,0.1,0.8,5);
+			Tabu tabu(instance, 10000,2,0.1,0.9,10);
 			it->result[rep] = tabu.solve(it->bestknown);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
@@ -405,7 +405,7 @@ void case_study(int max_rep = 5)
 			instance.read_time_dependent_traveltime();
 			instance.create_neighbourhood(textfile.path, textfile.name);
 			//instance.alter_instance();
-			Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
+			Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
 			it->result[rep] = tabu.solve(it->bestknown);
 			//instance.unalter_instance();
 			//cout << "after repair" << endl;
@@ -566,93 +566,101 @@ void doe2(int max_rep = 5)
 	{
 		filename = "all.txt";
 	}
-	ofstream output;
-	output.open("output.txt", ios::out);
-	output << "DOE 2 for TS \n";
-	output << "epsilon;theta;gamma;avg_gap;std_gap\n";
-	output.close();
 	vector<double>epsilon{0.05,0.10,0.2};
 	vector<double>theta{0.7,0.8,0.9};
 	vector<double>gamma{2.5,5.0,10.0};
 	vector<Instance> dataset = read_dataset(filename);
-	vector<Instance>::iterator it;
+	std::ofstream instout("doe2_instance_means.csv", std::ios::out);
+	instout << "epsilon;theta;gamma;instance;mean_gap;sd_gap;mean_time\n";
+	instout.close();
+	std::ofstream overout("doe2_overall.csv", std::ios::out);
+	overout << "epsilon;theta;gamma;mean_gap_over_instances;sd_gap_over_instances;mean_time_over_instances\n";
+	overout.close();
 	for (int par1 = 0; par1 < 3; ++par1)
 	{
 		for (int par2 = 0; par2 < 3; ++par2)
 		{
 			for (int par3 = 0; par3 < 3; ++par3)
 			{
-				for (it = dataset.begin(); it != dataset.end(); ++it)
+				// ---- Aggregate over reps: per-instance means (then overall across instances)
+				std::vector<double> per_inst_mean_gap;
+				std::vector<double> per_inst_mean_time;
+				per_inst_mean_gap.reserve(dataset.size());
+				per_inst_mean_time.reserve(dataset.size());
+				std::ofstream instout("doe2_instance_means.csv", std::ios::app);
+				for (auto& inst : dataset) 
 				{
-					it->result.resize(max_rep);
-				}
-				for (int rep = 0; rep < max_rep; ++rep)
-				{
-					//solve the dataset
-					double avggap = 0.0;
-					double avgscore = 0.0;
-					for (it = dataset.begin(); it != dataset.end(); ++it)
+					std::vector<double> gaps(max_rep), times(max_rep);
+					inst.result.resize(max_rep);
+					for (int rep = 0; rep < max_rep; ++rep) 
 					{
-						Ins::MCTDTOPTW textfile = { it->path,it->filename };
-						Ins instance(textfile);
-						instance.read_time_independent_traveltime();
+						Ins::MCTDTOPTW textfile = {inst.path,inst.filename};
+						Ins instance(textfile); instance.read_time_independent_traveltime();
 						instance.read_time_dependent_traveltime();
 						instance.create_neighbourhood(textfile.path, textfile.name);
 						Tabu tabu(instance, 10000, 2, epsilon[par1], theta[par2], gamma[par3]);
-						it->result[rep] = tabu.solve(it->bestknown);
-						avggap += it->result[rep].gap;
-						avgscore += it->result[rep].sol.score;
-						cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
-					}//end it
-				}//end rep
-				//calculate results over all replicates
-				double globalgap = 0.0;
-				double globalgap_sq = 0.0;
-				for (it = dataset.begin(); it != dataset.end(); ++it)
-				{
-					double avgscore = 0.0;
-					double avgcpu = 0.0;
-					vector<double> gaps(max_rep);
-
-					for (int rep = 0; rep < max_rep; ++rep)
-					{
-						avgscore += it->result[rep].sol.score;
-						avgcpu += it->result[rep].time;
-						gaps[rep] = it->result[rep].gap;
+						inst.result[rep] = tabu.solve(inst.bestknown);
+						gaps[rep] = inst.result[rep].gap;
+						times[rep] = inst.result[rep].time;
+						cout << "name: " << inst.filename << " best score: " << inst.bestknown << " score: " << inst.result[rep].sol.score << " cpu time: " << inst.result[rep].time << " gap: " << inst.result[rep].gap << endl;
 					}
+					// per-instance mean gap and time
+					double mean_gap = std::accumulate(gaps.begin(), gaps.end(), 0.0) / max_rep;
+					double mean_time = std::accumulate(times.begin(), times.end(), 0.0) / max_rep;
 
-					avgscore /= max_rep;
-					avgcpu /= max_rep;
+					// per-instance sample stdev of gap across reps
+					double var_gap = 0.0;
+					if (max_rep > 1) 
+					{
+						for (double g : gaps) var_gap += (g - mean_gap) * (g - mean_gap);
+						var_gap /= (max_rep - 1);
+					}
+					double sd_gap = std::sqrt(var_gap);
 
-					// Compute avg gap per instance
-					double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100.0;
-					globalgap += avggap;
+					per_inst_mean_gap.push_back(mean_gap);
+					per_inst_mean_time.push_back(mean_time);
 
-					// Compute standard deviation of gap
-					double gap_sum = accumulate(gaps.begin(), gaps.end(), 0.0);
-					double gap_mean = gap_sum / max_rep;
-
-					double sq_sum = 0.0;
-					for (double g : gaps)
-						sq_sum += (g - gap_mean) * (g - gap_mean);
-
-					double gap_stdev = sqrt(sq_sum / max_rep);
-					globalgap_sq += gap_stdev;
-					output.open("output.txt", ios::out | ios::app);
-					output << epsilon[par1] << ";" << theta[par2] << ";" << gamma[par3] << ";" << gap_mean << ";" << gap_stdev << "\n";
-
+					// write per-instance row (now unambiguous)
+					
+					instout << epsilon[par1] << ';' << theta[par2] << ';' << gamma[par3] << ';'<< inst.filename << ';' << mean_gap << ';' << sd_gap << ';' << mean_time << "\n";
+					
 				}
-				globalgap /= dataset.size();
-				globalgap_sq /= dataset.size();
+				instout.close();
+				// overall mean across instances (of per-instance means)
+				auto mean_of = [](const std::vector<double>& v) 
+				{
+					return std::accumulate(v.begin(), v.end(), 0.0) / std::max<size_t>(1, v.size());
+				};
+				auto sd_of = [&](const std::vector<double>& v) 
+				{
+					double m = mean_of(v), acc = 0.0;
+					if (v.size() > 1) 
+					{
+						for (double x : v) acc += (x - m) * (x - m);
+						acc /= (v.size() - 1);  // sample stdev across instances
+					}
+					return std::sqrt(acc);
+				};
 
-				cout << "epsilon: " << epsilon[par1] << " theta: " << theta[par2] << " gamma: " << gamma[par3] << " avg gap is: " << globalgap << " sd gap is: " << globalgap_sq << endl;
-				output.open("output.txt", ios::out | ios::app);
-				output << epsilon[par1] << ";" << theta[par2] << ";" << gamma[par3] << ";" << globalgap << ";" << globalgap_sq << "\n";
-				output.close();
+				double mean_gap_over_inst = mean_of(per_inst_mean_gap);
+				double sd_gap_over_inst = sd_of(per_inst_mean_gap);
+				double mean_time_over_inst = mean_of(per_inst_mean_time);
+
+				// write 1 overall row per config to a separate file
+				std::ofstream overout("doe2_overall.csv", std::ios::app);
+				overout << epsilon[par1] << ';' << theta[par2] << ';' << gamma[par3] << ';'	<< mean_gap_over_inst << ';' << sd_gap_over_inst << ';' << mean_time_over_inst << "\n";
+				overout.close();
+
+				std::cout << "epsilon: " << epsilon[par1]
+					<< " theta: " << theta[par2]
+					<< " gamma: " << gamma[par3]
+					<< " | mean_gap: " << mean_gap_over_inst
+					<< " sd_gap: " << sd_gap_over_inst
+					<< " mean_time: " << mean_time_over_inst << std::endl;
 			}//end par3
 		}//end par2
 	}//end par1
-}//end doe
+}//end doe 2
 
 
 void debug_ctop()
@@ -743,10 +751,10 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(1);
+	//solve_dataset(5);
 	//ctop_gap(10);
 	//doe(10);
-	doe2(5);
+	//doe2(5);
 	//case_study(10);
 
 

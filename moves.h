@@ -91,7 +91,7 @@ public:
 	bool swap_nb(Sol& sol, int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool two_opt_nb(Sol& sol, int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool shift_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
-	bool move_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
+	bool relocate_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool swap2_nb(Sol& sol,int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool one_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement
 	bool two_one_replace_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement

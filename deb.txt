@@ -1,2 +1,2 @@
 ..\..\datasets\MCTDTOPTW\
-50.1.2.1.txt	357.8
+50.2.1.1.txt	531.0

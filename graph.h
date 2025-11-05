@@ -1,5 +1,5 @@
 #pragma once
-#include "ConsoleColor.h"
+#include "consoleColor.h"
 #include <fstream>//input
 #include <string.h>
 #include <string>

@@ -36,6 +36,7 @@ void Ins::read_time_independent_traveltime()
 	}
 }//end read time independent
 
+
 void Ins::read_time_dependent_traveltime()
 {
 	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
@@ -84,6 +85,171 @@ void Ins::read_time_dependent_traveltime()
 	}
 	tt.close();
 }//end read time dependent travel time
+
+
+/*
+void Ins::read_time_dependent_traveltime()//with fifo checker
+{
+	const std::string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	std::ifstream tt(filepath + "tt" + std::to_string(maxvertices) + ".TXT");
+	if (!tt.is_open()) {
+		std::cout << term::fg(term::Color::red)
+			<< "could not open time-dependent travel time file\n";
+		return;
+	}
+
+	// Tolerances for floating-point checks (hours)
+	const double TOL_BOUNDARY = 1e-9;   // boundary FIFO (arr[k+1] + tol >= arr[k])
+	const double TOL_SLOPE = 1e-12;  // slope checks (1+mu >= -tol), |mu| <= 1 + tol
+
+	// Stats
+	std::uint64_t parse_warn = 0, neg_warn = 0, naninf_warn = 0;
+	std::uint64_t fifo_boundary_viol = 0, fifo_withinslot_viol = 0, abs_mu_warn = 0;
+	std::uint64_t lines_read = 0;
+
+	for (int i = 0; i < maxvertices; ++i) {
+		for (int j = 0; j < maxvertices; ++j) {
+
+			std::string line;
+			if (!std::getline(tt, line)) {
+				std::cout << term::fg(term::Color::red)
+					<< "Unexpected EOF at arc (" << i << "," << j << ")\n";
+				return;
+			}
+			++lines_read;
+
+			// Normalize delimiters: turn ';' ',' '\t' into space so stringstream >> works
+			for (char& c : line) {
+				if (c == ';' || c == ',' || c == '\t') c = ' ';
+			}
+
+			std::stringstream ss(line);
+			std::vector<double> ttvals;
+			ttvals.reserve(maxtimeslots);
+			double val;
+			while (ss >> val) ttvals.push_back(val);
+
+			if (static_cast<int>(ttvals.size()) != maxtimeslots) {
+				++parse_warn;
+				std::cout << term::fg(term::Color::yellow)
+					<< "Line " << lines_read << " for arc (" << i << "," << j
+					<< "): expected " << maxtimeslots << " values, got "
+					<< ttvals.size() << "\n";
+				// best-effort: pad/truncate to expected length
+				ttvals.resize(maxtimeslots, (ttvals.empty() ? 0.0 : ttvals.back()));
+			}
+
+			// Basic value checks: finite and >= 0 (times are in hours)
+			for (int k = 0; k < maxtimeslots; ++k) {
+				if (!std::isfinite(ttvals[k])) {
+					++naninf_warn;
+					std::cout << term::fg(term::Color::yellow)
+						<< "Non-finite value at arc (" << i << "," << j
+						<< "), slot " << k << "\n";
+					ttvals[k] = 0.0; // sanitize to keep going
+				}
+				if (ttvals[k] < 0.0) {
+					++neg_warn;
+					std::cout << term::fg(term::Color::yellow)
+						<< "Negative travel time at arc (" << i << "," << j
+						<< "), slot " << k << " : " << ttvals[k] << "\n";
+					ttvals[k] = 0.0; // clamp
+				}
+			}
+
+			// Boundary FIFO check: arrival at boundary must be nondecreasing
+			// A_k = time_periods[k] + ttvals[k]
+			for (int k = 0; k + 1 < maxtimeslots; ++k) {
+				const double Ak = time_periods[k] + ttvals[k];
+				const double Ak1 = time_periods[k + 1] + ttvals[k + 1];
+				if (Ak1 + TOL_BOUNDARY < Ak) {
+					++fifo_boundary_viol;
+					// Print first few only to avoid flooding
+					if (fifo_boundary_viol <= 5) {
+						std::cout << term::fg(term::Color::yellow)
+							<< "Boundary FIFO violation on arc (" << i << "," << j<< "), slot " << k << " --> " << (k + 1)<< " : Ak=" << Ak << " > Ak+1=" << Ak1 << "\n";
+					}
+				}
+			}
+
+			// Store coefficients
+			auto* edge = v[i].con[j];
+			if (!edge) {
+				std::cout << term::fg(term::Color::red)
+					<< "Null edge pointer at (" << i << "," << j << ")\n";
+				return;
+			}
+			auto& mu = edge->mu;
+			auto& oneplusmu = edge->oneplusmu;
+			auto& nu = edge->nu;
+			mu.resize(maxtimeslots);
+			oneplusmu.resize(maxtimeslots);
+			nu.resize(maxtimeslots);
+
+			// Compute μ, ν (affine-in-slot model).
+			for (int t = 0; t < maxtimeslots; ++t) {
+				if (t == maxtimeslots - 1) {
+					// last slot: hold travel time constant within the slot
+					mu[t] = 0.0;
+					oneplusmu[t] = 1.0;
+					nu[t] = ttvals[t];
+					continue;
+				}
+				const double dt = time_periods[t + 1] - time_periods[t];
+				if (dt <= 0.0) {
+					std::cout << term::fg(term::Color::red)
+						<< "Non-positive slot width at slot " << t
+						<< " (dt=" << dt << ")\n";
+					return;
+				}
+
+				const double slope = (ttvals[t + 1] - ttvals[t]) / dt;
+				mu[t] = slope;
+				oneplusmu[t] = 1.0 + slope;
+				nu[t] = ttvals[t] - slope * time_periods[t];
+
+				// Within-slot FIFO: 1 + μ >= 0 (allow tiny tolerance)
+				if (oneplusmu[t] < -TOL_SLOPE) {
+					++fifo_withinslot_viol;
+					if (fifo_withinslot_viol <= 5) {
+						std::cout << term::fg(term::Color::yellow)
+							<< "Within-slot FIFO violated on arc (" << i << "," << j<< "), slot " << t << " : 1+mu=" << oneplusmu[t] << "\n";
+					}
+				}
+				// Empirical check: |μ| <= 1 (your practice)
+				if (std::abs(mu[t]) > 1.0 + TOL_SLOPE) {
+					++abs_mu_warn;
+					if (abs_mu_warn <= 5) {
+						std::cout << term::fg(term::Color::yellow)
+							<< "Slope magnitude > 1 on arc (" << i << "," << j<< "), slot " << t << " : mu=" << mu[t] << "\n";
+					}
+				}
+			}
+
+			// last slot already filled above (μ=0, ν=ttvals[last])
+		}
+	}
+
+	tt.close();
+
+	// Summary
+	if (parse_warn || naninf_warn || neg_warn || fifo_boundary_viol || fifo_withinslot_viol || abs_mu_warn) {
+		std::cout << term::fg(term::Color::yellow)
+			<< "[TT checks] lines=" << lines_read
+			<< ", parse=" << parse_warn
+			<< ", nan/inf=" << naninf_warn
+			<< ", negative=" << neg_warn
+			<< ", FIFO_boundary=" << fifo_boundary_viol
+			<< ", FIFO_within=" << fifo_withinslot_viol
+			<< ", |mu|>1=" << abs_mu_warn << "\n";
+	}
+	else {
+		std::cout << term::fg(term::Color::green)
+			<< "[TT checks] OK: parsed " << lines_read
+			<< " lines; no issues detected.\n";
+	}
+}
+*/
 
 Ins::Ins(MCTDTOPTW textfile)
 {

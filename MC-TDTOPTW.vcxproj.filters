@@ -50,7 +50,7 @@
     <ClInclude Include="graph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ConsoleColor.h">
+    <ClInclude Include="consoleColor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="time.h">

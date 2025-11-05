@@ -150,7 +150,7 @@
     <ClCompile Include="solver.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ConsoleColor.h" />
+    <ClInclude Include="consoleColor.h" />
     <ClInclude Include="elitepool.h" />
     <ClInclude Include="graph.h" />
     <ClInclude Include="instance.h" />

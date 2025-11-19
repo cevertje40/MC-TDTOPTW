@@ -15,7 +15,13 @@ Sol::Sol(Ins& ins):ins(&ins)
 		tours[t].action.reserve(ins.maxvertices);
 		tours[t].action.push_back(0);
 		tours[t].max_shift.reserve(ins.maxvertices);
-		tours[t].max_shift.push_back(0);
+		tours[t].max_shift.push_back(0.0);
+		tours[t].wait_at.reserve(ins.maxvertices);
+		tours[t].wait_at.push_back(0.0);
+		tours[t].pref_wait.reserve(ins.maxvertices);
+		tours[t].pref_wait.push_back(0.0);
+		tours[t].br_margin.reserve(ins.maxvertices);
+		tours[t].br_margin.push_back(0.0);
 		tours[t].score = 0;
 		tours[t].weight = 0.0;
 		tours[t].volume = 0.0;
@@ -325,30 +331,51 @@ void Tour::update(int start, int end) // keep break fixed and update travel time
 
 void Tour::update_break(int newbreakindex)
 {
-	//update break to new position
-	action[breakindex] = 0;
+	const int n = (int)seq.size();
+	if (n < 2) return;                         // nothing to do
+	if (newbreakindex < 1 || newbreakindex > n - 1) return;  // invalid target
+
+	// clear old mark (if any) and set the new one
+	if (breakindex >= 1 && breakindex <= n - 1) action[breakindex] = 0;
 	breakindex = newbreakindex;
 	action[newbreakindex] = 1;
-	//update complete solution because break is repositioned
-	double currenttime = ins->t[index].EDT;
-	int end = (int)seq.size();
-	for (int u = 0; u < end - 1; ++u)
+
+	// forward recompute with fixed break position (start-only semantics)
+	const double EDT = ins->t[index].EDT;
+	const double B = ins->breakdur;
+	const int END_DEPOT = ins->maxvertices - 1;
+
+	deptime[0] = 0.0;
+	double t = EDT;
+
+	for (int u = 0; u < n - 1; ++u)
 	{
-		//gather departure time and corresponding time slot
 		Ins::Vertex* o = seq[u];
 		Ins::Vertex* p = seq[u + 1];
-		//travel time from van o to p
-		double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-		if (arrivaltime + (action[u + 1] * ins->breakdur) < p->LTW[index])
+
+		double arr = ins->arrival_time(o->con[p->index], t);
+
+		// Take the break exactly at the chosen vertex (before serving p)
+		if (u + 1 == breakindex)
 		{
-			arrivaltime = p->LTW[index] - (action[u + 1] * ins->breakdur);
+			const bool endp = (p->index == END_DEPOT);
+			// Non-depot: if early, wait to breakstart; depot: allowed to start on arrival
+			double start = endp ? arr : std::max(arr, ins->breakstart);
+			arr = start + B;
 		}
-		arrivaltime += p->serv + (action[u + 1] * ins->breakdur);
-		deptime[u + 1] = arrivaltime - ins->t[index].EDT;
-		currenttime = arrivaltime;
-	}//end for all u
+
+		// Enforce LTW after the break (if any), then add service
+		if (arr < p->LTW[index]) arr = p->LTW[index];
+		arr += p->serv;
+
+		deptime[u + 1] = arr - EDT;
+		t = arr;
+	}
+
+	// Recompute max_shift consistently with this fixed break position
 	calc_maxshift();
 }
+
 
 void Tour::update_break()  // reposition break, update times and max_shift
 {
@@ -390,42 +417,65 @@ void Tour::update_break()  // reposition break, update times and max_shift
 	std::vector<double> wait_after_start(n, 0.0);
 	for (int j = 1; j < n; ++j) 
 	{
-		double usable = svc[j] - std::max(arr0[j], ins->breakstart);
+		const bool depot = (seq[j]->index == ins->maxvertices - 1);
+		double anchor = depot ? arr0[j] : std::max(arr0[j], ins->breakstart);
+		double usable = svc[j] - anchor;
 		if (usable < 0.0) usable = 0.0;
 		wait_after_start[j] = usable;
 	}
 
+
 	// --- earliest feasible index (start-only semantics) ---
-	//     use arr0 (not current clock); ignore breakend here (we'll handle feasibility via slack)
-	int earliestbreakindex = n - 1; // default to end depot
+	int earliestbreakindex = n - 1;
 	for (int u = 0; u < n - 1; ++u) 
 	{
-		// Can begin by breakstart if we arrive after breakstart or can wait to LTW so that LTW-B >= breakstart
-		double lhs = std::max(arr0[u + 1], seq[u + 1]->LTW[index] - ins->breakdur);
-		if (lhs >= ins->breakstart - 1e-9) {
-			earliestbreakindex = u + 1;
+		const int j = u + 1;
+		const bool depot = (seq[j]->index == ins->maxvertices - 1);
+		const double B = ins->breakdur;
+
+		const double latest_start = depot
+			? std::min(ins->breakend, ins->t[index].LAT - B)
+			: std::min(ins->breakend, seq[j]->UTW[index] - B);
+
+		// earliest possible start at j
+		const double earliest_start = depot ? arr0[j] : std::max(arr0[j], ins->breakstart);
+
+		if (earliest_start <= latest_start + 1e-9) 
+		{
+			earliestbreakindex = j;
 			break;
 		}
 	}
 
-	// --- choose first position with enough budget; else force end depot (cannot fail) ---
+
+	// --- choose first position with enough budget; no illegal depot fallback ---
 	const double B = ins->breakdur;
 	bool placed = false;
-	for (int u = earliestbreakindex; u <= n - 1; ++u) 
-	{ // end depot included
-		if (max_shift[u] + wait_after_start[u] + 1e-9 >= B) 
-		{
+	for (int u = earliestbreakindex; u <= n - 1; ++u) {
+		const bool depot = (seq[u]->index == ins->maxvertices - 1);
+
+		const double latest_start = depot
+			? std::min(ins->breakend, ins->t[index].LAT - B)
+			: std::min(ins->breakend, seq[u]->UTW[index] - B);
+
+		const double earliest_start = depot ? arr0[u] : std::max(arr0[u], ins->breakstart);
+		if (earliest_start > latest_start + 1e-9) continue;
+
+		if (max_shift[u] + wait_after_start[u] + 1e-9 >= B) {
 			action[u] = 1;
 			breakindex = u;
 			placed = true;
 			break;
 		}
 	}
+
 	if (!placed) 
 	{
-		// unconditional fallback: end depot (special-case semantics will apply)
-		action.back() = 1;
-		breakindex = n - 1;
+		cout << "Could not place break legally in tour for vehicle " << index << endl;
+		// No legal position — do NOT force depot illegally
+		// Option 1: leave break unset and return (signal infeasibility to caller)
+		return;
+		// Option 2: keep previous placement if you’re “re-optimizing” rather than forcing a move
 	}
 
 	// --- forward recompute from breakindex-1 with break semantics ---
@@ -440,38 +490,51 @@ void Tour::update_break()  // reposition break, update times and max_shift
 
 		double arr = ins->arrival_time(o->con[p->index], currenttime);
 
-		if (action[u + 1]) 
-		{
+		if (action[u + 1]) {
 			const bool endp = (p->index == ins->maxvertices - 1);
-			// start-only rule:
-			//  - Non-depot: if early, wait to breakstart, then add B
-			//  - Depot: allowed to start at arrival even if < breakstart
+			const double B = ins->breakdur;
+
+			// latest legal start at p
+			double latest_start = endp
+				? std::min(ins->breakend, ins->t[index].LAT - B)
+				: std::min(ins->breakend, p->UTW[index] - B);
+
 			if (!endp && arr < ins->breakstart) arr = ins->breakstart;
-			arr += B; // take the break
+
+			// start-time feasibility
+			if (arr > latest_start + 1e-9) {
+				// chosen placement is infeasible; bail out so caller can handle it
+				return;
+			}
+			arr += B;
 		}
 
-		// LTW after break if needed, then service
 		if (arr < p->LTW[index]) arr = p->LTW[index];
 		arr += p->serv;
 
-		// local delta to max_shift (NO CLAMP; negative signals infeasibility)
 		max_shift[u + 1] = (deptime[u + 1] + max_shift[u + 1]) - (arr - ins->t[index].EDT);
-
 		deptime[u + 1] = arr - ins->t[index].EDT;
 		currenttime = arr;
 	}
 
-	// --- safety: recompute end-depot from predecessor mirroring semantics ---
+	// --- safety: end depot ---
 	{
-		double tp  = ins->t[index].EDT + deptime[n - 2];
+		double tp = ins->t[index].EDT + deptime[n - 2];
 		double arr = ins->arrival_time(seq[n - 2]->con[seq[n - 1]->index], tp);
-		if (action[n - 1]) arr += B;                             // depot break on arrival
-		if (arr < seq[n - 1]->LTW[index]) arr = seq[n - 1]->LTW[index]; // honor LTW at depot (usually 0)
-		arr += seq[n - 1]->serv;                                 // usually 0
+		if (action[n - 1]) {
+			const double B = ins->breakdur;
+			double latest_start_depot = std::min(ins->breakend, ins->t[index].LAT - B);
+			if (arr > latest_start_depot + 1e-9) {
+				return; // illegal depot break
+			}
+			arr += B;
+		}
+		if (arr < seq[n - 1]->LTW[index]) arr = seq[n - 1]->LTW[index];
+		arr += seq[n - 1]->serv;
 		deptime[n - 1] = arr - ins->t[index].EDT;
 	}
 
-	// --- backward slack cap (unchanged in spirit) ---
+	// --- backward slack cap ---
 	if (breakindex == n - 1) 
 	{
 		// break at end depot
@@ -527,44 +590,61 @@ void Tour::update_maxshift(int start, int end, double arrivaltime)
 
 void Tour::calc_maxshift() {
 	const int n = (int)seq.size();
-	const double EDT = ins->t[index].EDT;          // == LTW at end depot
-	const double LAT = ins->t[index].LAT;          // == EDT + T_max
+	const double EDT = ins->t[index].EDT;
+	const double LAT = ins->t[index].LAT;
 	const double B = ins->breakdur;
 	const double BEND = ins->breakend;
+	const int ENDDEP = ins->maxvertices - 1;
 
-	// --- End depot slack on DEPARTURE time (finish time) ---
-	// Latest allowed departure at end depot = min(LAT, BEND + (break?B:0))
+	wait_at.assign(n, 0.0);
+	pref_wait.assign(n, 0.0);
+	br_margin.assign(n, 0.0);
+
+	// --- transient no-break forward (DO NOT write deptime here)
+	double t = EDT;
+	for (int u = 0; u < n - 1; ++u) 
+	{
+		auto* o = seq[u];
+		auto* p = seq[u + 1];
+
+		const double arr0 = ins->arrival_time(o->con[p->index], t);
+		const double svc = (arr0 < p->LTW[index] ? p->LTW[index] : arr0);
+
+		// budgets
+		const bool depot = (p->index == ENDDEP);
+		const double earliest = depot ? arr0 : std::max(arr0, ins->breakstart);
+		const double latest = depot ? std::min(BEND, LAT - B)
+			: std::min(BEND, p->UTW[index] - B);
+
+		double margin = latest - earliest; if (margin < 0.0) margin = 0.0;
+		br_margin[u + 1] = margin;
+
+		const double w = depot ? std::max(0.0, svc - arr0)
+			: std::max(0.0, svc - std::max(arr0, ins->breakstart));
+		wait_at[u + 1] = w;
+		pref_wait[u + 1] = pref_wait[u] + w;
+
+		t = svc + p->serv;  // advance transient clock (no break)
+	}
+
+	// --- backward slack on the CURRENT schedule (uses existing deptime/action)
 	double L_dep_end = LAT;
 	if (action.back() == 1) L_dep_end = std::min(L_dep_end, BEND + B);
-
-	// deptime[] is relative to EDT, so absolute current departure is EDT + deptime.back()
 	max_shift.back() = L_dep_end - (EDT + deptime.back());
 
-	// --- Backward seed: latest ARRIVAL-BEFORE-SERVICE at end depot ---
-	// If the break is at the depot, arrival must be ≤ min(LAT, BEND + B) - B
 	double arr_cap = (action.back() == 1) ? (std::min(LAT, BEND + B) - B) : LAT;
-
-	// --- Backward recursion over internal vertices ---
 	for (int i = n - 2; i > 0; --i) 
 	{
-		Ins::Vertex* y = seq[i];
-		Ins::Vertex* z = seq[i + 1];
-		const bool has_break_here = (action[i] == 1);
+		auto* y = seq[i];
+		auto* z = seq[i + 1];
+		const bool has_break = (action[i] == 1);
 
-		// latest departure from y that reaches z by arr_cap
 		double L_dep_i = ins->departure_time(y->con[z->index], arr_cap);
-
-		// cap by y's own UTW + serv (latest start-of-service + service)
 		L_dep_i = std::min(L_dep_i, y->UTW[index] + y->serv);
+		if (has_break) L_dep_i = std::min(L_dep_i, BEND + B);
 
-		// if break at y, departure (after taking the break) cannot exceed BEND + B
-		if (has_break_here) L_dep_i = std::min(L_dep_i, BEND + B);
-
-		// slack at y (relative to current scheduled departure EDT + deptime[i])
 		max_shift[i] = L_dep_i - (EDT + deptime[i]);
-
-		// update latest arrival-before-service for predecessor
-		arr_cap = L_dep_i - (y->serv + (has_break_here ? B : 0.0));
+		arr_cap = L_dep_i - (y->serv + (has_break ? B : 0.0));
 	}
 }
 
@@ -611,6 +691,7 @@ void Tour::remove_vertex(int position)
 		calc_maxshift();
 	}
 }//end remove_vertex tour version
+
 
 void Tour::remove_vertices(int position1, int position2)
 {
@@ -672,7 +753,7 @@ void Tour::replace_vertex(Ins::Vertex* candidate, int position, int breakindex)
 	update_break(breakindex);//update travel time and max_shift for complete tour
 }
 
-void Tour::opt_vertices(int i, int j)
+void Tour::opt_vertices(int i, int j,int newbreakindex)
 {
 	//reverse sequence
 	for (int f = 0; f < 1 + (j - i) / 2; ++f)
@@ -681,37 +762,33 @@ void Tour::opt_vertices(int i, int j)
 		seq[j - f] = seq[i + f];
 		seq[i + f] = temp;
 	}
-	//determine wether break is required
-	bool reqbreak = false;
-	if (i <= breakindex)
+	if (newbreakindex != breakindex)
 	{
-		reqbreak = true;
-	}
-	if (reqbreak)
-	{
-		update_break();
+		action[breakindex] = 0;
+		action[newbreakindex] = 1;
+		breakindex = newbreakindex;
+		update(0, int(seq.size()));
+		calc_maxshift();
 	}
 	else
 	{
 		update(i - 1, int(seq.size()));
 		calc_maxshift();
 	}
-	
 }
 
-void Tour::swap_vertices(int i, int j)
+void Tour::swap_vertices(int i, int j,int newbreakindex)
 {
 	Ins::Vertex* remember = seq[i];
 	seq[i] = seq[j];
 	seq[j] = remember;
-	bool reqbreak = false;
-	if (i <= breakindex)
+	if (newbreakindex!=breakindex)
 	{
-		reqbreak = true;
-	}
-	if (reqbreak)
-	{///break comes after i so might need to be replaced
-		update_break();
+		action[breakindex] = 0;
+		action[newbreakindex] = 1;
+		breakindex = newbreakindex;
+		update(0,int(seq.size()));
+		calc_maxshift();
 	}
 	else
 	{
@@ -1084,7 +1161,13 @@ void Sol::reset()
 		tours[tour].action.clear();
 		tours[tour].action.push_back(0);
 		tours[tour].max_shift.clear();
-		tours[tour].max_shift.push_back(0);
+		tours[tour].max_shift.push_back(0.0);
+		tours[tour].wait_at.clear();
+		tours[tour].wait_at.push_back(0.0);
+		tours[tour].pref_wait.clear();
+		tours[tour].pref_wait.push_back(0.0);
+		tours[tour].br_margin.clear();
+		tours[tour].br_margin.push_back(0.0);
 		tours[tour].score = 0;
 		tours[tour].weight = 0;
 		tours[tour].volume = 0;

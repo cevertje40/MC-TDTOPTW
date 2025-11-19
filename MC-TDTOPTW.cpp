@@ -762,9 +762,9 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(1);
+	solve_dataset(1);
 	//ctop_gap(1);
-	doe(5);
+	//doe(5);
 	//doe2(5);
 	//case_study(10);
 

@@ -997,6 +997,10 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					if (!s.check())
+					{
+						cout << "error in replace: " << pick << endl;
+					}
 					moved = true;
 					tabulist.nextIteration();
 				}
@@ -1016,6 +1020,10 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					if (!s.check())
+					{
+						cout << "error in replace: " << pick << endl;
+					}
 					moved = true;
 					tabulist.nextIteration();
 				}
@@ -1035,18 +1043,19 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					if (!s.check())
+					{
+						cout << "error in replace: " << pick << endl;
+					}
 					moved = true;
 					tabulist.nextIteration();
 				}
 				break;
 			}
 		}//end switch
-		/*
-		if (!s.check())
-		{
-			cout << "error in replace: " << pick << endl;
-		}
-		*/
+		
+		
+		
 		if (no_feasible_moves_in_a_row > 5) 
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
@@ -1087,7 +1096,7 @@ Res Tabu::solve(int bestknown)
 				bool improved = false;
 				switch (op) 
 				{
-					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;   // or moves.two_opt_nb(s,1)
+					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;
 					case LsOp::Swap:     improved = swap_nb(s, 1);       break;
 					case LsOp::Swap2:    improved = swap2_nb(s, 1);      break;
 					case LsOp::Relocate: improved = relocate_nb(s, 1);   break;

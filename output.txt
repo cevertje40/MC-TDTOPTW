@@ -1,3 +1,6 @@
 solution methods for the CTOP 
 filename,bestscore,score,cpu,gap
-20.1.1.1.txt;247;247;2.36374;0
+20.1.1.3.txt;233;190;8.20269;18.4549
+filename;avgscore;avgtime;avggap;sdgap
+20.1.1.3.txt;190;8.20269;18.4549;0
+avg avg gap: 18.4549 sd avg gap: -nan(ind)

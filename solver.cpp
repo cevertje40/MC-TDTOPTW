@@ -978,11 +978,12 @@ Res Tabu::solve(int bestknown)
 		int crit_id = pick_weighted(w);
 		auto kind = static_cast<RatioKind>(crit_id);
 		//select neighborhood structure at random
-		int pick=nbpicker(engine);
-		//int pick = 2;//to debug
+		//int pick=nbpicker(engine);
+		int pick = 3;
 		//build admissable neighborhoods using the selected neighborhoodstructure
 		switch (pick)
 		{
+		
 			case 1:
 			{
 				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score,kind);
@@ -999,7 +1000,7 @@ Res Tabu::solve(int bestknown)
 					executeMove(nb, s, tabulist);
 					if (!s.check())
 					{
-						cout << "error in replace: " << pick << endl;
+						cout << "error in one-one replace: " << pick << endl;
 					}
 					moved = true;
 					tabulist.nextIteration();
@@ -1022,7 +1023,7 @@ Res Tabu::solve(int bestknown)
 					executeMove(nb, s, tabulist);
 					if (!s.check())
 					{
-						cout << "error in replace: " << pick << endl;
+						cout << "error in two-one replace: " << pick << endl;
 					}
 					moved = true;
 					tabulist.nextIteration();
@@ -1045,7 +1046,7 @@ Res Tabu::solve(int bestknown)
 					executeMove(nb, s, tabulist);
 					if (!s.check())
 					{
-						cout << "error in replace: " << pick << endl;
+						cout << "error in one-two replace: " << pick << endl;
 					}
 					moved = true;
 					tabulist.nextIteration();
@@ -1085,6 +1086,7 @@ Res Tabu::solve(int bestknown)
 		enum class LsOp { TwoOpt, Swap, Swap2, Relocate };
 		std::array<LsOp, 4> ops = { LsOp::TwoOpt, LsOp::Swap, LsOp::Swap2, LsOp::Relocate };
 
+		
 		bool improved_any = true;
 		while (improved_any) 
 		{
@@ -1096,10 +1098,10 @@ Res Tabu::solve(int bestknown)
 				bool improved = false;
 				switch (op) 
 				{
-					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;
-					case LsOp::Swap:     improved = swap_nb(s, 1);       break;
-					case LsOp::Swap2:    improved = swap2_nb(s, 1);      break;
-					case LsOp::Relocate: improved = relocate_nb(s, 1);   break;
+					//case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;
+					//case LsOp::Swap:     improved = swap_nb(s, 1);       break;
+					//case LsOp::Swap2:    improved = swap2_nb(s, 1);      break;
+					//case LsOp::Relocate: improved = relocate_nb(s, 1);   break;
 				}
 				if (improved) 
 				{                     // RVND "restart-on-improvement"
@@ -1108,6 +1110,7 @@ Res Tabu::solve(int bestknown)
 				}
 			}
 		}
+		
 		//update constraint pressure
 		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 

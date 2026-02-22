@@ -10,13 +10,16 @@ class Tour
 	std::vector<double> deptime;//departuretime-EDT at each vertex
 	std::vector<double> max_shift;//local evaluation metric, maximum amount of time each vertex can be shifted forward in time
 	std::vector<int> action;//0 visit, 1 break and visit
+	std::vector<double> wait_at;    // usable waiting to start break at j
+	std::vector<double> pref_wait;  // prefix sum of wait_at
+	std::vector<double> br_margin;  // (latest_start - earliest_start) at j
 	int score;//total score of tour
 	double weight;//weight per tour
 	double volume;//volume per tour
 	int breakindex;//position of break in tour
 	void update(int start, int end);//keep break fixed and update time and maxshift for positions after start
 	void update_break(int newbreakindex);//update solution and position break at input breakindex
-	void update_break();//complete update of the tour with optimized break repositioning, only works for feasible tours
+	bool update_break();//complete update of the tour with optimized break repositioning, only works for feasible tours
 	void update_maxshift(int start, int end, double arrivaltime);//update maxshift for positions before end
 	void calc_maxshift();//for specific tour of solution
 	void insert_vertex(Ins::Vertex* candidate,int position);
@@ -24,10 +27,9 @@ class Tour
 	void remove_vertices(int position1, int position2);
 	void replace_vertex(Ins::Vertex* candidate, int position);
 	void replace_vertex(Ins::Vertex* candidate, int position,int breakindex);
-	void opt_vertices(int i, int j);//assumption i < j
-	void swap_vertices(int i, int j);//assumption i < j
+	void opt_vertices(int i, int j,int newbreakindex);//assumption i < j
+	void swap_vertices(int i, int j,int newbreakindex);//assumption i < j
 	bool check();
-	std::vector<double> compute_wait_suffix();
 	std::pair<int,int> repair();//repairs solution by removed last regular vertex, return score decrease
 };
 

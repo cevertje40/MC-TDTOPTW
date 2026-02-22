@@ -449,18 +449,18 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	Res resdebug;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.3.2.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
 	instance.create_neighbourhood(textfile.path, textfile.name);
 	//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
-	Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
-	resdebug=tabu.solve(894);
+	Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
+	resdebug=tabu.solve(250);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//resdataset.push_back(ils.solve());
-	cout << " best score: " << 894 << " score: "<< resdebug.sol.score << " cpu time: " << resdebug.time << " gap: " << resdebug.gap << endl;
+	cout << " best score: " << 250 << " score: "<< resdebug.sol.score << " cpu time: " << resdebug.time << " gap: " << resdebug.gap << endl;
 }
 
 void doe(int max_rep = 10)
@@ -760,11 +760,11 @@ int main()
 {
 	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
-	//debug_instance();
+	debug_instance();
 	//debug_ctop();
-	//solve_dataset(1);
+	//solve_dataset(5);
 	//ctop_gap(1);
-	doe(5);
+	//doe(5);
 	//doe2(5);
 	//case_study(10);
 

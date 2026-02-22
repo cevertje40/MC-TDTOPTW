@@ -77,6 +77,12 @@ void Sol::read_from_file()
 		Sol::Tour* tour = &tours[t];
 		double currenttime = ins->t[t].EDT;
 		Ins::Vertex* last = tour->seq[0];
+
+		const double EDT = ins->t[t].EDT;
+		const double LAT = ins->t[t].LAT;
+		const double B = ins->breakdur;
+		const double BE = ins->breakend;
+		const int ENDDEP = ins->maxvertices - 1;
 		for (int i = 1; i < inputv[t].size(); ++i)
 		{
 			Ins::Vertex* candidate = &ins->v[inputv[t][i]];
@@ -88,18 +94,39 @@ void Sol::read_from_file()
 			tour->volume += candidate->volume;
 			tour->weight += candidate->weight;
 			tour->action.push_back(inputb[t][i]);
-			if (inputb[t][i] == 1)
-			{
-				tour->breakindex = i+1;
-			}
 			//deptime calc
 			double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
-			if (arrivaltime + inputb[t][i] * ins->breakdur < candidate->LTW[t])
+			double startservice = 0.0;
+			double startbreak = 0.0;
+			double endbreak=0.0;
+			if (inputb[t][i] == 1)
 			{
-				arrivaltime = candidate->LTW[t] - (inputb[t][i] * ins->breakdur);
+				tour->breakindex = i;
+				const bool endp = (candidate->index == ENDDEP);
+
+				// break can start upon arrival; at non-depot clamp to breakstart
+				if (!endp && arrivaltime < ins->breakstart)
+					startbreak = ins->breakstart;
+				else
+					startbreak = arrivaltime;
+
+				// NEW: latest legal start guard
+				double latest_start = endp
+					? std::min(BE, LAT - B)
+					: std::min(BE, candidate->UTW[t] - B);
+
+				endbreak = startbreak + B;
+
+				// Apply LTW at start-of-service
+				startservice = (endbreak < candidate->LTW[t]) ? candidate->LTW[t] : endbreak;
 			}
-			arrivaltime += candidate->serv + (inputb[t][i] * ins->breakdur);
-			tour->deptime.push_back(arrivaltime - ins->t[t].EDT);
+			else
+			{
+				// No break: just LTW
+				startservice = (arrivaltime < candidate->LTW[t]) ? candidate->LTW[t] : arrivaltime;
+			}
+			arrivaltime =startservice + candidate->serv;
+			tour->deptime.push_back(arrivaltime - EDT);
 			currenttime = arrivaltime;
 			last = candidate;
 		}//end tour creation
@@ -525,7 +552,8 @@ void Tour::update_maxshift(int start, int end, double arrivaltime)
 	}// end for i
 }//end update max_shift
 
-void Tour::calc_maxshift() {
+void Tour::calc_maxshift() 
+{
 	const int n = (int)seq.size();
 	const double EDT = ins->t[index].EDT;          // == LTW at end depot
 	const double LAT = ins->t[index].LAT;          // == EDT + T_max
@@ -576,6 +604,9 @@ void Tour::insert_vertex(Ins::Vertex* candidate, int position)
 	score += candidate->score;// update score of the new solution
 	volume += candidate->volume;
 	weight += candidate->weight;
+	max_shift.insert(max_shift.begin() + position + 1, 0);
+	update_break();
+	/*
 	if (position < breakindex)
 	{
 		breakindex += 1;//due to insertion of 1 vertex the index needs to be incremented with 1
@@ -584,6 +615,7 @@ void Tour::insert_vertex(Ins::Vertex* candidate, int position)
 	update(position, int(seq.size()));//update travel time and maxshift for all positions after insertion
 	double arrivaltime = (deptime[position + 2] + ins->t[index].EDT + max_shift[position + 2]) - (seq[position + 2]->serv + action[position + 2] * ins->breakdur);//service time eraftrekken
 	update_maxshift(0, position + 1, arrivaltime);//update maxshift for all positions before insertion
+	*/
 }
 
 void Tour::remove_vertex(int position)
@@ -763,150 +795,185 @@ bool Tour::check()
 	int scorecheck = 0;
 	double weightcheck = 0;
 	double volumecheck = 0;
-	//a. travel time check
-	double currenttime = ins->t[index].EDT + deptime[0];
+
+	const double EDT = ins->t[index].EDT;
+	const double LAT = ins->t[index].LAT;
+	const double B = ins->breakdur;
+	const double BE = ins->breakend;
+	const int ENDDEP = ins->maxvertices - 1;
+
+	// a. travel time check
+	double currenttime = EDT + deptime[0];
 	double length = 0;
 	int end = (int)seq.size() - 1;
+
 	for (int i = 0; i < end; ++i)
 	{
 		scorecheck += seq[i]->score;
 		weightcheck += seq[i]->weight;
 		volumecheck += seq[i]->volume;
+
 		Ins::Vertex* last = seq[i];
 		Ins::Vertex* current = seq[i + 1];
 		int breakcurrent = action[i + 1];
+
 		double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-		double waitingtime = 0.0;
+
 		double startbreak = 0.0;
 		double endbreak = 0.0;
 		double startservice = 0.0;
 		double endservice = 0.0;
-		if (breakcurrent) 
+
+		if (breakcurrent)
 		{
-			if ((arrivaltime < ins->breakstart)&&(current->index != ins->maxvertices - 1))
-			{//break can not start before breakstart
-				waitingtime += ins->breakstart - arrivaltime;
+			const bool endp = (current->index == ENDDEP);
+
+			// break can start upon arrival; at non-depot clamp to breakstart
+			if (!endp && arrivaltime < ins->breakstart)
 				startbreak = ins->breakstart;
-			}
 			else
-			{//break can start upon arrival or before breakstart at enddepot
 				startbreak = arrivaltime;
-			}
-			if (startbreak > ins->breakend + 1e-6)
+
+			// NEW: latest legal start guard
+			double latest_start = endp
+				? std::min(BE, LAT - B)
+				: std::min(BE, current->UTW[index] - B);
+
+			if (startbreak > latest_start + 1e-6)
 			{
-				cout << "tour: " << index << "FAILURE!!! break start time exceeds breakend for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+				std::cout << term::fg(term::Color::red)
+					<< "tour: " << index
+					<< " FAILURE!!! break start exceeds latest_start at pos=" << (i + 1)
+					<< " node=" << current->index
+					<< " start=" << startbreak << " latest=" << latest_start << "\n";
 				tourok = false;
 			}
-			endbreak = startbreak + ins->breakdur;
-			if (endbreak < current->LTW[index])
-			{
-				waitingtime += current->LTW[index] - endbreak;
-				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
-				startservice = current->LTW[index];
-			}
-			else
-			{
-				startservice = endbreak;
-			}
+
+			endbreak = startbreak + B;
+
+			// Apply LTW at start-of-service
+			startservice = (endbreak < current->LTW[index]) ? current->LTW[index] : endbreak;
 		}
 		else
 		{
-			if (arrivaltime < current->LTW[index])
-			{
-				waitingtime += current->LTW[index] - arrivaltime;
-				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
-				startservice = current->LTW[index];
-			}
-			else
-			{
-				startservice = arrivaltime;
-			}
+			// No break: just LTW
+			startservice = (arrivaltime < current->LTW[index]) ? current->LTW[index] : arrivaltime;
 		}
-		
-		if (startservice < current->LTW[index]- 1e-6)
+
+		// Windows at start-of-service
+		if (startservice < current->LTW[index] - 1e-6)
 		{
-			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! LTW fail for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+			std::cout << term::fg(term::Color::red)
+				<< "tour: " << index << " FAILURE!!! LTW fail at pos=" << (i + 1)
+				<< " node=" << current->index << "\n";
+			tourok = false;
+		}
+		if (startservice > current->UTW[index] + 1e-6)
+		{
+			std::cout << term::fg(term::Color::red)
+				<< "tour: " << index << " FAILURE!!! UTW fail at pos=" << (i + 1)
+				<< " node=" << current->index << " start=" << startservice
+				<< " UTW=" << current->UTW[index] << "\n";
 			tourok = false;
 		}
 
-		if (startservice > current->UTW[index]+ 1e-6)
+		endservice = startservice + current->serv;
+		currenttime = endservice;
+
+		// NEW: consistency check at each step
+		double stored = EDT + deptime[i + 1];
+		if (std::fabs(stored - currenttime) > 1e-6)
 		{
-			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! UTW fail for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+			std::cout << term::fg(term::Color::red)
+				<< "tour: " << index
+				<< " deptime mismatch at pos=" << (i + 1)
+				<< " calc=" << (currenttime - EDT)
+				<< " stored=" << deptime[i + 1] << "\n";
 			tourok = false;
 		}
-		endservice = startservice + current->serv;
-		//cout<<i+1<<" calc traveltime: " << endservice-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
-		currenttime = endservice;
-	}//end for i
-	length = currenttime - ins->t[index].EDT;
+	}
+
+	length = currenttime - EDT;
+
+	// NEW: end depot LAT guard
+	if (currenttime > LAT + 1e-6)
+	{
+		std::cout << term::fg(term::Color::red)
+			<< "tour: " << index << " arrival " << currenttime
+			<< " above LAT " << LAT << "\n";
+		tourok = false;
+	}
+
 	if (length > ins->t[index].T_max + 1e-6)
 	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "length " << length << " above max: " << ins->t[index].T_max << endl;
+		std::cout << term::fg(term::Color::red)
+			<< "tour: " << index << " length " << length
+			<< " above T_max " << ins->t[index].T_max << "\n";
 		tourok = false;
+	}
 
-	}
-	if (fabs(length - deptime.back()) > 1e-6)
+	if (std::fabs(length - deptime.back()) > 1e-6)
 	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated length: " << length << " stored length: " << deptime.back() << "max length" << ins->t[index].T_max << endl;
+		std::cout << term::fg(term::Color::red)
+			<< "tour: " << index << " total length mismatch. calc=" << length
+			<< " stored=" << deptime.back() << " T_max=" << ins->t[index].T_max << "\n";
 		tourok = false;
 	}
-	//c. weight checks
-	if (fabs(weightcheck - weight) > 1e-6)
+
+	// c. weight checks
+	if (std::fabs(weightcheck - weight) > 1e-6)
 	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
+		std::cout << term::fg(term::Color::red) << "tour: " << index << " new weight " << weightcheck << " stored " << weight << " max " << ins->t[index].W_max << "\n";
 		tourok = false;
 	}
-	if (weight-ins->t[index].W_max> 1e-6)
+	if (weight - ins->t[index].W_max > 1e-6)
 	{
-		tourok = false;
-		cout << term::fg(term::Color::red) << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
-	}
-	//d. volume checks
-	if (fabs(volumecheck - volume) > 1e-6)
-	{
-		cout << term::fg(term::Color::yellow) << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
+		std::cout << term::fg(term::Color::red) << "tour: " << index << " weight " << weight << " above max " << ins->t[index].W_max << "\n";
 		tourok = false;
 	}
-	if (volume - ins->t[index].V_max> 1e-6)
+
+	// d. volume checks
+	if (std::fabs(volumecheck - volume) > 1e-6)
 	{
+		std::cout << term::fg(term::Color::yellow) << "tour: " << index << " new volume " << volumecheck << " stored " << volume << " max " << ins->t[index].V_max << "\n";
 		tourok = false;
-		cout << term::fg(term::Color::red) << "tour: " << index << " volume " << volume << " above max: " << ins->t[index].V_max << endl;
 	}
-	//e. break timing check
-	bool breakcheck = false;
+	if (volume - ins->t[index].V_max > 1e-6)
+	{
+		std::cout << term::fg(term::Color::red) << "tour: " << index << " volume " << volume << " above max " << ins->t[index].V_max << "\n";
+		tourok = false;
+	}
+
+	// e. exactly one break, index consistency
 	int amountbreaks = 0;
-	for (int i = 0; i <= end; ++i)//break kan op enddepot zitten
+	for (int i = 0; i <= end; ++i) // break can be at end depot
 	{
 		if (action[i] == 1)
 		{
 			if (breakindex != i)
 			{
-				cout << term::fg(term::Color::red) << "tour: " << index << "breakindex and sol action don't match" << endl;
+				std::cout << term::fg(term::Color::red)
+					<< "tour: " << index << " breakindex and action mismatch\n";
 				tourok = false;
 			}
 			++amountbreaks;
 		}
 	}
-	//f. amount of breaks check
-	if (amountbreaks == 1)
+	if (amountbreaks != 1)
 	{
-		//cout << yellow << "break ok" << endl;
-	}
-	else
-	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "amount of breaks not ok" << amountbreaks << endl;
+		std::cout << term::fg(term::Color::red)
+			<< "tour: " << index << " amount of breaks not ok " << amountbreaks << "\n";
 		tourok = false;
 	}
-	//g. tour should start and end at the respective depots
-	if ((seq[0] == &ins->v[0]) && (seq.back() == &ins->v[ins->maxvertices - 1]))
+
+	// g. start/end depots
+	if (!((seq[0] == &ins->v[0]) && (seq.back() == &ins->v[ins->maxvertices - 1])))
 	{
-		//cout<<yellow << "start and end ok" << endl;
-	}
-	else
-	{
-		cout << term::fg(term::Color::red)  <<"tour: " << index << "start and end vertex not ok" << endl;
+		std::cout << term::fg(term::Color::red)
+			<< "tour: " << index << " start/end vertex not ok\n";
 		tourok = false;
 	}
+
 	//h. max_shift check
 	vector<double> max_shiftcheck(max_shift.size(), 0);
 	int size = (int)seq.size();
@@ -918,7 +985,7 @@ bool Tour::check()
 		if (ins->t[index].LAT > ins->breakend + ins->breakdur)
 		{
 			//cout<<"path: "<<d<< " bij calc maxshift break op enddepot verhindert een maxshift: " << endl;
-			max_shiftcheck.back() = (ins->breakend + ins->breakdur) - (ins->t[index].EDT+deptime.back());
+			max_shiftcheck.back() = (ins->breakend + ins->breakdur) - (ins->t[index].EDT + deptime.back());
 			arrivaltime = ins->breakend;//zoals hieronder service of enkel break in dit geval ervan aftrekken
 		}
 	}
@@ -954,12 +1021,13 @@ bool Tour::check()
 	{
 		if (fabs(max_shift[i] - max_shiftcheck[i]) > 0.01)
 		{
-			cout << term::fg(term::Color::red) <<"tour: "<< index << "error in max_shift for position: " << i <<" new max_shift: "<<max_shiftcheck[i]<<" stored max_shift: "<<max_shift[i] << endl;
+			cout << term::fg(term::Color::red) << "tour: " << index << "error in max_shift for position: " << i << " new max_shift: " << max_shiftcheck[i] << " stored max_shift: " << max_shift[i] << endl;
 			tourok = false;
 		}
 	}
 	return tourok;
 }//end tour check
+
 
 pair<int, int> Tour::repair()
 {

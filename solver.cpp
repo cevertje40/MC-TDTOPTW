@@ -886,7 +886,9 @@ Res Tabu::solve(int bestknown)
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 	s.reset();
-	//s.read_from_file();
+	s.read_from_file();
+	s.check();
+	cout << "hier" << endl;
 	//s.write_to_file();
 	parallel_construct(s);
 	gb = s;//set global best to initial solution
@@ -996,7 +998,19 @@ Res Tabu::solve(int bestknown)
 				else
 				{
 					no_feasible_moves_in_a_row = 0;
+					Sol olds = s;
 					executeMove(nb, s, tabulist);
+					if (!s.check())
+					{
+						cout << "error in 1-1 replace: " << pick << endl;
+
+						cout << "old solution: " << endl;
+						cout << olds << endl;
+
+						cout << "new solution" << endl;
+						cout << s << endl;
+						//olds.write_to_file();
+					}
 					moved = true;
 					tabulist.nextIteration();
 				}
@@ -1016,6 +1030,10 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					if (!s.check())
+					{
+						cout << "error in 2-1 replace: " << pick << endl;
+					}
 					moved = true;
 					tabulist.nextIteration();
 				}
@@ -1035,18 +1053,17 @@ Res Tabu::solve(int bestknown)
 				{
 					no_feasible_moves_in_a_row = 0;
 					executeMove(nb, s, tabulist);
+					if (!s.check())
+					{
+						cout << "error in 1-2 replace: " << pick << endl;
+					}
 					moved = true;
 					tabulist.nextIteration();
 				}
 				break;
 			}
 		}//end switch
-		/*
-		if (!s.check())
-		{
-			cout << "error in replace: " << pick << endl;
-		}
-		*/
+		
 		if (no_feasible_moves_in_a_row > 5) 
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
@@ -1087,7 +1104,7 @@ Res Tabu::solve(int bestknown)
 				bool improved = false;
 				switch (op) 
 				{
-					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;   // or moves.two_opt_nb(s,1)
+					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;
 					case LsOp::Swap:     improved = swap_nb(s, 1);       break;
 					case LsOp::Swap2:    improved = swap2_nb(s, 1);      break;
 					case LsOp::Relocate: improved = relocate_nb(s, 1);   break;
@@ -1126,6 +1143,12 @@ Res Tabu::solve(int bestknown)
 		if ((iter & 2) == 0) elites.consider(s, ins->maxvertices);
 		elites.tick();
 		++iter;
+		
+		if (!s.check())
+		{
+			cout << "error after RVND: " << pick << endl;
+		}
+		
 		/*
 		if ((iter % 2000) == 0 && restart_count > 0) 
 		{

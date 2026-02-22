@@ -449,7 +449,7 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	Res resdebug;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"100.3.2.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
@@ -760,11 +760,11 @@ int main()
 {
 	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
-	//debug_instance();
+	debug_instance();
 	//debug_ctop();
 	//solve_dataset(1);
 	//ctop_gap(1);
-	doe(5);
+	//doe(5);
 	//doe2(5);
 	//case_study(10);
 

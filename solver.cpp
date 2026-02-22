@@ -886,7 +886,8 @@ Res Tabu::solve(int bestknown)
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 	s.reset();
-	//s.read_from_file();
+	s.read_from_file();
+	s.check();
 	//s.write_to_file();
 	parallel_construct(s);
 	gb = s;//set global best to initial solution

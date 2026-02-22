@@ -77,6 +77,12 @@ void Sol::read_from_file()
 		Sol::Tour* tour = &tours[t];
 		double currenttime = ins->t[t].EDT;
 		Ins::Vertex* last = tour->seq[0];
+
+		const double EDT = ins->t[t].EDT;
+		const double LAT = ins->t[t].LAT;
+		const double B = ins->breakdur;
+		const double BE = ins->breakend;
+		const int ENDDEP = ins->maxvertices - 1;
 		for (int i = 1; i < inputv[t].size(); ++i)
 		{
 			Ins::Vertex* candidate = &ins->v[inputv[t][i]];
@@ -88,18 +94,34 @@ void Sol::read_from_file()
 			tour->volume += candidate->volume;
 			tour->weight += candidate->weight;
 			tour->action.push_back(inputb[t][i]);
-			if (inputb[t][i] == 1)
-			{
-				tour->breakindex = i+1;
-			}
 			//deptime calc
 			double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
-			if (arrivaltime + inputb[t][i] * ins->breakdur < candidate->LTW[t])
+			double startservice = 0.0;
+			double startbreak = 0.0;
+			double endbreak = 0.0;
+			if (inputb[t][i] == 1)
 			{
-				arrivaltime = candidate->LTW[t] - (inputb[t][i] * ins->breakdur);
+				tour->breakindex = i;
+				const bool endp = (candidate->index == ENDDEP);
+
+				// break can start upon arrival; at non-depot clamp to breakstart
+				if (!endp && arrivaltime < ins->breakstart)
+					startbreak = ins->breakstart;
+				else
+					startbreak = arrivaltime;
+
+				endbreak = startbreak + B;
+
+				// Apply LTW at start-of-service
+				startservice = (endbreak < candidate->LTW[t]) ? candidate->LTW[t] : endbreak;
 			}
-			arrivaltime += candidate->serv + (inputb[t][i] * ins->breakdur);
-			tour->deptime.push_back(arrivaltime - ins->t[t].EDT);
+			else
+			{
+				// No break: just LTW
+				startservice = (arrivaltime < candidate->LTW[t]) ? candidate->LTW[t] : arrivaltime;
+			}
+			arrivaltime = startservice + candidate->serv;
+			tour->deptime.push_back(arrivaltime - EDT);
 			currenttime = arrivaltime;
 			last = candidate;
 		}//end tour creation

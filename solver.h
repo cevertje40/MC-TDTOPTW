@@ -105,23 +105,114 @@ struct GreedyInsertion
 	double shift = 0.0;
 };
 
+enum class SelectionOp
+{
+	Random = 1,
+	HighestScore = 2,
+	HighestScoreToBurden = 3,
+	LowestResource = 4,
+	RegretTime = 5
+};
+
+enum class InsertionOp
+{
+	BestPosition = 1,
+	FirstFeasible = 2,
+	LastFeasible = 3,
+	RandomFeasible = 4,
+	LeastLoadedBestPosition = 5
+};
+
+template <size_t N>
+int weighted_pick(const std::array<double, N>& w, std::mt19937& engine)
+{
+	double sum = 0.0;
+	for (double x : w) sum += x;
+	if (sum <= 0.0)
+	{
+		std::uniform_int_distribution<int> dist(0, (int)N - 1);
+		return dist(engine);
+	}
+
+	double u = std::uniform_real_distribution<double>(0.0, sum)(engine);
+	double acc = 0.0;
+	for (int i = 0; i < (int)N; ++i)
+	{
+		acc += w[i];
+		if (u <= acc) return i;
+	}
+	return (int)N - 1;
+}
+
 class Alns : public Moves
 {
 private:
 	int max_it;
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
+
+	std::array<double, 7> rem_w;
+	std::array<double, 5> sel_w;
+	std::array<double, 5> ins_w;
+
+	std::array<double, 7> rem_score;
+	std::array<double, 5> sel_score;
+	std::array<double, 5> ins_score;
+
+	std::array<int, 7> rem_used;
+	std::array<int, 5> sel_used;
+	std::array<int, 5> ins_used;
 	
 	std::vector<std::pair<int, int>> collect_removable_positions(Sol& sol);
-	std::vector<RemovedCustomer> random_remove_1(Sol& sol);
-	std::vector<RemovedCustomer> random_remove_2(Sol& sol);
-	std::vector<RemovedCustomer> worst_remove_1(Sol& sol);
-	std::vector<RemovedCustomer> worst_remove_1_resource_time(Sol& sol);
-	GreedyInsertion best_insertion_for_vertex(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed);
-	std::vector<Ins::Vertex*> collect_available_customers(const Sol& sol);
-	const RemovedCustomer* find_removed_info(Ins::Vertex* y,const std::vector<RemovedCustomer>& removed) const;
-	void greedy_repair(Sol& sol, const std::vector<RemovedCustomer>& removed);
+	const RemovedCustomer* find_removed_info(Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+	//removal operators
+	std::vector<RemovedCustomer> random_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> worst_remove_burden(Sol& sol, int beta);
+	std::vector<RemovedCustomer> largest_time_saving_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> sequence_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> break_neighborhood_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> largest_demand_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> lowest_profit_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> largest_service_time_remove(Sol& sol, int beta);
+	std::vector<RemovedCustomer> random_route_remove(Sol& sol, int beta);
+
+
+	
+	//selection operators
+	std::vector<Ins::Vertex*> collect_available_customers(const Sol& sol) const;
+
+	Ins::Vertex* random_selection_from_pool(const std::vector<Ins::Vertex*>& pool) const;
+	Ins::Vertex* highest_score_selection_from_pool(const std::vector<Ins::Vertex*>& pool) const;
+	Ins::Vertex* highest_score_to_burden_selection_from_pool(const std::vector<Ins::Vertex*>& pool) const;
+	Ins::Vertex* lowest_resource_selection_from_pool(const std::vector<Ins::Vertex*>& pool) const;
+	Ins::Vertex* dynamic_travel_time_profit_selection_from_pool(const Sol& sol, const std::vector<Ins::Vertex*>& pool, const std::vector<RemovedCustomer>& removed) const;
+
+	Ins::Vertex* apply_selection_operator_from_pool(const Sol& sol, const std::vector<Ins::Vertex*>& pool, SelectionOp sel_op, const std::vector<RemovedCustomer>& removed) const;
+
+	//insertion operators
+	std::vector<double> collect_feasible_insertion_shifts(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+	bool evaluate_insertion_position(const Sol& sol, Ins::Vertex* y, int d, int j, const std::vector<RemovedCustomer>& removed, GreedyInsertion& out) const;
+
+	GreedyInsertion best_position_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+	GreedyInsertion first_feasible_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+	GreedyInsertion last_feasible_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+	GreedyInsertion random_feasible_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+	GreedyInsertion least_loaded_best_position_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+
+	GreedyInsertion apply_insertion_operator(const Sol& sol, Ins::Vertex* y, InsertionOp op, const std::vector<RemovedCustomer>& removed) const;//dispatcher for insertion operators
+
+	void apply_local_search(Sol& sol);
+
+	void repair_with_selection_and_insertion(Sol& sol, SelectionOp sel_op, InsertionOp ins_op, const std::vector<RemovedCustomer>& removed);
+
+
+
+	//acceptance functions
 	bool accept_candidate(const Sol& cur, const Sol& cand, double T);
+
+	void update_operator_weights();
+
+
 public:
 	Alns(Ins& ins, int max_it);
 	Res solve(int bestknown = 1);

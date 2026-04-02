@@ -82,6 +82,9 @@ public:
 class Moves
 {
 public:
+
+	//construction functions
+	void parallel_construct(Sol& sol);
 	//local search moves
 	bool insert_nb(Sol& sol,int mode=1);//mode: 0 first improvement, 1 best improvement
 	bool exchange_nb(Sol& sol, int mode = 1);//mode: 0 first improvement, 1 best improvement

@@ -664,183 +664,6 @@ void Tabu::perturbe(Sol& sol)
 	}
 }
 
-void Tabu::parallel_construct(Sol& sol)
-{
-	// 0) Per-tour depot-reachable lists, sorted by score
-	std::vector<std::vector<Ins::Vertex*>> dep_reach(ins->maxtours);
-	for (int d = 0; d < ins->maxtours; ++d) 
-	{
-		for (int i = 1; i < ins->maxvertices - 1; ++i) 
-		{
-			const double lb = ins->v[0].con[i]->determin+ ins->v[i].serv+ ins->v[i].con[ins->maxvertices - 1]->determin;
-			if (lb <= ins->t[d].T_max + 1e-9)
-				dep_reach[d].push_back(&ins->v[i]);
-		}
-		std::sort(dep_reach[d].begin(), dep_reach[d].end(),[](Ins::Vertex* a, Ins::Vertex* b) { return a->score > b->score; });
-	}
-
-	// Helper: try to append cand to the end of tour d; return new deptime, break flag
-	auto try_append = [&](int d, Ins::Vertex* cand, double& new_deptime, int& brk) -> bool 
-		{
-			if (!sol.available[cand->index]) return false;
-
-			Sol::Tour& tour = sol.tours[d];
-			if (tour.weight + cand->weight > ins->t[d].W_max + 1e-9) return false;
-			if (tour.volume + cand->volume > ins->t[d].V_max + 1e-9) return false;
-
-			double currenttime = tour.deptime.back() + ins->t[d].EDT;
-			Ins::Vertex* last = tour.seq.back();
-
-			double arr = ins->arrival_time(last->con[cand->index], currenttime);
-			int need_break = -1;
-			if ((tour.breakindex == -1) &&((arr >= ins->breakstart) || (cand->LTW[d] - ins->breakdur >= ins->breakstart))) 
-			{
-				arr += ins->breakdur;
-				need_break = 1;
-			}
-			else 
-			{
-				need_break = 0;
-			}
-			if (arr < cand->LTW[d]) arr = cand->LTW[d];
-			if (arr > cand->UTW[d] + 1e-9) return false;
-
-			arr += cand->serv;
-
-			double enddep = ins->arrival_time(cand->con[ins->maxvertices - 1], arr);
-			if ((tour.breakindex == -1) && (need_break == 0)) enddep += ins->breakdur;
-			if (enddep > ins->t[d].LAT + 1e-9) return false;
-
-			new_deptime = arr - ins->t[d].EDT; // includes break if taken
-			brk = need_break;
-			return true;
-		};
-
-	// 1) Phase A: seed each tour with one vertex (round-robin)
-	std::vector<size_t> ptr(ins->maxtours, 0);   // per-tour scan pointer
-	bool seeded_any = true;
-	const int K = 12; // small scan window per pass to stay fast
-
-	while (seeded_any) 
-	{
-		seeded_any = false;
-
-		for (int d = 0; d < ins->maxtours; ++d) 
-		{
-			Sol::Tour& tour = sol.tours[d];
-
-			double best_key = -DBL_MAX;
-			Ins::Vertex* best_v = nullptr;
-			double best_deptime = 0.0;
-			int best_brk = 0;
-
-			int examined = 0;
-			auto& L = dep_reach[d];
-			// advance ptr[d] past already assigned vertices
-			while (ptr[d] < L.size() && !sol.available[L[ptr[d]]->index]) ++ptr[d];
-
-			for (size_t k = ptr[d]; k < L.size() && examined < K; ++k) 
-			{
-				Ins::Vertex* cand = L[k];
-				if (!sol.available[cand->index]) continue;
-
-				double ndt; int brk;
-				if (!try_append(d, cand, ndt, brk)) continue;
-
-				// key: score / (Δt + capacity fraction)
-				double delta_t = ndt - tour.deptime.back();
-				double cap_frac = cand->weight / ins->t[d].W_max + cand->volume / ins->t[d].V_max;
-				double denom = std::max(1e-12, delta_t) + std::max(1e-12, cap_frac);
-				double key = cand->score / denom;
-
-				if (key > best_key) 
-				{
-					best_key = key; best_v = cand; best_deptime = ndt; best_brk = brk; 
-				}
-				++examined;
-			}
-
-			if (best_v) 
-			{
-				// commit the seed
-				tour.seq.push_back(best_v);
-				tour.deptime.push_back(best_deptime);
-				tour.max_shift.push_back(0);
-				tour.action.push_back(best_brk);
-				if (best_brk == 1) tour.breakindex = int(tour.seq.size()) - 1;
-				tour.weight += best_v->weight;
-				tour.volume += best_v->volume;
-				tour.score += best_v->score;
-				sol.score += best_v->score;
-				sol.available[best_v->index] = false;
-				seeded_any = true;
-			}
-		}
-	}
-
-	// 2) Phase B: greedily append remaining vertices
-	std::vector<Ins::Vertex*> pool;
-	pool.reserve(ins->maxvertices);
-	for (int i = 1; i < ins->maxvertices - 1; ++i)
-		if (sol.available[i]) pool.push_back(&ins->v[i]);
-	std::sort(pool.begin(), pool.end(), [](Ins::Vertex* a, Ins::Vertex* b) { return a->score > b->score; });
-
-	for (Ins::Vertex* cand : pool) {
-		int best_d = -1; double best_key = -DBL_MAX;
-		double best_deptime = 0.0; int best_brk = 0;
-
-		for (int d = 0; d < ins->maxtours; ++d) 
-		{
-			double ndt; int brk;
-			if (!try_append(d, cand, ndt, brk)) continue;
-
-			double delta_t = ndt - sol.tours[d].deptime.back();
-			double cap_frac = cand->weight / ins->t[d].W_max + cand->volume / ins->t[d].V_max;
-			double denom = std::max(1e-12, delta_t) + std::max(1e-12, cap_frac);
-			double key = cand->score / denom;
-
-			if (key > best_key) { best_key = key; best_d = d; best_deptime = ndt; best_brk = brk; }
-		}
-
-		if (best_d >= 0) 
-		{
-			auto& tour = sol.tours[best_d];
-			tour.seq.push_back(cand);
-			tour.deptime.push_back(best_deptime);
-			tour.max_shift.push_back(0);
-			tour.action.push_back(best_brk);
-			if (best_brk == 1) tour.breakindex = int(tour.seq.size()) - 1;
-			tour.weight += cand->weight;
-			tour.volume += cand->volume;
-			tour.score += cand->score;
-			sol.score += cand->score;
-			sol.available[cand->index] = false;
-		}
-	}
-
-	// 3) Close tours with end depot
-	for (int t = 0; t < ins->maxtours; ++t) 
-	{
-		Sol::Tour& tour = sol.tours[t];
-		double currenttime = ins->t[t].EDT + tour.deptime.back();
-		double arrivaltime = ins->arrival_time(tour.seq.back()->con[ins->maxvertices - 1], currenttime);
-		tour.deptime.push_back(arrivaltime - ins->t[t].EDT);
-		tour.seq.push_back(&ins->v[ins->maxvertices - 1]);
-		tour.max_shift.push_back(0);
-		if (tour.breakindex == -1) {
-			tour.action.push_back(1);
-			tour.deptime.back() += ins->breakdur;
-			tour.breakindex = int(tour.seq.size()) - 1;
-		}
-		else {
-			tour.action.push_back(0);
-		}
-		tour.calc_maxshift();
-	}
-	cout << "start solution with score: " << sol.score << endl;
-	//sol.check();
-}
-
 template<typename MoveType>
 void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& tabulist) 
 {
@@ -886,8 +709,6 @@ Res Tabu::solve(int bestknown)
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 	s.reset();
-	s.read_from_file();
-	s.check();
 	//s.write_to_file();
 	parallel_construct(s);
 	gb = s;//set global best to initial solution
@@ -1143,4 +964,489 @@ Res Tabu::solve(int bestknown)
 	return Res(gb, cpuTime, bestknown);
 }
 
+Alns::Alns(Ins& ins, int max_it): Moves(ins), max_it(max_it)
+{
+	gb = Sol(ins);//best sol
+	s = Sol(ins);//iter sol
+}
 
+
+std::vector<std::pair<int, int>> Alns::collect_removable_positions(Sol& sol)
+{
+	std::vector<std::pair<int, int>> pos;
+	const int startDepot = 0;
+	const int endDepot = ins->maxvertices - 1;
+
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		const Tour& tour = sol.tours[t];
+		for (int p = 1; p < (int)tour.seq.size(); ++p)   // skip start depot at 0
+		{
+			int vid = tour.seq[p]->index;
+			if (vid != startDepot && vid != endDepot)
+			{
+				pos.push_back({ t, p });
+			}
+		}
+	}
+	return pos;
+}
+
+std::vector<RemovedCustomer> Alns::random_remove_1(Sol& sol)
+{
+	std::vector<RemovedCustomer> removed;
+	auto pos = collect_removable_positions(sol);
+
+	if (pos.empty()) return removed;
+
+	std::uniform_int_distribution<int> dist(0, (int)pos.size() - 1);
+	auto [tour_idx, position] = pos[dist(engine)];
+
+	Ins::Vertex* v = sol.tours[tour_idx].seq[position];
+	int pred = sol.tours[tour_idx].seq[position - 1]->index;
+	int succ = sol.tours[tour_idx].seq[position + 1]->index;
+
+	removed.push_back({ v, tour_idx, position, pred, succ });
+
+	sol.remove_vertex(sol.tours[tour_idx], position);
+
+	return removed;
+}
+
+std::vector<RemovedCustomer> Alns::random_remove_2(Sol& sol)
+{
+	std::vector<RemovedCustomer> removed;
+	auto pos = collect_removable_positions(sol);
+	if (pos.empty()) return removed;
+
+	if (pos.size() == 1)
+	{
+		auto [tour_idx, position] = pos[0];
+		Ins::Vertex* v = sol.tours[tour_idx].seq[position];
+		int pred = sol.tours[tour_idx].seq[position - 1]->index;
+		int succ = sol.tours[tour_idx].seq[position + 1]->index;
+
+		removed.push_back({ v, tour_idx, position, pred, succ });
+		sol.remove_vertex(sol.tours[tour_idx], position);
+		return removed;
+	}
+
+	std::uniform_int_distribution<int> dist1(0, (int)pos.size() - 1);
+	int idx1 = dist1(engine);
+
+	std::uniform_int_distribution<int> dist2(0, (int)pos.size() - 2);
+	int idx2 = dist2(engine);
+	if (idx2 >= idx1) ++idx2;
+
+	auto [tour_idx1, position1] = pos[idx1];
+	auto [tour_idx2, position2] = pos[idx2];
+
+	if (tour_idx1 == tour_idx2)
+	{
+		if (position1 > position2) std::swap(position1, position2);
+
+		Ins::Vertex* v1 = sol.tours[tour_idx1].seq[position1];
+		Ins::Vertex* v2 = sol.tours[tour_idx1].seq[position2];
+
+		int pred1 = sol.tours[tour_idx1].seq[position1 - 1]->index;
+		int succ1 = sol.tours[tour_idx1].seq[position1 + 1]->index;
+
+		int pred2 = sol.tours[tour_idx1].seq[position2 - 1]->index;
+		int succ2 = sol.tours[tour_idx1].seq[position2 + 1]->index;
+
+		removed.push_back({ v1, tour_idx1, position1, pred1, succ1 });
+		removed.push_back({ v2, tour_idx1, position2, pred2, succ2 });
+
+		sol.remove_vertices(sol.tours[tour_idx1], position1, position2);
+	}
+	else
+	{
+		Ins::Vertex* v1 = sol.tours[tour_idx1].seq[position1];
+		Ins::Vertex* v2 = sol.tours[tour_idx2].seq[position2];
+
+		int pred1 = sol.tours[tour_idx1].seq[position1 - 1]->index;
+		int succ1 = sol.tours[tour_idx1].seq[position1 + 1]->index;
+
+		int pred2 = sol.tours[tour_idx2].seq[position2 - 1]->index;
+		int succ2 = sol.tours[tour_idx2].seq[position2 + 1]->index;
+
+		removed.push_back({ v1, tour_idx1, position1, pred1, succ1 });
+		removed.push_back({ v2, tour_idx2, position2, pred2, succ2 });
+
+		sol.remove_vertex(sol.tours[tour_idx1], position1);
+		sol.remove_vertex(sol.tours[tour_idx2], position2);
+	}
+
+	return removed;
+}
+
+std::vector<RemovedCustomer> Alns::worst_remove_1(Sol& sol)
+{
+	std::vector<RemovedCustomer> removed;
+
+	const int startDepot = 0;
+	const int endDepot = ins->maxvertices - 1;
+
+	int bestTour = -1;
+	int bestPos = -1;
+	int worstScore = std::numeric_limits<int>::max();
+
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		const Tour& tour = sol.tours[t];
+		for (int p = 1; p < (int)tour.seq.size(); ++p)
+		{
+			Ins::Vertex* v = tour.seq[p];
+			int vid = v->index;
+			if (vid == startDepot || vid == endDepot) continue;
+
+			if (v->score < worstScore)
+			{
+				worstScore = v->score;
+				bestTour = t;
+				bestPos = p;
+			}
+		}
+	}
+
+	if (bestTour < 0) return removed;
+
+	Ins::Vertex* v = sol.tours[bestTour].seq[bestPos];
+	int pred = sol.tours[bestTour].seq[bestPos - 1]->index;
+	int succ = sol.tours[bestTour].seq[bestPos + 1]->index;
+
+	removed.push_back({ v, bestTour, bestPos, pred, succ });
+	sol.remove_vertex(sol.tours[bestTour], bestPos);
+
+	return removed;
+}
+
+std::vector<RemovedCustomer> Alns::worst_remove_1_resource_time(Sol& sol)
+{
+	std::vector<RemovedCustomer> removed;
+
+	const int startDepot = 0;
+	const int endDepot = ins->maxvertices - 1;
+
+	int bestTour = -1;
+	int bestPos = -1;
+	double worstValue = std::numeric_limits<double>::infinity();
+
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		const Tour& tour = sol.tours[t];
+		const double Wmax = ins->t[t].W_max;
+		const double Vmax = ins->t[t].V_max;
+		const double Tmax = ins->t[t].T_max;
+
+		for (int p = 1; p < (int)tour.seq.size() - 1; ++p) // skip both depots
+		{
+			Ins::Vertex* y = tour.seq[p];
+			const int vid = y->index;
+			if (vid == startDepot || vid == endDepot) continue;
+
+			Ins::Vertex* x = tour.seq[p - 1];
+			Ins::Vertex* z = tour.seq[p + 1];
+
+			// approximate marginal time burden using deterministic travel times
+			double detour =
+				x->con[y->index]->determin +
+				y->serv +
+				y->con[z->index]->determin -
+				x->con[z->index]->determin;
+
+			if (detour < 0.0) detour = 0.0;
+
+			// normalize time and resource use
+			double timeFrac = (Tmax > 0.0 ? detour / Tmax : 0.0);
+			double weightFrac = (Wmax > 0.0 ? y->weight / Wmax : 0.0);
+			double volumeFrac = (Vmax > 0.0 ? y->volume / Vmax : 0.0);
+
+			// total "cost" of keeping this customer
+			double burden = timeFrac + weightFrac + volumeFrac;
+
+			// low score relative to burden => good candidate to remove
+			double value = double(y->score) / std::max(1e-9, burden);
+
+			if (value < worstValue)
+			{
+				worstValue = value;
+				bestTour = t;
+				bestPos = p;
+			}
+		}
+	}
+
+	if (bestTour < 0) return removed;
+
+	Ins::Vertex* v = sol.tours[bestTour].seq[bestPos];
+	int pred = sol.tours[bestTour].seq[bestPos - 1]->index;
+	int succ = sol.tours[bestTour].seq[bestPos + 1]->index;
+
+	removed.push_back({ v, bestTour, bestPos, pred, succ });
+	sol.remove_vertex(sol.tours[bestTour], bestPos);
+
+	return removed;
+}
+
+GreedyInsertion Alns::best_insertion_for_vertex(const Sol& sol,	Ins::Vertex* y,	const std::vector<RemovedCustomer>& removed)
+{
+	GreedyInsertion best;
+
+	const RemovedCustomer* rem = find_removed_info(y, removed);
+
+	for (int d = 0; d < ins->maxtours; ++d)
+	{
+		const Sol::Tour& tour = sol.tours[d];
+		const auto& Td = ins->t[d];
+
+		const double EDT = Td.EDT;
+		const double Wmax = Td.W_max;
+		const double Vmax = Td.V_max;
+		const double breakdur = ins->breakdur;
+
+		if (tour.weight + y->weight > Wmax + 1e-9) continue;
+		if (tour.volume + y->volume > Vmax + 1e-9) continue;
+
+		const int endj = (int)tour.seq.size();
+		const std::vector<double> wait_suffix = tour.compute_wait_suffix();
+
+		for (int j = 0; j < endj - 1; ++j)
+		{
+			Ins::Vertex* x = tour.seq[j];
+			Ins::Vertex* z = tour.seq[j + 1];
+			const int breakz = tour.action[j + 1];
+
+			if (!(x->nbi[d][y->index] && y->nbi[d][z->index])) continue;
+
+			const double currenttime = tour.deptime[j] + EDT;
+
+			const double base_up = ins->arrival_time(x->con[z->index], currenttime) - currenttime;
+			const double ins_lb = x->con[y->index]->determin + y->serv + y->con[z->index]->determin;
+			const double dt_lb = std::max(0.0, ins_lb - base_up);
+
+			if (dt_lb > wait_suffix[j + 1] + tour.max_shift[j + 1] + 1e-9) continue;
+
+			double at = ins->arrival_time(x->con[y->index], currenttime);
+
+			if (at < y->LTW[d]) at = y->LTW[d];
+			if (at > y->UTW[d] + 1e-9) continue;
+
+			at += y->serv;
+			at = ins->arrival_time(y->con[z->index], at);
+
+			if (breakz)
+			{
+				const bool endp = (z->index == ins->maxvertices - 1);
+				if (!endp && at < ins->breakstart) at = ins->breakstart;
+				if (at > ins->breakend + 1e-9) continue;
+				at += breakdur;
+			}
+
+			if (at < z->LTW[d]) at = z->LTW[d];
+			at += z->serv;
+
+			const double shift = (at - EDT) - tour.deptime[j + 1];
+			if (shift > tour.max_shift[j + 1] + 1e-9) continue;
+
+			const double rho =
+				(Wmax > 0.0 ? y->weight / Wmax : 0.0) +
+				(Vmax > 0.0 ? y->volume / Vmax : 0.0);
+
+			double key = double(y->score) / std::max(1e-9, shift + rho);
+
+			if (rem != nullptr)
+			{
+				double penalty = 1.0;
+				const int newPos = j + 1;
+
+				if (d == rem->oldTour) penalty *= 0.90;
+				if (newPos == rem->oldPos) penalty *= 0.75;
+				if (x->index == rem->oldPred) penalty *= 0.65;
+				if (z->index == rem->oldSucc) penalty *= 0.65;
+
+				if (d == rem->oldTour &&
+					x->index == rem->oldPred &&
+					z->index == rem->oldSucc)
+				{
+					penalty *= 0.25;
+				}
+
+				key *= penalty;
+			}
+
+			if (!best.feasible || key > best.key)
+			{
+				best.feasible = true;
+				best.vertex_idx = y->index;
+				best.tour_idx = d;
+				best.position = j;
+				best.key = key;
+				best.shift = shift;
+			}
+		}
+	}
+
+	return best;
+}
+
+std::vector<Ins::Vertex*> Alns::collect_available_customers(const Sol& sol)
+{
+	std::vector<Ins::Vertex*> cand;
+	for (int i = 1; i < ins->maxvertices - 1; ++i)   // skip depots
+	{
+		if (sol.available[i])
+			cand.push_back(&ins->v[i]);
+	}
+	return cand;
+}
+
+const RemovedCustomer* Alns::find_removed_info(	Ins::Vertex* y,	const std::vector<RemovedCustomer>& removed) const
+{
+	for (const auto& r : removed)
+	{
+		if (r.v->index == y->index)
+			return &r;
+	}
+	return nullptr;
+}
+
+void Alns::greedy_repair(Sol& sol, const std::vector<RemovedCustomer>& removed)
+{
+	const int K = 3; // choose randomly among top-K feasible insertions
+
+	while (true)
+	{
+		std::vector<GreedyInsertion> candidates;
+		candidates.reserve(ins->maxvertices);
+
+		// evaluate all currently available regular vertices
+		for (int vid = 1; vid < ins->maxvertices - 1; ++vid)
+		{
+			if (!sol.available[vid]) continue;
+
+			Ins::Vertex* y = &ins->v[vid];
+			auto cand = best_insertion_for_vertex(sol, y, removed);
+
+			if (cand.feasible)
+				candidates.push_back(cand);
+		}
+
+		// no feasible insertion left
+		if (candidates.empty()) break;
+
+		// sort descending by key
+		std::sort(candidates.begin(), candidates.end(),
+			[](const GreedyInsertion& a, const GreedyInsertion& b)
+			{
+				return a.key > b.key;
+			});
+
+		// pick randomly among top-K
+		const int k_eff = std::min(K, (int)candidates.size());
+		std::uniform_int_distribution<int> pick_top(0, k_eff - 1);
+		const GreedyInsertion& chosen = candidates[pick_top(engine)];
+
+		sol.insert_vertex(sol.tours[chosen.tour_idx], &ins->v[chosen.vertex_idx], chosen.position);
+	}
+}
+
+bool Alns::accept_candidate(const Sol& cur, const Sol& cand, double T)
+{
+	if (cand.score >= cur.score) return true;
+
+	double delta = double(cand.score - cur.score); // negative if worse
+	double prob = std::exp(delta / std::max(1e-9, T));
+	double u = std::uniform_real_distribution<double>(0.0, 1.0)(engine);
+
+	return u < prob;
+}
+
+Res Alns::solve(int bestknown)
+{
+	s.reset();
+	parallel_construct(s);
+	gb = s;//set global best to initial solution
+	int noimpr = 0;
+	using clock = std::chrono::steady_clock;
+	auto t0 = clock::now();
+	double T = 0.05 * std::max(1, s.score);
+	double alpha = 0.995;    // cooling rate
+	for (int iter = 0; iter < max_it; ++iter)
+	{
+
+		Sol cand = s;
+		std::vector<RemovedCustomer> removed;
+
+		std::uniform_int_distribution<> nbpicker(1, 3);
+		int destroy_op = nbpicker(engine);
+
+		switch (destroy_op)
+		{
+		case 1: removed = random_remove_1(cand); break;
+		case 2: removed = random_remove_2(cand); break;
+		case 3: removed = worst_remove_1(cand);  break;
+		//case 3: removed = worst_remove_1_resource_time(cand);  break;
+		}
+
+		greedy_repair(cand, removed);
+
+		
+
+		if (accept_candidate(s, cand, T))
+		{
+			s = cand;
+
+			
+			// local search on cand
+			enum class LsOp { TwoOpt, Swap, Swap2, Relocate };
+			std::array<LsOp, 4> ops = { LsOp::TwoOpt, LsOp::Swap, LsOp::Swap2, LsOp::Relocate };
+
+			
+			bool improved_any = true;
+			while (improved_any)
+			{
+				improved_any = false;
+				std::shuffle(ops.begin(), ops.end(), engine);
+
+				for (auto op : ops)
+				{
+					bool improved = false;
+					switch (op)
+					{
+					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);   break;
+					case LsOp::Swap:     improved = swap_nb(s, 1);      break;
+					case LsOp::Swap2:    improved = swap2_nb(s, 1);     break;
+					case LsOp::Relocate: improved = relocate_nb(s, 1);  break;
+					}
+					if (improved)
+					{
+						improved_any = true;
+						break;
+					}
+				}
+			}
+			
+
+		}
+		if (cand.score > gb.score)
+		{
+			gb = cand;
+			noimpr = 0;
+		}
+		else
+		{
+			++noimpr;
+		}
+
+		T *= alpha;
+		if (noimpr > 200)
+		{
+			s = gb;
+			noimpr = 0;
+			T = 0.05 * std::max(1, s.score);
+		}
+	}
+	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
+	return Res(gb, cpuTime, bestknown);
+}

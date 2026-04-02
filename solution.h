@@ -27,7 +27,7 @@ class Tour
 	void opt_vertices(int i, int j);//assumption i < j
 	void swap_vertices(int i, int j);//assumption i < j
 	bool check();
-	std::vector<double> compute_wait_suffix();
+	std::vector<double> compute_wait_suffix() const;
 	std::pair<int,int> repair();//repairs solution by removed last regular vertex, return score decrease
 };
 

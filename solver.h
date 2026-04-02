@@ -73,16 +73,59 @@ private:
 	double EMA_RHO; //	learning rate for exponential moving average of gains
 	double THRESH;  // start biasing after 80% utilization
 	double GAMMA;  // bias strength
-	void parallel_construct(Sol& sol);
+	
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
 	
 
 public:
+	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
 	void perturbe(Sol& sol);
 	Res solve(int bestknown = 1);
 	std::string name = "Tabu";
+};
+
+struct RemovedCustomer
+{
+	Ins::Vertex* v = nullptr;
+	int oldTour = -1;
+	int oldPos = -1;
+	int oldPred = -1;
+	int oldSucc = -1;
+};
+
+struct GreedyInsertion
+{
+	bool feasible = false;
+	int vertex_idx = -1;
+	int tour_idx = -1;
+	int position = -1;   // insert after seq[position]
+	double key = -DBL_MAX;
+	double shift = 0.0;
+};
+
+class Alns : public Moves
+{
+private:
+	int max_it;
+	Sol s;//current iteration solution
+	Sol gb;//global best solution
+	
+	std::vector<std::pair<int, int>> collect_removable_positions(Sol& sol);
+	std::vector<RemovedCustomer> random_remove_1(Sol& sol);
+	std::vector<RemovedCustomer> random_remove_2(Sol& sol);
+	std::vector<RemovedCustomer> worst_remove_1(Sol& sol);
+	std::vector<RemovedCustomer> worst_remove_1_resource_time(Sol& sol);
+	GreedyInsertion best_insertion_for_vertex(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed);
+	std::vector<Ins::Vertex*> collect_available_customers(const Sol& sol);
+	const RemovedCustomer* find_removed_info(Ins::Vertex* y,const std::vector<RemovedCustomer>& removed) const;
+	void greedy_repair(Sol& sol, const std::vector<RemovedCustomer>& removed);
+	bool accept_candidate(const Sol& cur, const Sol& cand, double T);
+public:
+	Alns(Ins& ins, int max_it);
+	Res solve(int bestknown = 1);
+
 };
 
 

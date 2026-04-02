@@ -742,7 +742,7 @@ void Tour::swap_vertices(int i, int j)
 	}
 }
 
-vector<double> Tour::compute_wait_suffix()
+vector<double> Tour::compute_wait_suffix() const
 {
 	const int n = (int)seq.size();
 	std::vector<double> arr0(n, 0.0), svc(n, 0.0), wait_suffix(n, 0.0);

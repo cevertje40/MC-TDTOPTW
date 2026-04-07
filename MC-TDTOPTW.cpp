@@ -333,13 +333,13 @@ void solve_dataset(int max_rep = 5)
 			instance.create_neighbourhood(textfile.path, textfile.name);
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
-			//Tabu tabu(instance, 10000,2,0.1,0.9,10);
-			//it->result[rep] = tabu.solve(it->bestknown);
+			Tabu tabu(instance, 10000,2,0.1,0.9,10);
+			it->result[rep] = tabu.solve(it->bestknown);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Alns alns(instance, 10000);
-			it->result[rep] = alns.solve(it->bestknown);
+			//Alns alns(instance,5000,0.9997,150,200,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
+			//it->result[rep] = alns.solve(it->bestknown);
 
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
@@ -461,7 +461,7 @@ void debug_instance()
 	//resdebug=tabu.solve(250);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//resdataset.push_back(ils.solve());
-	Alns alns(instance, 10000);
+	Alns alns(instance, 5000, 0.9997, 150, 1500, 8.0, 4.0, 1.0, 100.0, 0.0001, 0.15, 0.8);
 	resdebug = alns.solve(250);
 	cout << " best score: " << 894 << " score: "<< resdebug.sol.score << " cpu time: " << resdebug.time << " gap: " << resdebug.gap << endl;
 }

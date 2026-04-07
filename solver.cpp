@@ -964,7 +964,8 @@ Res Tabu::solve(int bestknown)
 	return Res(gb, cpuTime, bestknown);
 }
 
-Alns::Alns(Ins& ins, int max_it): Moves(ins), max_it(max_it)
+
+Alns::Alns(Ins& ins, int iter_max_best, double alpha, int segment_len, int iter_per_segment, double sigma1, double sigma2, double sigma3, double temp_factor,double temp_min, double beta_frac, double lambda) : Moves(ins), iter_max_best(iter_max_best), alpha(alpha), segment_len(segment_len), iter_per_segment(iter_per_segment), sigma1(sigma1), sigma2(sigma2), sigma3(sigma3), temp_factor(temp_factor), temp_min(temp_min), beta_frac(beta_frac), lambda(lambda)
 {
 	gb = Sol(ins);//best sol
 	s = Sol(ins);//iter sol
@@ -1487,8 +1488,6 @@ std::vector<RemovedCustomer> Alns::random_route_remove(Sol& sol, int beta)
 	return removed;
 }
 
-
-
 std::vector<Ins::Vertex*> Alns::collect_available_customers(const Sol& sol) const
 {
 	std::vector<Ins::Vertex*> pool;
@@ -1663,11 +1662,7 @@ Ins::Vertex* Alns::apply_selection_operator_from_pool(const Sol& sol,const std::
 	return nullptr;
 }
 
-void Alns::repair_with_selection_and_insertion(
-	Sol& sol,
-	SelectionOp sel_op,
-	InsertionOp ins_op,
-	const std::vector<RemovedCustomer>& removed)
+void Alns::repair_with_selection_and_insertion_improved(Sol& sol,SelectionOp sel_op,InsertionOp ins_op,	const std::vector<RemovedCustomer>& removed)
 {
 	while (true)
 	{
@@ -1701,6 +1696,26 @@ void Alns::repair_with_selection_and_insertion(
 	}
 }
 
+
+std::vector<Ins::Vertex*> Alns::collect_insertable_customers(const Sol& sol,InsertionOp ins_op,	const std::vector<RemovedCustomer>& removed) const
+{
+	std::vector<Ins::Vertex*> pool;
+
+	for (int vid = 1; vid < ins->maxvertices - 1; ++vid)
+	{
+		if (!sol.available[vid]) continue;
+
+		Ins::Vertex* y = &ins->v[vid];
+		GreedyInsertion cand = apply_insertion_operator(sol, y, ins_op, removed);
+
+		if (cand.feasible)
+			pool.push_back(y);
+	}
+
+	return pool;
+}
+
+
 const RemovedCustomer* Alns::find_removed_info(	Ins::Vertex* y,	const std::vector<RemovedCustomer>& removed) const
 {
 	for (const auto& r : removed)
@@ -1711,6 +1726,30 @@ const RemovedCustomer* Alns::find_removed_info(	Ins::Vertex* y,	const std::vecto
 	return nullptr;
 }
 
+void Alns::repair_with_selection_and_insertion(	Sol& sol,	SelectionOp sel_op,	InsertionOp ins_op,	const std::vector<RemovedCustomer>& removed)
+{
+	while (true)
+	{
+		// only nodes that can actually be inserted with the chosen insertion operator
+		std::vector<Ins::Vertex*> pool =
+			collect_insertable_customers(sol, ins_op, removed);
+
+		if (pool.empty())
+			break;
+
+		// choose one insertable node according to the selected strategy
+		Ins::Vertex* y = apply_selection_operator_from_pool(sol, pool, sel_op, removed);
+		if (y == nullptr)
+			break;
+
+		// place it with the chosen insertion operator
+		GreedyInsertion insCand = apply_insertion_operator(sol, y, ins_op, removed);
+		if (!insCand.feasible)
+			break; // should normally not happen because pool was prefiltered
+
+		sol.insert_vertex(sol.tours[insCand.tour_idx], y, insCand.position);
+	}
+}
 
 GreedyInsertion Alns::best_position_insertion(const Sol& sol,Ins::Vertex* y,const std::vector<RemovedCustomer>& removed) const
 {
@@ -1730,7 +1769,6 @@ GreedyInsertion Alns::best_position_insertion(const Sol& sol,Ins::Vertex* y,cons
 	}
 	return best;
 }
-
 
 GreedyInsertion Alns::first_feasible_insertion(	const Sol& sol,	Ins::Vertex* y,	const std::vector<RemovedCustomer>& removed) const
 {
@@ -1917,7 +1955,6 @@ bool Alns::evaluate_insertion_position(
 	return true;
 }
 
-
 GreedyInsertion Alns::apply_insertion_operator(	const Sol& sol,	Ins::Vertex* y,	InsertionOp op,	const std::vector<RemovedCustomer>& removed) const
 {
 	switch (op)
@@ -1977,10 +2014,8 @@ void Alns::apply_local_search(Sol& sol)
 	}
 }
 
-void Alns::update_operator_weights()
+void Alns::update_operator_weights(double lambda)
 {
-	const double lambda = 0.8;
-
 	for (int i = 0; i < 7; ++i)
 	{
 		if (rem_used[i] > 0)
@@ -2012,20 +2047,20 @@ Res Alns::solve(int bestknown)
 	parallel_construct(s);
 	gb = s;
 
+	rem_w.fill(1.0); sel_w.fill(1.0); ins_w.fill(1.0);
+	rem_score.fill(0.0); sel_score.fill(0.0); ins_score.fill(0.0);
+	rem_used.fill(0); sel_used.fill(0); ins_used.fill(0);
+
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 
 	int noimpr = 0;
 
-	const double sigma1 = 8.0; // new global best
-	const double sigma2 = 4.0; // accepted improving current
-	const double sigma3 = 1.0; // accepted worse / non-improving
-	const int segment_len = 150; // iterations between weight updates
+	int total_it = segment_len * iter_per_segment;
 	// SA temperature
-	double T = 0.05 * std::max(1, s.score);
-	const double alpha = 0.995;
-
-	for (int iter = 0; iter < max_it; ++iter)
+	double T = temp_factor;
+	
+	for (int iter = 0; iter < total_it; ++iter)
 	{
 		Sol cand = s;
 		std::vector<RemovedCustomer> removed;
@@ -2039,7 +2074,7 @@ Res Alns::solve(int bestknown)
 			break;
 
 		// slightly more conservative than Hammami for your richer problem
-		int beta_max = std::min(4, std::max(1, (int)std::floor(0.15 * nVisited)));
+		int beta_max = std::max(1, (int)std::floor(beta_frac * nVisited));
 		std::uniform_int_distribution<int> beta_picker(1, beta_max);
 		int beta = beta_picker(engine);
 
@@ -2090,7 +2125,7 @@ Res Alns::solve(int bestknown)
 
 		if (accepted && improving_current)
 		{
-			apply_local_search(cand);
+			//apply_local_search(cand);
 		}
 
 		bool new_global_best = (cand.score > gb.score);
@@ -2122,24 +2157,25 @@ Res Alns::solve(int bestknown)
 		ins_score[ins_idx] += reward;
 
 		// ----- cool temperature -----
-		T *= alpha;
+		T = std::max(temp_min, T * alpha);
 
 		// ----- simple restart / reheat -----
-		if (noimpr > 200)
+		if (noimpr > iter_max_best)
 		{
 			s = gb;
 			noimpr = 0;
-			T = 0.05 * std::max(1, s.score);
+			T = temp_factor;
 		}
 
 		// ----- segment-based weight update -----
-		if ((iter + 1) % segment_len == 0)
+		if ((iter + 1) % iter_per_segment == 0)
 		{
-			update_operator_weights();
+			update_operator_weights(lambda);
 		}
 	}
 
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
+	gb.check();
 	return Res(gb, cpuTime, bestknown);
 }
 

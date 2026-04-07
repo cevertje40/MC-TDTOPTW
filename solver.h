@@ -144,10 +144,25 @@ int weighted_pick(const std::array<double, N>& w, std::mt19937& engine)
 	return (int)N - 1;
 }
 
+
+
+
 class Alns : public Moves
 {
 private:
-	int max_it;
+	double alpha; //cooling rate
+	int segment_len;// total number of run segments
+	int iter_per_segment;//iterations per segment
+	int iter_max_best; //number of iterations with the same global best before termination
+	double sigma1; //new global best
+	double sigma2 ; //accepted improving current
+	double sigma3; //accepted worst/ non-improving
+	double temp_factor; //initial temperature factor
+	double temp_min;//minimum temperature
+	double beta_frac; //fraction of visited customers
+	int beta_cap;// hard cap on beta
+	double lambda;//weight update learning rate
+
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
 
@@ -176,8 +191,6 @@ private:
 	std::vector<RemovedCustomer> largest_service_time_remove(Sol& sol, int beta);
 	std::vector<RemovedCustomer> random_route_remove(Sol& sol, int beta);
 
-
-	
 	//selection operators
 	std::vector<Ins::Vertex*> collect_available_customers(const Sol& sol) const;
 
@@ -190,6 +203,8 @@ private:
 	Ins::Vertex* apply_selection_operator_from_pool(const Sol& sol, const std::vector<Ins::Vertex*>& pool, SelectionOp sel_op, const std::vector<RemovedCustomer>& removed) const;
 
 	//insertion operators
+	
+
 	std::vector<double> collect_feasible_insertion_shifts(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
 	bool evaluate_insertion_position(const Sol& sol, Ins::Vertex* y, int d, int j, const std::vector<RemovedCustomer>& removed, GreedyInsertion& out) const;
 
@@ -203,20 +218,19 @@ private:
 
 	void apply_local_search(Sol& sol);
 
+	void repair_with_selection_and_insertion_improved(Sol& sol, SelectionOp sel_op, InsertionOp ins_op, const std::vector<RemovedCustomer>& removed);
+
+	std::vector<Ins::Vertex*> collect_insertable_customers(const Sol& sol, InsertionOp ins_op, const std::vector<RemovedCustomer>& removed) const;
 	void repair_with_selection_and_insertion(Sol& sol, SelectionOp sel_op, InsertionOp ins_op, const std::vector<RemovedCustomer>& removed);
-
-
 
 	//acceptance functions
 	bool accept_candidate(const Sol& cur, const Sol& cand, double T);
 
-	void update_operator_weights();
-
+	void update_operator_weights(double lambda);
 
 public:
-	Alns(Ins& ins, int max_it);
+	Alns(Ins& ins, int iter_max_best, double alpha, int segment_len, int iter_per_segment,double sigma1, double sigma2, double sigma3, double temp_factor,double temp_min, double beta_frac,double lambda);
 	Res solve(int bestknown = 1);
-
 };
 
 

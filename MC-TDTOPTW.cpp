@@ -335,6 +335,7 @@ void solve_dataset(int max_rep = 5)
 			//it->result[rep]=acs.solve(it->bestscore);
 			Tabu tabu(instance, 10000,2,0.1,0.9,10);
 			it->result[rep] = tabu.solve(it->bestknown);
+			it->result[rep].sol.write_to_cplex(textfile.name);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
@@ -450,20 +451,21 @@ void case_study(int max_rep = 5)
 void debug_instance()
 {
 	Res resdebug;
-	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.1.1.1.txt" };
+	Ins::MCTDTOPTW textfile = { "..\\..\\datasets\\MCTDTOPTW\\" ,"20.3.2.1.txt" };
 	Ins instance(textfile);
 	instance.read_time_independent_traveltime();
 	instance.read_time_dependent_traveltime();
 	instance.create_neighbourhood(textfile.path, textfile.name);
 	//Aco acs(instance, 1, 3, 0.01, 20, 10000, 0.25, 0.05);
 	//resdataset.push_back(acs.solve());
-	//Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
-	//resdebug=tabu.solve(250);
+	Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
+	resdebug=tabu.solve(416);
+	resdebug.sol.write_to_cplex(textfile.name);
 	//Ils ils(instance, 10000, 100, 20, 30);
 	//resdataset.push_back(ils.solve());
-	Alns alns(instance, 5000, 0.9997, 150, 1500, 8.0, 4.0, 1.0, 100.0, 0.0001, 0.15, 0.8);
-	resdebug = alns.solve(250);
-	cout << " best score: " << 894 << " score: "<< resdebug.sol.score << " cpu time: " << resdebug.time << " gap: " << resdebug.gap << endl;
+	//Alns alns(instance, 5000, 0.9997, 150, 1500, 8.0, 4.0, 1.0, 100.0, 0.0001, 0.15, 0.8);
+	//resdebug = alns.solve(250);
+	cout << " best score: " << 416 << " score: "<< resdebug.sol.score << " cpu time: " << resdebug.time << " gap: " << resdebug.gap << endl;
 }
 
 void doe(int max_rep = 10)
@@ -763,9 +765,9 @@ int main()
 {
 	//create_case_dataset();
 	//Graph bemobile(425479, 519915);
-	//debug_instance();
+	debug_instance();
 	//debug_ctop();
-	solve_dataset(1);
+	//solve_dataset(1);
 	//ctop_gap(1);
 	//doe(5);
 	//doe2(5);

@@ -53,7 +53,7 @@ public:
 	bool check();
 	void read_from_file();
 	void write_to_file();
-	void write_to_cplex();
+	void write_to_cplex(const std::string& dataset);
 	void check_availability();
 	
 	int repair();

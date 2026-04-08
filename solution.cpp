@@ -151,40 +151,62 @@ void Sol::write_to_file()
 	output.close();
 }
 
-void Sol::write_to_cplex()
+void Sol::write_to_cplex(const std::string& dataset)
 {
-	ofstream output;
-	string name = "sol_" + to_string(ins->maxvertices)+ ".txt";
-	output.open(name, ios::out);
+	std::ofstream output;
+	std::string name = "sol_" + dataset;   
+	output.open(name, std::ios::out);
+
+	if (!output.is_open())
+	{
+		std::cerr << "Could not open " << name << " for writing.\n";
+		return;
+	}
+
 	output << score << "\n";
+
 	for (int t = 0; t < ins->maxtours; ++t)
 	{
 		Sol::Tour* tour = &tours[t];
-		output << tour->seq.size()<<" ";
-		for (int i = 0; i < tour->seq.size(); ++i)
+		const int size = static_cast<int>(tour->seq.size());
+
+		// 1) route size
+		output << size << " ";
+
+		// 2) vertex sequence
+		for (int i = 0; i < size; ++i)
 		{
 			output << tour->seq[i]->index << " ";
 		}
 		output << "\n";
-		for (int i = 0; i < tour->seq.size(); ++i)
+
+		// 3) departure times for arcs: one value per arc (size - 1 values)
+		// deptime[a] is the departure/service completion time at seq[a],
+		// corresponding to arc (seq[a], seq[a+1]).
+		for (int a = 0; a < size - 1; ++a)
 		{
-			output << time_periods[0] + tour->deptime[i] << " ";
+			output << tour->deptime[a] << " ";
 		}
 		output << "\n";
-		for (int i = 0; i < tour->seq.size(); ++i)
+
+		// 4) time slots for arcs: one value per arc (size - 1 values)
+		for (int a = 0; a < size - 1; ++a)
 		{
-			output << ins->find_t(time_periods[0] + tour->deptime[i])<<" ";
+			double abs_departure = ins->t[t].EDT + tour->deptime[a];
+			output << ins->find_t(abs_departure) << " ";
 		}
 		output << "\n";
-		for (int i = 0; i < tour->seq.size(); ++i)
+
+		// 5) one break vertex index
+		// CPLEX expects q[p][breakvertex[p]] = 1
+		int breakvertex = 0;
+		if (tour->breakindex >= 0 && tour->breakindex < size)
 		{
-			if (tour->action[i] == 1)
-			{
-				output << tour->seq[i]->index << endl;
-			}
+			breakvertex = tour->seq[tour->breakindex]->index;
 		}
-		output << "\n";
+		output << breakvertex << "\n";
 	}
+
 	output.close();
 }
 

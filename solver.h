@@ -82,7 +82,7 @@ public:
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
 	void perturbe(Sol& sol);
-	Res solve(int bestknown = 1);
+	Res solve(int bestknown = 1, double max_time_sec=5.0);
 	std::string name = "Tabu";
 };
 
@@ -230,7 +230,7 @@ private:
 
 public:
 	Alns(Ins& ins, int iter_max_best, double alpha, int segment_len, int iter_per_segment,double sigma1, double sigma2, double sigma3, double temp_factor,double temp_min, double beta_frac,double lambda);
-	Res solve(int bestknown = 1);
+	Res solve(int bestknown = 1, double max_time_sec=5.0);
 };
 
 

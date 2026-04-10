@@ -704,12 +704,23 @@ inline Pressures compute_pressures(const Sol& s) {
 	return { t_p, w_p, v_p };
 }
 
-Res Tabu::solve(int bestknown)
+Res Tabu::solve(int bestknown, double max_time_sec)
 {
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 	s.reset();
 	//s.write_to_file();
+
+	auto elapsed_sec = [&]() -> double
+		{
+			return std::chrono::duration<double>(clock::now() - t0).count();
+		};
+
+	auto time_up = [&]() -> bool
+		{
+			return elapsed_sec() >= max_time_sec;
+		};
+
 	parallel_construct(s);
 	gb = s;//set global best to initial solution
 	ElitePool elites;
@@ -737,7 +748,7 @@ Res Tabu::solve(int bestknown)
 	double restart_dist_sum = 0.0;
 
 
-	while (noimpr < max_noimpr)
+	while (noimpr < max_noimpr && !time_up())
 	{
 		if (gb.score == ins->maxscore)
 		{
@@ -2041,8 +2052,21 @@ void Alns::update_operator_weights(double lambda)
 	}
 }
 
-Res Alns::solve(int bestknown)
+Res Alns::solve(int bestknown, double max_time_sec)
 {
+	using clock = std::chrono::steady_clock;
+	auto t0 = clock::now();
+
+	auto elapsed_sec = [&]() -> double
+		{
+			return std::chrono::duration<double>(clock::now() - t0).count();
+		};
+
+	auto time_up = [&]() -> bool
+		{
+			return elapsed_sec() >= max_time_sec;
+		};
+
 	s.reset();
 	parallel_construct(s);
 	gb = s;
@@ -2051,8 +2075,7 @@ Res Alns::solve(int bestknown)
 	rem_score.fill(0.0); sel_score.fill(0.0); ins_score.fill(0.0);
 	rem_used.fill(0); sel_used.fill(0); ins_used.fill(0);
 
-	using clock = std::chrono::steady_clock;
-	auto t0 = clock::now();
+	
 
 	int noimpr = 0;
 
@@ -2062,6 +2085,10 @@ Res Alns::solve(int bestknown)
 	
 	for (int iter = 0; iter < total_it; ++iter)
 	{
+		if (time_up())
+		{
+			break;
+		}
 		Sol cand = s;
 		std::vector<RemovedCustomer> removed;
 

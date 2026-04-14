@@ -880,7 +880,7 @@ void Ins::read_neighbourhood(string path,string name)
 void Ins::alter_instance()
 {
 	breakdur = 0.0;
-	/*
+	
 	for (int i = 0; i < maxvertices; ++i)
 	{
 		for (int j = 0; j < maxvertices; ++j)
@@ -890,21 +890,23 @@ void Ins::alter_instance()
 				if (t == maxtimeslots - 1)
 				{
 					v[i].con[j]->mu[t]=0.0;
+					v[i].con[j]->oneplusmu[t] = 1.0;
 					v[i].con[j]->nu[t]=v[i].con[j]->determin;
 				}
 				else
 				{
 					v[i].con[j]->mu[t]=0.0;
+					v[i].con[j]->oneplusmu[t] = 1.0;
 					v[i].con[j]->nu[t]=v[i].con[j]->determin;
 				}
 			}
 		}
 	}
-	*/
+	
 }
 
 void Ins::unalter_instance()
 {
 	breakdur = 0.75;
-	//read_time_dependent_traveltime();
+	read_time_dependent_traveltime();
 }

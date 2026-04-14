@@ -221,17 +221,126 @@ void Sol::check_availability()
 	}
 }
 
-int Sol::repair()
+
+SolutionPerfStats Sol::repair_and_collect_stats()
 {
-	int total_removed = 0;
-	for (int t = 0; t < ins->maxtours; ++t) {
-		Sol::Tour* tour = &tours[t];
-		auto result = tour->repair();
-		score -= result.first;      // subtract score decrease
-		total_removed += result.second; // accumulate removed vertices
+	SolutionPerfStats stats;
+	stats.route_stats.reserve(ins->maxtours);
+
+	int removed_score_sum = 0;
+	double removed_tw_width_sum = 0.0;
+	double removed_service_sum = 0.0;
+	double removed_weight_sum = 0.0;
+	double removed_volume_sum = 0.0;
+	double removed_depot_tt_sum = 0.0;
+	double removed_position_sum = 0.0;
+
+	double sum_route_duration = 0.0;
+	double sum_route_time_util = 0.0;
+	double sum_weight_util = 0.0;
+	double sum_volume_util = 0.0;
+	double sum_wait_per_customer = 0.0;
+	double sum_break_start = 0.0;
+	double sum_break_pos = 0.0;
+
+	int routes_with_break_start = 0;
+	int routes_with_break_pos = 0;
+	int routes_break_at_end = 0;
+
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Tour* tour = &tours[t];
+
+		RemovedVertexStats removed_stats;
+		auto result = tour->repair(removed_stats);
+
+		score -= result.first;
+
+		RoutePerfStats r = tour->collect_route_stats();
+		r.removed = removed_stats;
+		stats.route_stats.push_back(r);
+
+		stats.total_removed_customers += removed_stats.removed_count;
+
+		removed_score_sum += removed_stats.removed_score_sum;
+		removed_tw_width_sum += removed_stats.removed_tw_width_sum;
+		removed_service_sum += removed_stats.removed_service_sum;
+		removed_weight_sum += removed_stats.removed_weight_sum;
+		removed_volume_sum += removed_stats.removed_volume_sum;
+		removed_depot_tt_sum += removed_stats.removed_depot_tt_sum;
+		removed_position_sum += removed_stats.removed_position_sum;
 	}
-	std::cout << "Vertices removed in repair: " << total_removed << std::endl;
-	return total_removed;
+
+	for (const auto& r : stats.route_stats)
+	{
+		stats.total_score += r.collected_score;
+		stats.total_served_customers += r.served_customers;
+
+		sum_route_duration += r.route_duration;
+		sum_route_time_util += r.route_time_utilization;
+		sum_weight_util += r.weight_utilization;
+		sum_volume_util += r.volume_utilization;
+		sum_wait_per_customer += r.avg_waiting_time_per_customer;
+
+		if (r.break_start_time >= 0.0)
+		{
+			sum_break_start += r.break_start_time;
+			routes_with_break_start++;
+		}
+		if (r.break_position_norm >= 0.0)
+		{
+			sum_break_pos += r.break_position_norm;
+			routes_with_break_pos++;
+		}
+		if (r.break_at_end_depot)
+		{
+			routes_break_at_end++;
+		}
+	}
+
+	const int nRoutes = static_cast<int>(stats.route_stats.size());
+
+	if (stats.total_served_customers > 0)
+	{
+		stats.avg_score_per_served_customer =
+			static_cast<double>(stats.total_score) / stats.total_served_customers;
+	}
+
+	if (nRoutes > 0)
+	{
+		stats.avg_route_duration = sum_route_duration / nRoutes;
+		stats.avg_route_time_utilization = sum_route_time_util / nRoutes;
+		stats.avg_weight_utilization = sum_weight_util / nRoutes;
+		stats.avg_volume_utilization = sum_volume_util / nRoutes;
+		stats.avg_waiting_time_per_customer = sum_wait_per_customer / nRoutes;
+		stats.pct_break_at_end_depot = 100.0 * static_cast<double>(routes_break_at_end) / nRoutes;
+	}
+
+	if (routes_with_break_start > 0)
+		stats.avg_break_start_time = sum_break_start / routes_with_break_start;
+
+	if (routes_with_break_pos > 0)
+		stats.avg_break_position_norm = sum_break_pos / routes_with_break_pos;
+
+	if (stats.total_removed_customers > 0)
+	{
+		stats.avg_removed_score =
+			static_cast<double>(removed_score_sum) / stats.total_removed_customers;
+		stats.avg_removed_tw_width =
+			removed_tw_width_sum / stats.total_removed_customers;
+		stats.avg_removed_service =
+			removed_service_sum / stats.total_removed_customers;
+		stats.avg_removed_weight =
+			removed_weight_sum / stats.total_removed_customers;
+		stats.avg_removed_volume =
+			removed_volume_sum / stats.total_removed_customers;
+		stats.avg_removed_depot_tt =
+			removed_depot_tt_sum / stats.total_removed_customers;
+		stats.avg_removed_position =
+			removed_position_sum / stats.total_removed_customers;
+	}
+
+	return stats;
 }
 
 ostream& operator<<(ostream& output, Sol& sol)
@@ -1005,7 +1114,7 @@ bool Tour::check()
 	return tourok;
 }//end tour check
 
-pair<int, int> Tour::repair()
+std::pair<int, int> Tour::repair(RemovedVertexStats& removed_stats)
 {
 	int scoredecrease = 0;
 	int removed = 0;
@@ -1040,7 +1149,26 @@ pair<int, int> Tour::repair()
 		end = static_cast<int>(seq.size()) - 1;
 		if (end <= 1) break; // no regular vertices left
 
-		scoredecrease += seq[end - 1]->score;
+		Ins::Vertex* removed_vertex = seq[end - 1];
+
+		// log removed-customer characteristics
+		removed_stats.removed_count++;
+		removed_stats.removed_score_sum += removed_vertex->score;
+		removed_stats.removed_service_sum += removed_vertex->serv;
+		removed_stats.removed_weight_sum += removed_vertex->weight;
+		removed_stats.removed_volume_sum += removed_vertex->volume;
+		removed_stats.removed_tw_width_sum += (removed_vertex->UTW[index] - removed_vertex->LTW[index]);
+
+		// time-independent depot travel time from start depot to removed customer
+		Ins::Vertex* start_depot = seq.front();
+		removed_stats.removed_depot_tt_sum += start_depot->con[removed_vertex->index]->determin;
+
+		// normalized position in route among current regular vertices
+		int served_before = std::max(1, static_cast<int>(seq.size()) - 2);
+		double pos_norm = static_cast<double>(end - 1) / served_before;
+		removed_stats.removed_position_sum += pos_norm;
+
+		scoredecrease += removed_vertex->score;
 		++removed;
 		remove_vertex(end - 1);
 
@@ -1072,6 +1200,87 @@ pair<int, int> Tour::repair()
 
 	return { scoredecrease, removed };
 }
+
+RoutePerfStats Tour::collect_route_stats() const
+{
+	RoutePerfStats s;
+
+	s.collected_score = score;
+	s.served_customers = std::max(0, static_cast<int>(seq.size()) - 2);
+
+	s.route_time_budget = ins->t[index].T_max;
+
+	double currenttime = ins->t[index].EDT + deptime[0];
+	double total_waiting = 0.0;
+	double break_start_abs = -1.0;
+
+	int end = static_cast<int>(seq.size()) - 1;
+
+	for (int i = 0; i < end; ++i)
+	{
+		Ins::Vertex* last = seq[i];
+		Ins::Vertex* current = seq[i + 1];
+		int breakcurrent = action[i + 1];
+
+		double raw_arrival = ins->arrival_time(last->con[current->index], currenttime);
+
+		if (breakcurrent == 1 && break_start_abs < 0.0)
+		{
+			break_start_abs = raw_arrival;
+		}
+
+		double adjusted_arrival = raw_arrival;
+		if (adjusted_arrival + breakcurrent * ins->breakdur < current->LTW[index])
+		{
+			double waiting_here = current->LTW[index] - (adjusted_arrival + breakcurrent * ins->breakdur);
+			total_waiting += waiting_here;
+			adjusted_arrival = current->LTW[index] - breakcurrent * ins->breakdur;
+		}
+
+		currenttime = adjusted_arrival + current->serv + breakcurrent * ins->breakdur;
+	}
+
+	s.route_duration = currenttime - ins->t[index].EDT;
+	if (s.route_time_budget > 1e-9)
+		s.route_time_utilization = s.route_duration / s.route_time_budget;
+
+	s.weight_used = weight;
+	s.weight_capacity = ins->t[index].W_max;
+	if (s.weight_capacity > 1e-9)
+		s.weight_utilization = s.weight_used / s.weight_capacity;
+
+	s.volume_used = volume;
+	s.volume_capacity = ins->t[index].V_max;
+	if (s.volume_capacity > 1e-9)
+		s.volume_utilization = s.volume_used / s.volume_capacity;
+
+	s.total_waiting_time = total_waiting;
+	if (s.served_customers > 0)
+		s.avg_waiting_time_per_customer = total_waiting / s.served_customers;
+
+	s.break_taken = (breakindex >= 0 && breakindex < static_cast<int>(seq.size()));
+	s.break_at_end_depot = (breakindex == static_cast<int>(seq.size()) - 1);
+
+	if (break_start_abs >= 0.0)
+	{
+		s.break_start_time = break_start_abs - ins->t[index].EDT;
+	}
+
+	if (s.served_customers > 0 && s.break_taken)
+	{
+		// normalize by number of customer visits
+		if (breakindex <= 0)
+			s.break_position_norm = 0.0;
+		else if (breakindex >= static_cast<int>(seq.size()) - 1)
+			s.break_position_norm = 1.0;
+		else
+			s.break_position_norm = static_cast<double>(breakindex) / s.served_customers;
+	}
+
+	return s;
+}
+
+
 
 void Sol::insert_vertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)
 {

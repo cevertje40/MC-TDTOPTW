@@ -334,6 +334,7 @@ void solve_dataset(int max_rep = 5)
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
 			
+
 			double maxtime;
 			if (instance.maxvertices == 20)
 				maxtime = 1;
@@ -394,8 +395,8 @@ void case_study(int max_rep = 5)
 	}
 	ofstream output;
 	output.open("output.txt", ios::out);
-	output << "solution methods for the CTOP \n";
-	output << "filename,bestscore,score,cpu,gap,removed\n";
+	output << "case study results \n";
+	output << "filename;bestscore;score;cpu;gap;total_served_customers;total_removed_customers;avg_score_per_served_customer;avg_route_duration;avg_route_time_utilization;avg_weight_utilization;avg_volume_utilization;avg_waiting_time_per_customer;avg_break_start_time;avg_break_position_norm;pct_break_at_end_depot;avg_removed_score;avg_removed_tw_width;avg_removed_service;avg_removed_weight;avg_removed_volume;avg_removed_depot_tt;avg_removed_position\n";
 	output.close();
 	vector<Instance> dataset = read_dataset(filename);
 	vector<Instance>::iterator it;
@@ -407,8 +408,6 @@ void case_study(int max_rep = 5)
 	for (int rep = 0; rep < max_rep; ++rep)
 	{
 		//solve the dataset
-		double avggap = 0.0;
-		double avgscore = 0.0;
 		for (it = dataset.begin(); it != dataset.end(); ++it)
 		{
 			Ins::MCTDTOPTW textfile = { it->path,it->filename };
@@ -416,48 +415,174 @@ void case_study(int max_rep = 5)
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
 			instance.create_neighbourhood(textfile.path, textfile.name);
-			//instance.alter_instance();
-			//Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
-			//it->result[rep] = tabu.solve(it->bestknown);
-			//instance.unalter_instance();
+			instance.alter_instance();
+			Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
+			it->result[rep] = tabu.solve(it->bestknown);
+			//Alns alns(instance,5000,0.9997,150,200,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
+			//it->result[rep] = alns.solve(it->bestknown);
+			instance.unalter_instance();
 			//cout << "after repair" << endl;
-			//it->result[rep].removed=it->result[rep].sol.repair();
-			Alns alns(instance,5000,0.9997,150,200,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
-			it->result[rep] = alns.solve(it->bestknown);
+		
+			it->result[rep].stats = it->result[rep].sol.repair_and_collect_stats();
+
+			cout << "name: " << it->filename
+				<< " best score: " << it->bestknown
+				<< " score: " << it->result[rep].sol.score
+				<< " cpu time: " << it->result[rep].time
+				<< " gap: " << it->result[rep].gap
+				<< " served: " << it->result[rep].stats.total_served_customers
+				<< " removed: " << it->result[rep].stats.total_removed_customers
+				<< " avg score/ served customer: " << it->result[rep].stats.avg_score_per_served_customer
+				<< " avg route duration: " << it->result[rep].stats.avg_route_duration
+				<< " avg route time utilization: " << it->result[rep].stats.avg_route_time_utilization
+				<< " avg weight utilization: " << it->result[rep].stats.avg_weight_utilization
+				<< " avg volume utilization: " << it->result[rep].stats.avg_volume_utilization
+				<< " avg waiting time/customer: " << it->result[rep].stats.avg_waiting_time_per_customer
+				<< " avg break start time: " << it->result[rep].stats.avg_break_start_time
+				<< " avg break position norm: " << it->result[rep].stats.avg_break_position_norm
+				<< " pct break at end depot: " << it->result[rep].stats.pct_break_at_end_depot
+				<< " avg removed score: " << it->result[rep].stats.avg_removed_score
+				<< " avg removed tw width: " << it->result[rep].stats.avg_removed_tw_width
+				<< " avg removed service: " << it->result[rep].stats.avg_removed_service
+				<< " avg removed weight: " << it->result[rep].stats.avg_removed_weight
+				<< " avg removed volume: " << it->result[rep].stats.avg_removed_volume
+				<< " avg removed depot tt: " << it->result[rep].stats.avg_removed_depot_tt
+				<< " avg removed position: " << it->result[rep].stats.avg_removed_position
+				<< endl;
+			
 			cout << it->result[rep].sol << endl;
-			avggap += it->result[rep].gap;
-			avgscore += it->result[rep].sol.score;
-			cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap<<" removed: "<< it->result[rep].removed << endl;
 			output.open("output.txt", ios::out | ios::app);
-			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap<< ";" << it->result[rep].removed << "\n";
+			output << it->filename << ";"
+				<< it->bestknown << ";"
+				<< it->result[rep].sol.score << ";"
+				<< it->result[rep].time << ";"
+				<< it->result[rep].gap << ";"
+				<< it->result[rep].stats.total_served_customers << ";"
+				<< it->result[rep].stats.total_removed_customers << ";"
+				<< it->result[rep].stats.avg_score_per_served_customer << ";"
+				<< it->result[rep].stats.avg_route_duration << ";"
+				<< it->result[rep].stats.avg_route_time_utilization << ";"
+				<< it->result[rep].stats.avg_weight_utilization << ";"
+				<< it->result[rep].stats.avg_volume_utilization << ";"
+				<< it->result[rep].stats.avg_waiting_time_per_customer << ";"
+				<< it->result[rep].stats.avg_break_start_time << ";"
+				<< it->result[rep].stats.avg_break_position_norm << ";"
+				<< it->result[rep].stats.pct_break_at_end_depot << ";"
+				<< it->result[rep].stats.avg_removed_score << ";"
+				<< it->result[rep].stats.avg_removed_tw_width << ";"
+				<< it->result[rep].stats.avg_removed_service << ";"
+				<< it->result[rep].stats.avg_removed_weight << ";"
+				<< it->result[rep].stats.avg_removed_volume << ";"
+				<< it->result[rep].stats.avg_removed_depot_tt << ";"
+				<< it->result[rep].stats.avg_removed_position << ";"
+				<< "\n";
 			output.close();
 		}
 	}
 	//calculate results over all replicates
 	double globalgap = 0.0;
 	output.open("output.txt", ios::out | ios::app);
+	output << "\nsummary over replications\n";
+	output << "filename;avg_score;avg_cpu;avg_removed;avg_served;avg_score_per_customer;avg_route_duration;avg_route_util;avg_weight_util;avg_volume_util;avg_waiting_per_customer;avg_break_start;avg_break_pos;avg_pct_break_end_depot;avg_removed_score;avg_removed_tw;avg_removed_service;avg_removed_weight;avg_removed_volume;avg_removed_depot_tt;avg_removed_position\n";
+
 	for (it = dataset.begin(); it != dataset.end(); ++it)
 	{
 		double avgscore = 0.0;
 		double avgcpu = 0.0;
 		double avgremoved = 0.0;
+		double avgserved = 0.0;
+		double avgscorepercust = 0.0;
+		double avgroute_duration = 0.0;
+		double avgrouteutil = 0.0;
+		double avgweightutil = 0.0;
+		double avgvolumeutil = 0.0;
+		double avgwait = 0.0;
+		double avgbreakstart = 0.0;
+		double avgbreakpos = 0.0;
+		double avgpctbreakend = 0.0;
+		double avgremovedscore = 0.0;
+		double avgremovedtw = 0.0;
+		double avgremovedservice = 0.0;
+		double avgremovedweight = 0.0;
+		double avgremovedvolume = 0.0;
+		double avgremoveddepot = 0.0;
+		double avgremovedposition = 0.0;
+
 		for (int rep = 0; rep < max_rep; ++rep)
 		{
 			avgscore += it->result[rep].sol.score;
 			avgcpu += it->result[rep].time;
-			avgremoved += it->result[rep].removed;
+			avgremoved += it->result[rep].stats.total_removed_customers;
+			avgserved += it->result[rep].stats.total_served_customers;
+			avgscorepercust += it->result[rep].stats.avg_score_per_served_customer;
+			avgroute_duration += it->result[rep].stats.avg_route_duration;
+			avgrouteutil += it->result[rep].stats.avg_route_time_utilization;
+			avgweightutil += it->result[rep].stats.avg_weight_utilization;
+			avgvolumeutil += it->result[rep].stats.avg_volume_utilization;
+			avgwait += it->result[rep].stats.avg_waiting_time_per_customer;
+			avgbreakstart += it->result[rep].stats.avg_break_start_time;
+			avgbreakpos += it->result[rep].stats.avg_break_position_norm;
+			avgpctbreakend += it->result[rep].stats.pct_break_at_end_depot;
+			avgremovedscore += it->result[rep].stats.avg_removed_score;
+			avgremovedtw += it->result[rep].stats.avg_removed_tw_width;
+			avgremovedservice += it->result[rep].stats.avg_removed_service;
+			avgremovedweight += it->result[rep].stats.avg_removed_weight;
+			avgremovedvolume += it->result[rep].stats.avg_removed_volume;
+			avgremoveddepot += it->result[rep].stats.avg_removed_depot_tt;
+			avgremovedposition += it->result[rep].stats.avg_removed_position;
 		}
+
 		avgscore /= max_rep;
 		avgcpu /= max_rep;
 		avgremoved /= max_rep;
-		output << it->filename << ";" << avgscore << ";" << avgcpu << " ; " << avgremoved<< "\n";
-		double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100;
+		avgserved /= max_rep;
+		avgscorepercust /= max_rep;
+		avgroute_duration /= max_rep;
+		avgrouteutil /= max_rep;
+		avgweightutil /= max_rep;
+		avgvolumeutil /= max_rep;
+		avgwait /= max_rep;
+		avgbreakstart /= max_rep;
+		avgbreakpos /= max_rep;
+		avgpctbreakend /= max_rep;
+		avgremovedscore /= max_rep;
+		avgremovedtw /= max_rep;
+		avgremovedservice /= max_rep;
+		avgremovedweight /= max_rep;
+		avgremovedvolume /= max_rep;
+		avgremoveddepot /= max_rep;
+		avgremovedposition /= max_rep;
+
+		output << it->filename << ";"
+			<< avgscore << ";"
+			<< avgcpu << ";"
+			<< avgremoved << ";"
+			<< avgserved << ";"
+			<< avgscorepercust << ";"
+			<< avgroute_duration << ";"
+			<< avgrouteutil << ";"
+			<< avgweightutil << ";"
+			<< avgvolumeutil << ";"
+			<< avgwait << ";"
+			<< avgbreakstart << ";"
+			<< avgbreakpos << ";"
+			<< avgpctbreakend << ";"
+			<< avgremovedscore << ";"
+			<< avgremovedtw << ";"
+			<< avgremovedservice << ";"
+			<< avgremovedweight << ";"
+			<< avgremovedvolume << ";"
+			<< avgremoveddepot << ";"
+			<< avgremovedposition
+			<< "\n";
+
+		double avggap = (double(it->bestknown - avgscore) / it->bestknown) * 100.0;
 		globalgap += avggap;
 	}
+
 	output.close();
 	globalgap /= dataset.size();
 	cout << "global avg gap is: " << globalgap << endl;
-
 }
 
 void debug_instance()
@@ -779,11 +904,11 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	solve_dataset(5);
+	//solve_dataset(5);
 	//ctop_gap(1);
 	//doe(5);
 	//doe2(5);
-	//case_study(1);
+	case_study(1);
 
 
 }

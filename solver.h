@@ -9,7 +9,7 @@ public:
 	Sol sol;
 	double time;
 	double gap;
-	int removed;
+	SolutionPerfStats stats;
 	Res() {}
 	Res(Sol sol, double& time) :sol(sol), time(time), gap(0.0) {}
 	Res(Sol sol, double& time, int& bestknown) :sol(sol), time(time)
@@ -82,7 +82,7 @@ public:
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
 	void perturbe(Sol& sol);
-	Res solve(int bestknown = 1, double max_time_sec=5.0);
+	Res solve(int bestknown = 1, double max_time_sec=1000.0);
 	std::string name = "Tabu";
 };
 

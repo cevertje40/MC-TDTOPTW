@@ -344,14 +344,14 @@ void solve_dataset(int max_rep = 5)
 				maxtime = 5.0;
 
 
-			//Tabu tabu(instance, 50000, 2, 0.1, 0.9, 10);
-			//it->result[rep] = tabu.solve(it->bestknown,maxtime);
+			Tabu tabu(instance, 50000, 2, 0.1, 0.9, 10);
+			it->result[rep] = tabu.solve(it->bestknown,maxtime);
 			//it->result[rep].sol.write_to_cplex(textfile.name);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Alns alns(instance,5000,0.9997,150,500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
-			it->result[rep] = alns.solve(it->bestknown,maxtime);
+			//Alns alns(instance,5000,0.9997,150,500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
+			//it->result[rep] = alns.solve(it->bestknown,maxtime);
 
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
@@ -415,12 +415,12 @@ void case_study(int max_rep = 5)
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
 			instance.create_neighbourhood(textfile.path, textfile.name);
-			instance.alter_instance();
+			//instance.alter_instance();
 			Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
 			it->result[rep] = tabu.solve(it->bestknown);
 			//Alns alns(instance,5000,0.9997,150,200,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
 			//it->result[rep] = alns.solve(it->bestknown);
-			instance.unalter_instance();
+			//instance.unalter_instance();
 			//cout << "after repair" << endl;
 		
 			it->result[rep].stats = it->result[rep].sol.repair_and_collect_stats();
@@ -904,11 +904,11 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(5);
-	//ctop_gap(1);
+	solve_dataset(1);
+	//ctop_gap(5);
 	//doe(5);
 	//doe2(5);
-	case_study(1);
+	//case_study(10);
 
 
 }

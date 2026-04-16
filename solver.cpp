@@ -615,7 +615,7 @@ Res Ils::solve(int bestknown)
 }
 
 
-Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it, double ema_rho, double thresh, double gamma) : Moves(ins), max_noimpr(max_noimpr), nb_tabu_it(nb_tabu_it), EMA_RHO(ema_rho), THRESH(thresh), GAMMA(gamma)
+Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it, double ema_rho, double thresh, double gamma) : Moves(ins), max_noimpr(max_noimpr), nb_tabu_it(nb_tabu_it), ema_rho(ema_rho), thresh(thresh), gamma(gamma)
 {
 	gb = Sol(ins);//best sol
 	s = Sol(ins);//iter sol
@@ -730,9 +730,7 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 	enum Crit { SCORE = 0, TIME = 1, VOLUME = 2, WEIGHT = 3, N_CRIT = 4 };
 	struct CritStats { double ema_gain = 0.0; long used = 0; };
 	std::array<CritStats, N_CRIT> crit_stats{};
-	const double EMA_RHO = 0.1; //	learning rate for exponential moving average of gains
-	const double THRESH = 0.80;   // start biasing after 80% utilization
-	const double GAMMA = 5;    // bias strength
+
 	const double EPS_GAIN = 1e-6;// to avoid zero gains
 
 	uniform_int_distribution<> nbpicker(1,3);//random move selector
@@ -760,9 +758,9 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		//select criterion based on constraint pressure
 		auto P = compute_pressures(s);
 		auto ctx_mult = [&](int crit)->double {
-			if (crit == TIME)   return 1.0 + std::max(0.0, P.time_p - THRESH) * GAMMA;
-			if (crit == VOLUME) return 1.0 + std::max(0.0, P.volume_p - THRESH) * GAMMA;
-			if (crit == WEIGHT) return 1.0 + std::max(0.0, P.weight_p - THRESH) * GAMMA;
+			if (crit == TIME)   return 1.0 + std::max(0.0, P.time_p - thresh) * gamma;
+			if (crit == VOLUME) return 1.0 + std::max(0.0, P.volume_p - thresh) * gamma;
+			if (crit == WEIGHT) return 1.0 + std::max(0.0, P.weight_p - thresh) * gamma;
 			return 1.0; // SCORE neutral
 			};
 
@@ -938,14 +936,14 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		{
 			double gain = std::max(0, s.score - prev_score);
 			crit_stats[crit_id].ema_gain =
-				(1.0 - EMA_RHO) * crit_stats[crit_id].ema_gain + EMA_RHO * gain;
+				(1.0 - ema_rho) * crit_stats[crit_id].ema_gain + ema_rho * gain;
 			crit_stats[crit_id].used++;
 		}
 		else 
 		{
 			// gentle global decay
 			for (int c = 0; c < N_CRIT; ++c)
-				crit_stats[c].ema_gain *= (1.0 - 0.05 * EMA_RHO);
+				crit_stats[c].ema_gain *= (1.0 - 0.05 * ema_rho);
 		}
 		if (s.score > gb.score)
 		{

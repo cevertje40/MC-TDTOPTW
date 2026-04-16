@@ -908,5 +908,7 @@ void Ins::alter_instance()
 void Ins::unalter_instance()
 {
 	breakdur = 0.75;
+	
 	read_time_dependent_traveltime();
+	
 }

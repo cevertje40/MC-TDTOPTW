@@ -70,9 +70,9 @@ class Tabu : public Moves
 private:
 	int max_noimpr;
 	int nb_tabu_it;
-	double EMA_RHO; //	learning rate for exponential moving average of gains
-	double THRESH;  // start biasing after 80% utilization
-	double GAMMA;  // bias strength
+	double ema_rho; //	learning rate for exponential moving average of gains
+	double thresh;  // start biasing after 80% utilization
+	double gamma;  // bias strength
 	
 	Sol s;//current iteration solution
 	Sol gb;//global best solution

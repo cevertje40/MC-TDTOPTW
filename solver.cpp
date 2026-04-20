@@ -709,6 +709,8 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 	s.reset();
+	//s.read_from_file();
+	//s.check();
 	//s.write_to_file();
 
 	auto elapsed_sec = [&]() -> double
@@ -723,6 +725,7 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 
 	parallel_construct(s);
 	gb = s;//set global best to initial solution
+	//gb.check();
 	ElitePool elites;
 	elites.consider(s, ins->maxvertices);
 
@@ -812,6 +815,11 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		int pick=nbpicker(engine);
 		//int pick = 2;//to debug
 		//build admissable neighborhoods using the selected neighborhoodstructure
+		if (!s.check())
+		{
+			cout << "error before replace: " << pick << endl;
+		}
+		
 		switch (pick)
 		{
 			case 1:
@@ -872,12 +880,12 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 				break;
 			}
 		}//end switch
-		/*
+		
 		if (!s.check())
 		{
-			cout << "error in replace: " << pick << endl;
+			cout << "error after replace: " << pick << endl;
 		}
-		*/
+		
 		if (no_feasible_moves_in_a_row > 5) 
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
@@ -930,6 +938,12 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 				}
 			}
 		}
+
+		if (!s.check())
+		{
+			cout << "error after rvnd: " << pick << endl;
+		}
+
 		//update constraint pressure
 		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 

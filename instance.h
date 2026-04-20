@@ -1,6 +1,7 @@
 #pragma once
 #include "graph.h"
 
+
 class Ins//problem instance class that stores all required information
 {
 public:
@@ -14,6 +15,48 @@ public:
 	struct CTOP {
 		std::string path;
 		std::string name;
+	};
+
+	struct KnownOptimalCTOP
+	{
+		std::string path;
+		std::string name;
+
+		std::vector<std::vector<int>> planted_routes =
+		{
+				{128,69,204,107},
+				{293,286,159,43},
+				{99,180,233,258,135,220},
+				{209,131},
+				{234,300,319,82},
+				{198,165,124,269}
+		};
+
+
+		double time_scale = 0.06;
+
+		double break_dur = 0.75;
+		double break_start = 0.0;
+		double break_end = DBL_MAX;
+
+		double horizon_slack = 0.0;
+		bool disable_unused_tours = true;
+
+		// New affine congestion parameters
+		double planted_mu = 0.0;                 // slope for planted arcs
+		double planted_extra_nu = 0.0;           // extra intercept for planted arcs
+
+		double nonplanted_mu = 0.02;             // slope for non-planted arcs
+		double nonplanted_extra_nu_factor = 0.2; // extra intercept = factor * determin
+	};
+
+	struct PlantedReplayResult
+	{
+		double completion_time = 0.0;   // absolute time at route end
+		double loadW = 0.0;
+		double loadV = 0.0;
+		bool break_taken = false;
+		bool feasible = true;
 	};
 
 	class Connec
@@ -82,6 +125,7 @@ public:
 	
 	Ins(struct MCTDTOPTW);//construct instance by reading file
 	Ins(struct CTOP);//convert CTOP instance
+	Ins(struct KnownOptimalCTOP);
 
 	void construct_time_independent_traveltime(Graph& graph);
 	void construct_time_dependent_traveltime(Graph& graph);
@@ -92,15 +136,17 @@ public:
 
 	void alter_instance();
 	void unalter_instance();
-	
+
+	PlantedReplayResult replay_planted_route_break_first_customer(const std::vector<int>& route,int tour_idx,bool verbose) const;
+
 	/**acces of c object methods*/
-	inline int find_t(double time)
+	inline int find_t(double time) const
 	{
 		int t = (int)((time - time_periods[0]) / 0.25);//when you change the time unit this has to change too
 		return std::min(55, t);
 	}
 
-	inline double travel_time(Connec* c, double start)
+	inline double travel_time(Connec* c, double start) const
 	{
 		int t = find_t(start);
 		return std::fma(c->nu[t] - 1.0, start, c->mu[t]);
@@ -111,7 +157,7 @@ public:
 		*/
 	}
 
-	inline double arrival_time(Connec* c, double start)
+	inline double arrival_time(Connec* c, double start) const
 	{
 		const int t = find_t(start);
 		// arr = a + b*start = nu + (1+mu)*start
@@ -123,7 +169,7 @@ public:
 		*/
 	}
 
-	inline double departure_time(Connec* c, double arrivaltime)
+	inline double departure_time(Connec* c, double arrivaltime) const
 	{
 		int t = find_t(arrivaltime);             // initial guess, not guaranteed correct
 		for (;;) {
@@ -153,5 +199,4 @@ public:
 		return departuretime;
 		*/
 	}
-
 };

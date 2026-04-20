@@ -87,170 +87,6 @@ void Ins::read_time_dependent_traveltime()
 }//end read time dependent travel time
 
 
-/*
-void Ins::read_time_dependent_traveltime()//with fifo checker
-{
-	const std::string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
-	std::ifstream tt(filepath + "tt" + std::to_string(maxvertices) + ".TXT");
-	if (!tt.is_open()) {
-		std::cout << term::fg(term::Color::red)
-			<< "could not open time-dependent travel time file\n";
-		return;
-	}
-
-	// Tolerances for floating-point checks (hours)
-	const double TOL_BOUNDARY = 1e-9;   // boundary FIFO (arr[k+1] + tol >= arr[k])
-	const double TOL_SLOPE = 1e-12;  // slope checks (1+mu >= -tol), |mu| <= 1 + tol
-
-	// Stats
-	std::uint64_t parse_warn = 0, neg_warn = 0, naninf_warn = 0;
-	std::uint64_t fifo_boundary_viol = 0, fifo_withinslot_viol = 0, abs_mu_warn = 0;
-	std::uint64_t lines_read = 0;
-
-	for (int i = 0; i < maxvertices; ++i) {
-		for (int j = 0; j < maxvertices; ++j) {
-
-			std::string line;
-			if (!std::getline(tt, line)) {
-				std::cout << term::fg(term::Color::red)
-					<< "Unexpected EOF at arc (" << i << "," << j << ")\n";
-				return;
-			}
-			++lines_read;
-
-			// Normalize delimiters: turn ';' ',' '\t' into space so stringstream >> works
-			for (char& c : line) {
-				if (c == ';' || c == ',' || c == '\t') c = ' ';
-			}
-
-			std::stringstream ss(line);
-			std::vector<double> ttvals;
-			ttvals.reserve(maxtimeslots);
-			double val;
-			while (ss >> val) ttvals.push_back(val);
-
-			if (static_cast<int>(ttvals.size()) != maxtimeslots) {
-				++parse_warn;
-				std::cout << term::fg(term::Color::yellow)
-					<< "Line " << lines_read << " for arc (" << i << "," << j
-					<< "): expected " << maxtimeslots << " values, got "
-					<< ttvals.size() << "\n";
-				// best-effort: pad/truncate to expected length
-				ttvals.resize(maxtimeslots, (ttvals.empty() ? 0.0 : ttvals.back()));
-			}
-
-			// Basic value checks: finite and >= 0 (times are in hours)
-			for (int k = 0; k < maxtimeslots; ++k) {
-				if (!std::isfinite(ttvals[k])) {
-					++naninf_warn;
-					std::cout << term::fg(term::Color::yellow)
-						<< "Non-finite value at arc (" << i << "," << j
-						<< "), slot " << k << "\n";
-					ttvals[k] = 0.0; // sanitize to keep going
-				}
-				if (ttvals[k] < 0.0) {
-					++neg_warn;
-					std::cout << term::fg(term::Color::yellow)
-						<< "Negative travel time at arc (" << i << "," << j
-						<< "), slot " << k << " : " << ttvals[k] << "\n";
-					ttvals[k] = 0.0; // clamp
-				}
-			}
-
-			// Boundary FIFO check: arrival at boundary must be nondecreasing
-			// A_k = time_periods[k] + ttvals[k]
-			for (int k = 0; k + 1 < maxtimeslots; ++k) {
-				const double Ak = time_periods[k] + ttvals[k];
-				const double Ak1 = time_periods[k + 1] + ttvals[k + 1];
-				if (Ak1 + TOL_BOUNDARY < Ak) {
-					++fifo_boundary_viol;
-					// Print first few only to avoid flooding
-					if (fifo_boundary_viol <= 5) {
-						std::cout << term::fg(term::Color::yellow)
-							<< "Boundary FIFO violation on arc (" << i << "," << j<< "), slot " << k << " --> " << (k + 1)<< " : Ak=" << Ak << " > Ak+1=" << Ak1 << "\n";
-					}
-				}
-			}
-
-			// Store coefficients
-			auto* edge = v[i].con[j];
-			if (!edge) {
-				std::cout << term::fg(term::Color::red)
-					<< "Null edge pointer at (" << i << "," << j << ")\n";
-				return;
-			}
-			auto& mu = edge->mu;
-			auto& oneplusmu = edge->oneplusmu;
-			auto& nu = edge->nu;
-			mu.resize(maxtimeslots);
-			oneplusmu.resize(maxtimeslots);
-			nu.resize(maxtimeslots);
-
-			// Compute μ, ν (affine-in-slot model).
-			for (int t = 0; t < maxtimeslots; ++t) {
-				if (t == maxtimeslots - 1) {
-					// last slot: hold travel time constant within the slot
-					mu[t] = 0.0;
-					oneplusmu[t] = 1.0;
-					nu[t] = ttvals[t];
-					continue;
-				}
-				const double dt = time_periods[t + 1] - time_periods[t];
-				if (dt <= 0.0) {
-					std::cout << term::fg(term::Color::red)
-						<< "Non-positive slot width at slot " << t
-						<< " (dt=" << dt << ")\n";
-					return;
-				}
-
-				const double slope = (ttvals[t + 1] - ttvals[t]) / dt;
-				mu[t] = slope;
-				oneplusmu[t] = 1.0 + slope;
-				nu[t] = ttvals[t] - slope * time_periods[t];
-
-				// Within-slot FIFO: 1 + μ >= 0 (allow tiny tolerance)
-				if (oneplusmu[t] < -TOL_SLOPE) {
-					++fifo_withinslot_viol;
-					if (fifo_withinslot_viol <= 5) {
-						std::cout << term::fg(term::Color::yellow)
-							<< "Within-slot FIFO violated on arc (" << i << "," << j<< "), slot " << t << " : 1+mu=" << oneplusmu[t] << "\n";
-					}
-				}
-				// Empirical check: |μ| <= 1 (your practice)
-				if (std::abs(mu[t]) > 1.0 + TOL_SLOPE) {
-					++abs_mu_warn;
-					if (abs_mu_warn <= 5) {
-						std::cout << term::fg(term::Color::yellow)
-							<< "Slope magnitude > 1 on arc (" << i << "," << j<< "), slot " << t << " : mu=" << mu[t] << "\n";
-					}
-				}
-			}
-
-			// last slot already filled above (μ=0, ν=ttvals[last])
-		}
-	}
-
-	tt.close();
-
-	// Summary
-	if (parse_warn || naninf_warn || neg_warn || fifo_boundary_viol || fifo_withinslot_viol || abs_mu_warn) {
-		std::cout << term::fg(term::Color::yellow)
-			<< "[TT checks] lines=" << lines_read
-			<< ", parse=" << parse_warn
-			<< ", nan/inf=" << naninf_warn
-			<< ", negative=" << neg_warn
-			<< ", FIFO_boundary=" << fifo_boundary_viol
-			<< ", FIFO_within=" << fifo_withinslot_viol
-			<< ", |mu|>1=" << abs_mu_warn << "\n";
-	}
-	else {
-		std::cout << term::fg(term::Color::green)
-			<< "[TT checks] OK: parsed " << lines_read
-			<< " lines; no issues detected.\n";
-	}
-}
-*/
-
 Ins::Ins(MCTDTOPTW textfile)
 {
 	//read in vertex and tour information from txt file and populate v and t objects
@@ -461,6 +297,530 @@ Ins::Ins(CTOP textfile)
 	else
 	{
 		cout << endl << " can not open CTOP instance file" << endl;;
+	}
+}
+
+struct PlantedReplayResult
+{
+	double completion_time = 0.0;
+	double loadW = 0.0;
+	double loadV = 0.0;
+	bool break_taken = false;
+	bool feasible = true;
+};
+
+Ins::PlantedReplayResult Ins::replay_planted_route_break_first_customer(const std::vector<int>& route,int tour_idx,bool verbose) const
+{
+	PlantedReplayResult res;
+	double currenttime = t[tour_idx].EDT;
+
+	if (verbose)
+	{
+		std::cout << "Checking planted route " << tour_idx << std::endl;
+	}
+
+	for (size_t k = 0; k + 1 < route.size(); ++k)
+	{
+		int source = route[k];
+		int target = route[k + 1];
+
+		int slot = find_t(currenttime);
+		double arrivaltime = arrival_time(v[source].con[target], currenttime);
+
+		if (verbose)
+		{
+			std::cout << "  arc " << source << " -> " << target
+				<< " dep=" << currenttime
+				<< " slot=" << slot
+				<< " tt=" << (arrivaltime - currenttime)
+				<< " arr=" << arrivaltime;
+		}
+
+		if (target != maxvertices - 1)
+		{
+			// fixed rule: break at the first customer only
+			if (!res.break_taken && k == 0)
+			{
+				if (verbose)
+					std::cout << " break@" << target << " start=" << arrivaltime;
+
+				// optional strict check: break must lie in break window
+				if (arrivaltime < breakstart || arrivaltime > breakend)
+				{
+					res.feasible = false;
+					if (verbose)
+						std::cout << " BREAK-WINDOW-FAIL";
+				}
+
+				arrivaltime += breakdur;
+				res.break_taken = true;
+			}
+
+			if (arrivaltime < v[target].LTW[tour_idx])
+			{
+				if (verbose)
+					std::cout << " wait=" << (v[target].LTW[tour_idx] - arrivaltime);
+				arrivaltime = v[target].LTW[tour_idx];
+			}
+
+			if (arrivaltime > v[target].UTW[tour_idx] + 1e-9)
+			{
+				res.feasible = false;
+				if (verbose)
+					std::cout << " TW-FAIL";
+			}
+
+			res.loadW += v[target].weight;
+			res.loadV += v[target].volume;
+
+			arrivaltime += v[target].serv;
+
+			if (verbose)
+			{
+				std::cout << " serv=" << v[target].serv
+					<< " dep_next=" << arrivaltime;
+			}
+		}
+
+		if (verbose)
+			std::cout << std::endl;
+
+		currenttime = arrivaltime;
+	}
+
+	res.completion_time = currenttime;
+
+	// if route had at least one customer, break should have been taken
+	if (route.size() > 2 && !res.break_taken)
+		res.feasible = false;
+
+	return res;
+}
+
+static std::vector<std::vector<char>> build_planted_arc_matrix(
+	int maxvertices,
+	const std::vector<std::vector<int>>& full_routes)
+{
+	std::vector<std::vector<char>> planted_arc(
+		maxvertices,
+		std::vector<char>(maxvertices, 0)
+	);
+
+	for (const auto& route : full_routes)
+	{
+		for (size_t k = 0; k + 1 < route.size(); ++k)
+		{
+			int i = route[k];
+			int j = route[k + 1];
+			planted_arc[i][j] = 1;
+		}
+	}
+
+	return planted_arc;
+}
+
+Ins::Ins(KnownOptimalCTOP data)
+{
+	ifstream ifs;
+	string filepath = data.path + data.name;
+	ifs.open(filepath, ifstream::in);
+
+	if (!ifs.is_open())
+	{
+		cout << endl << " can not open CTOP instance file" << endl;
+		return;
+	}
+
+	string line;
+	string dump;
+	vector<double> x_coordinates;
+	vector<double> y_coordinates;
+	double C_max = 0.0;
+	double T_max_ctop = 0.0;
+
+	// ------------------------------------------------------------
+	// 1. Read CTOP file
+	// ------------------------------------------------------------
+	getline(ifs, line);
+	getline(ifs, line);
+
+	getline(ifs, line);
+	stringstream str(line);
+	str >> dump;
+	str >> maxtours;
+
+	getline(ifs, line);
+	str = stringstream(line);
+	str >> dump;
+	str >> C_max;
+
+	getline(ifs, line);
+	str = stringstream(line);
+	str >> dump;
+	str >> T_max_ctop;
+
+	getline(ifs, line);
+	getline(ifs, line);
+	str = stringstream(line);
+	str >> dump;
+	double depotx = 0.0;
+	double depoty = 0.0;
+	str >> depotx;
+	str >> depoty;
+
+	getline(ifs, line);
+	getline(ifs, line);
+	str = stringstream(line);
+	str >> dump;
+	str >> maxvertices;
+	maxvertices += 2;
+
+	x_coordinates.resize(maxvertices, 0.0);
+	y_coordinates.resize(maxvertices, 0.0);
+	x_coordinates[0] = depotx;
+	y_coordinates[0] = depoty;
+	x_coordinates[maxvertices - 1] = depotx;
+	y_coordinates[maxvertices - 1] = depoty;
+
+	v.resize(maxvertices);
+	t.resize(maxtours);
+	c.resize(maxvertices * maxvertices);
+
+	getline(ifs, line);
+	getline(ifs, line);
+
+	maxscore = 0.0;
+
+	// ------------------------------------------------------------
+	// 2. Create regular vertices
+	// ------------------------------------------------------------
+	for (int i = 1; i < maxvertices - 1; ++i)
+	{
+		v[i].id = i;
+		v[i].index = i;
+
+		getline(ifs, line);
+		str = stringstream(line);
+
+		str >> x_coordinates[i];
+		str >> y_coordinates[i];
+		str >> v[i].weight;
+		v[i].volume = v[i].weight;
+		str >> v[i].serv;
+		str >> v[i].score;
+
+		v[i].serv *= data.time_scale;
+
+		maxscore += v[i].score;
+
+		v[i].LTW.resize(maxtours, 0.0);
+		v[i].UTW.resize(maxtours, 0.0);
+	}
+	ifs.close();
+
+	// ------------------------------------------------------------
+	// 3. Create depots
+	// ------------------------------------------------------------
+	v[0].id = 0;
+	v[0].index = 0;
+	v[0].score = 0;
+	v[0].serv = 0.0;
+	v[0].weight = 0.0;
+	v[0].volume = 0.0;
+	v[0].LTW.resize(maxtours, 0.0);
+	v[0].UTW.resize(maxtours, 0.0);
+
+	v[maxvertices - 1].id = maxvertices - 1;
+	v[maxvertices - 1].index = maxvertices - 1;
+	v[maxvertices - 1].score = 0;
+	v[maxvertices - 1].serv = 0.0;
+	v[maxvertices - 1].weight = 0.0;
+	v[maxvertices - 1].volume = 0.0;
+	v[maxvertices - 1].LTW.resize(maxtours, 0.0);
+	v[maxvertices - 1].UTW.resize(maxtours, 0.0);
+
+	// ------------------------------------------------------------
+	// 4. Build deterministic scaled CTOP matrix
+	// ------------------------------------------------------------
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		v[i].con.resize(maxvertices);
+
+		for (int j = 0; j < maxvertices; ++j)
+		{
+			int counter = i * maxvertices + j;
+			c[counter].from = i;
+			c[counter].to = j;
+
+			double dx = x_coordinates[i] - x_coordinates[j];
+			double dy = y_coordinates[i] - y_coordinates[j];
+			double euc = static_cast<int>(std::floor(std::hypot(dx, dy) + 0.5));
+
+			c[counter].determin = euc * data.time_scale;
+
+			c[counter].mu.resize(maxtimeslots, 0.0);
+			c[counter].oneplusmu.resize(maxtimeslots, 1.0);
+			c[counter].nu.resize(maxtimeslots, c[counter].determin);
+
+			v[i].con[j] = &c[counter];
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 5. Build full planted routes [0 ... end depot]
+	// ------------------------------------------------------------
+	std::vector<std::vector<int>> full_routes;
+	full_routes.reserve(data.planted_routes.size());
+
+	for (const auto& route : data.planted_routes)
+	{
+		std::vector<int> full;
+		full.push_back(0);
+		for (int x : route)
+		{
+			if (x != 0 && x != maxvertices - 1)
+				full.push_back(x);
+		}
+		full.push_back(maxvertices - 1);
+		full_routes.push_back(full);
+	}
+
+	// ------------------------------------------------------------
+	// 6. Record route loads
+	// ------------------------------------------------------------
+	std::vector<double> planted_route_weight(full_routes.size(), 0.0);
+	std::vector<double> planted_route_volume(full_routes.size(), 0.0);
+
+	for (size_t r = 0; r < full_routes.size(); ++r)
+	{
+		for (size_t k = 1; k + 1 < full_routes[r].size(); ++k)
+		{
+			int cust = full_routes[r][k];
+			planted_route_weight[r] += v[cust].weight;
+			planted_route_volume[r] += v[cust].volume;
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 7. Break settings
+	// ------------------------------------------------------------
+	breakdur = data.break_dur;
+	breakstart = time_periods[0] + data.break_start;
+	breakend = time_periods[0] + data.break_end;
+
+	// ------------------------------------------------------------
+	// 8. Common CTOP-like Tmax for all tours
+	// ------------------------------------------------------------
+	double common_Tmax = T_max_ctop * data.time_scale + breakdur + data.horizon_slack;
+
+	// ------------------------------------------------------------
+	// 9. Finalize tours immediately with common Tmax
+	// ------------------------------------------------------------
+	for (int tour = 0; tour < maxtours; ++tour)
+	{
+		t[tour].index = tour;
+		t[tour].id = tour;
+		t[tour].startv = &v[0];
+		t[tour].endv = &v[maxvertices - 1];
+		t[tour].EDT = time_periods[0];
+		t[tour].T_max = common_Tmax;
+		t[tour].LAT = t[tour].EDT + t[tour].T_max;
+
+		if (tour < static_cast<int>(full_routes.size()))
+		{
+			t[tour].W_max = C_max;
+			t[tour].V_max = C_max;
+		}
+		else
+		{
+			if (data.disable_unused_tours)
+			{
+				t[tour].W_max = 0.0;
+				t[tour].V_max = 0.0;
+			}
+			else
+			{
+				t[tour].W_max = C_max;
+				t[tour].V_max = C_max;
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 10. Wide-open time windows
+	// ------------------------------------------------------------
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		for (int tour = 0; tour < maxtours; ++tour)
+		{
+			v[i].LTW[tour] = t[tour].EDT;
+			v[i].UTW[tour] = t[tour].LAT;
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 11. Mark planted arcs
+	// ------------------------------------------------------------
+	std::vector<std::vector<char>> planted_arc =
+		build_planted_arc_matrix(maxvertices, full_routes);
+
+	// ------------------------------------------------------------
+	// 12. Build globally affine arc profiles
+	//     Same coefficients over all slots for a given arc
+	// ------------------------------------------------------------
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		for (int j = 0; j < maxvertices; ++j)
+		{
+			int counter = i * maxvertices + j;
+			double base = c[counter].determin;
+
+			double mu_arc = 0.0;
+			double nu_arc = base;
+
+			if (planted_arc[i][j])
+			{
+				mu_arc = data.planted_mu;
+				nu_arc = base + data.planted_extra_nu;
+			}
+			else
+			{
+				mu_arc = data.nonplanted_mu;
+				nu_arc = base + data.nonplanted_extra_nu_factor * base;
+			}
+
+			// safety: keep tt >= determin at route start
+			double min_tau = time_periods[0];
+			if (mu_arc * min_tau + nu_arc < base)
+			{
+				nu_arc = base - mu_arc * min_tau;
+			}
+
+			for (int ts = 0; ts < maxtimeslots; ++ts)
+			{
+				c[counter].mu[ts] = mu_arc;
+				c[counter].oneplusmu[ts] = 1.0 + mu_arc;
+				c[counter].nu[ts] = nu_arc;
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 13. Diagnostics: FIFO / continuity / lower bound
+	// ------------------------------------------------------------
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		for (int j = 0; j < maxvertices; ++j)
+		{
+			Ins::Connec* arc = v[i].con[j];
+			double base = arc->determin;
+
+			for (int ts = 0; ts < maxtimeslots; ++ts)
+			{
+				if (arc->oneplusmu[ts] < -1e-9)
+				{
+					std::cout << "FIFO slope violation on arc "
+						<< i << " -> " << j
+						<< " slot " << ts
+						<< " oneplusmu = " << arc->oneplusmu[ts] << std::endl;
+				}
+
+				double tau0 = time_periods[ts];
+				double tau1 = time_periods[ts + 1];
+
+				double tt0 = arc->mu[ts] * tau0 + arc->nu[ts];
+				double tt1 = arc->mu[ts] * tau1 + arc->nu[ts];
+
+				if (tt0 < base - 1e-9)
+				{
+					std::cout << "Travel time below deterministic on arc "
+						<< i << " -> " << j
+						<< " slot " << ts
+						<< " at left boundary: tt=" << tt0
+						<< " determin=" << base << std::endl;
+				}
+
+				if (tt1 < base - 1e-9)
+				{
+					std::cout << "Travel time below deterministic on arc "
+						<< i << " -> " << j
+						<< " slot " << ts
+						<< " at right boundary: tt=" << tt1
+						<< " determin=" << base << std::endl;
+				}
+			}
+
+			for (int ts = 0; ts < maxtimeslots - 1; ++ts)
+			{
+				double boundary = time_periods[ts + 1];
+				double left = arc->oneplusmu[ts] * boundary + arc->nu[ts];
+				double right = arc->oneplusmu[ts + 1] * boundary + arc->nu[ts + 1];
+
+				if (right < left - 1e-9)
+				{
+					std::cout << "FIFO boundary violation on arc "
+						<< i << " -> " << j
+						<< " between slots " << ts
+						<< " and " << ts + 1
+						<< " left=" << left
+						<< " right=" << right << std::endl;
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 14. Planted-route diagnostics only
+	//     Use your fixed first-customer break replay
+	// ------------------------------------------------------------
+	for (size_t r = 0; r < full_routes.size(); ++r)
+	{
+		PlantedReplayResult rr =
+			replay_planted_route_break_first_customer(full_routes[r], (int)r, true);
+
+		if (!rr.feasible)
+		{
+			std::cout << "Planted route infeasible under fixed first-customer break rule on route "
+				<< r << std::endl;
+		}
+
+		if (rr.loadW > t[r].W_max + 1e-9)
+		{
+			std::cout << "Weight violation on planted route " << r << std::endl;
+		}
+
+		if (rr.loadV > t[r].V_max + 1e-9)
+		{
+			std::cout << "Volume violation on planted route " << r << std::endl;
+		}
+
+		double total = rr.completion_time - t[r].EDT;
+		if (total > t[r].T_max + 1e-9)
+		{
+			std::cout << "Duration violation on planted route " << r
+				<< " total=" << total
+				<< " Tmax=" << t[r].T_max << std::endl;
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 15. Basic diagnostics
+	// ------------------------------------------------------------
+	if (full_routes.size() > static_cast<size_t>(maxtours))
+	{
+		cout << "Warning: more planted routes than available tours." << endl;
+	}
+
+	for (size_t r = 0; r < full_routes.size(); ++r)
+	{
+		if (planted_route_weight[r] > C_max)
+		{
+			cout << "Warning: planted route " << r << " exceeds weight capacity." << endl;
+		}
+		if (planted_route_volume[r] > C_max)
+		{
+			cout << "Warning: planted route " << r << " exceeds volume capacity." << endl;
+		}
 	}
 }
 
@@ -835,7 +1195,6 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 	}
 	*/
 }
-
 
 void Ins::read_neighbourhood(string path,string name)
 {

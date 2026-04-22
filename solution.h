@@ -118,8 +118,8 @@ public:
 	void remove_vertices(Tour &tour, int position1, int position2);//update score and availability
 	void reset();
 	bool check();
-	void read_from_file();
-	void write_to_file();
+	void read_from_file(const std::string& dataset);
+	void write_to_file(const std::string& dataset);
 	void write_to_cplex(const std::string& dataset);
 	void check_availability();
 	SolutionPerfStats repair_and_collect_stats();

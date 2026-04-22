@@ -815,10 +815,6 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		int pick=nbpicker(engine);
 		//int pick = 2;//to debug
 		//build admissable neighborhoods using the selected neighborhoodstructure
-		if (!s.check())
-		{
-			cout << "error before replace: " << pick << endl;
-		}
 		
 		switch (pick)
 		{
@@ -880,11 +876,7 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 				break;
 			}
 		}//end switch
-		
-		if (!s.check())
-		{
-			cout << "error after replace: " << pick << endl;
-		}
+	
 		
 		if (no_feasible_moves_in_a_row > 5) 
 		{
@@ -910,6 +902,7 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 			
 			continue;
 		}
+		
 		
 		// --- RVND: randomize LS order, restart when any op improves ---
 		enum class LsOp { TwoOpt, Swap, Swap2, Relocate };
@@ -938,12 +931,7 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 				}
 			}
 		}
-
-		if (!s.check())
-		{
-			cout << "error after rvnd: " << pick << endl;
-		}
-
+		
 		//update constraint pressure
 		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
 		if (moved) 

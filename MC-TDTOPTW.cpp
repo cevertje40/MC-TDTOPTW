@@ -330,21 +330,23 @@ void solve_dataset(int max_rep = 5)
 			Ins instance(textfile);
 			instance.read_time_independent_traveltime();
 			instance.read_time_dependent_traveltime();
+			//instance.create_neighbourhood_simple(textfile.path, textfile.name);
 			instance.create_neighbourhood(textfile.path, textfile.name);
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
 			
 
-			double maxtime;
+			double maxtime=9999;
+			/*
 			if (instance.maxvertices == 20)
 				maxtime = 1;
 			else if (instance.maxvertices == 50)
 				maxtime = 2.0;
 			else
 				maxtime = 5.0;
+			*/
 
-
-			Tabu tabu(instance, 50000, 2, 0.1, 0.9, 10);
+			Tabu tabu(instance, 20000, 2, 0.1, 0.9, 10);
 			it->result[rep] = tabu.solve(it->bestknown,maxtime);
 			//it->result[rep].sol.write_to_cplex(textfile.name);
 			//cout << it->result[rep].sol << endl;
@@ -817,7 +819,7 @@ void doe2(int max_rep = 5)
 void debug_ctop()
 {
 	Res res;
-	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b1.txt"};
+	Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\LargeScale CTOP\\set2\\","b2.txt"};
 	//Ins::CTOP textfile = {"..\\..\\datasets\\CTOP\\DatasetsCTOP\\2set\\","b5.txt"};
 	Ins instance(textfile);
 	instance.create_neighbourhood(textfile.path, textfile.name);
@@ -825,6 +827,7 @@ void debug_ctop()
 	//res = ils.solve();
 	Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
 	res = tabu.solve(139);
+	res.sol.write_to_file(textfile.name);
 	//Aco acs(instance, 1, 2, 0.01, 20, 10000, 0.25, 0.05);
 	//res=acs.solve();
 	cout << res.sol.score << " cpu time: " << res.time << endl;
@@ -873,6 +876,7 @@ void ctop_gap(int max_rep=5)
 			output.open("output.txt", ios::out | ios::app);
 			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
+			//it->result[rep].sol.write_to_file(it->filename);
 		}
 		//calculate dataset performance
 		avggap /= dataset.size();
@@ -931,11 +935,15 @@ void ctop_optimal(int max_rep = 1)
 			//it->result[rep] = acs.solve(it->bestscore);
 			//Ils ils(instance, 10000,100,2,3);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
+			Tabu tabu(instance, 10000,2, 0.1, 0.8, 5);
 			it->result[rep] = tabu.solve(it->bestknown);
+			Sol planted_sol(instance);
+			planted_sol.read_from_file(textfile.name);
+			it->bestknown = planted_sol.score;
+			it->result[rep].gap = (double(it->bestknown - it->result[rep].sol.score) / it->bestknown) * 100;
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
-			cout << "name: " << it->filename << " best score: " << it->bestknown << " " << tabu.name << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " planted score: " << it->bestknown << " " << tabu.name << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
 			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
@@ -969,11 +977,11 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(1);
-	//ctop_gap(5);
+	solve_dataset(1);
+	//ctop_gap();
 	//doe(5);
 	//doe2(5);
 	//case_study(10);
-	ctop_optimal(1);
+	//ctop_optimal(1);
 
 }

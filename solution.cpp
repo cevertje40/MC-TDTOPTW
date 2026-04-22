@@ -30,12 +30,13 @@ Sol::Sol(Ins& ins):ins(&ins)
 	available[ins.v[0].index] = false;
 }
 
-void Sol::read_from_file()
+void Sol::read_from_file(const std::string& dataset)
 {
 	vector<vector<int>> inputv(ins->maxtours);
 	vector<vector<int>> inputb(ins->maxtours);
 	ifstream ifs;
-	ifs.open("debug_sol.txt", ifstream::in);
+	std::string name = "sol_" + dataset;
+	ifs.open(name, ifstream::in);
 	if (ifs.is_open())
 	{
 		for (int t = 0; t < ins->maxtours; ++t)
@@ -129,10 +130,11 @@ void Sol::read_from_file()
 	}//end for all tours
 }//end input custom
 
-void Sol::write_to_file()
+void Sol::write_to_file(const std::string& dataset)
 {
 	ofstream output;
-	output.open("debug_sol_test.txt", ios::out);
+	std::string name = "sol_" + dataset;
+	output.open(name, ios::out);
 	for (int t = 0; t < ins->maxtours; ++t)
 	{
 		Sol::Tour* tour = &tours[t];

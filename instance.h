@@ -22,17 +22,6 @@ public:
 		std::string path;
 		std::string name;
 
-		std::vector<std::vector<int>> planted_routes =
-		{
-				{128,69,204,107},
-				{293,286,159,43},
-				{99,180,233,258,135,220},
-				{209,131},
-				{234,300,319,82},
-				{198,165,124,269}
-		};
-
-
 		double time_scale = 0.06;
 
 		double break_dur = 0.75;
@@ -132,6 +121,7 @@ public:
 	void read_time_independent_traveltime();
 	void read_time_dependent_traveltime();
 	void create_neighbourhood(std::string path, std::string name);
+	void create_neighbourhood_simple(std::string path, std::string name);
 	void read_neighbourhood(std::string path, std::string name);
 
 	void alter_instance();

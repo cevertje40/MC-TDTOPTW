@@ -397,14 +397,9 @@ Ins::PlantedReplayResult Ins::replay_planted_route_break_first_customer(const st
 	return res;
 }
 
-static std::vector<std::vector<char>> build_planted_arc_matrix(
-	int maxvertices,
-	const std::vector<std::vector<int>>& full_routes)
+static std::vector<std::vector<char>> build_planted_arc_matrix(int maxvertices,const std::vector<std::vector<int>>& full_routes)
 {
-	std::vector<std::vector<char>> planted_arc(
-		maxvertices,
-		std::vector<char>(maxvertices, 0)
-	);
+	std::vector<std::vector<char>> planted_arc(	maxvertices,std::vector<char>(maxvertices, 0));
 
 	for (const auto& route : full_routes)
 	{
@@ -569,22 +564,43 @@ Ins::Ins(KnownOptimalCTOP data)
 	// ------------------------------------------------------------
 	// 5. Build full planted routes [0 ... end depot]
 	// ------------------------------------------------------------
-	std::vector<std::vector<int>> full_routes;
-	full_routes.reserve(data.planted_routes.size());
-
-	for (const auto& route : data.planted_routes)
+	vector<vector<int>> full_routes(maxtours);
+	vector<vector<int>> inputb(maxtours);
+	std::string name = "sol_" + data.name;
+	
+	ifs.open(name, ifstream::in);
+	if (ifs.is_open())
 	{
-		std::vector<int> full;
-		full.push_back(0);
-		for (int x : route)
+		for (int t = 0; t < maxtours; ++t)
 		{
-			if (x != 0 && x != maxvertices - 1)
-				full.push_back(x);
+			int seqsize;
+			string line;
+			//read in number of vertices in tour
+			getline(ifs, line);
+			stringstream str(line);
+			str >> seqsize;
+			//read in vertex indices
+			getline(ifs, line);
+			str = stringstream(line);
+			for (int i = 0; i < seqsize; ++i)
+			{
+				int index;
+				str >> index;
+				full_routes[t].push_back(index);
+			}
+			//read in vertex action
+			getline(ifs, line);
+			str = stringstream(line);
+			for (int i = 0; i < seqsize; ++i)
+			{
+				int action;
+				str >> action;
+				inputb[t].push_back(action);
+			}
 		}
-		full.push_back(maxvertices - 1);
-		full_routes.push_back(full);
+		ifs.close();
 	}
-
+	
 	// ------------------------------------------------------------
 	// 6. Record route loads
 	// ------------------------------------------------------------
@@ -776,7 +792,7 @@ Ins::Ins(KnownOptimalCTOP data)
 	for (size_t r = 0; r < full_routes.size(); ++r)
 	{
 		PlantedReplayResult rr =
-			replay_planted_route_break_first_customer(full_routes[r], (int)r, true);
+			replay_planted_route_break_first_customer(full_routes[r], (int)r, false);
 
 		if (!rr.feasible)
 		{
@@ -1172,7 +1188,9 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 		}
 	}
 	file.close();
+	
 	/*
+	//full neighborhood (for testing)
 	for (int i = 0; i < maxvertices - 1; ++i)  // skip depot as origin
 	{
 		// Make sure containers exist
@@ -1195,6 +1213,126 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 	}
 	*/
 }
+
+void Ins::create_neighbourhood_simple(std::string path, std::string name)
+{
+	const int enddepot = maxvertices - 1;
+	const int K = 50;              // fixed neighborhood size
+	const double eps = 1e-9;
+
+	struct Cand
+	{
+		int j;
+		double s; // smaller is better
+	};
+
+	// make sure depot containers exist
+	v[enddepot].nb.resize(maxtours);
+	v[enddepot].nbi.resize(maxtours);
+
+	for (int d = 0; d < maxtours; ++d)
+	{
+#pragma omp parallel for schedule(guided)
+		for (int i = 0; i < maxvertices - 1; ++i) // skip end depot as origin
+		{
+			v[i].nb.resize(maxtours);
+			v[i].nbi.resize(maxtours);
+
+			std::vector<Cand> cand;
+			cand.reserve(maxvertices);
+
+			// ---------- Build feasible pool ----------
+			for (int j = 1; j < maxvertices - 1; ++j)
+			{
+				if (j == i) continue;
+
+				double arr_j = v[i].LTW[d] + v[i].serv + v[i].con[j]->determin;
+				if (arr_j < v[j].LTW[d]) arr_j = v[j].LTW[d];
+				if (arr_j > v[j].UTW[d]) continue;
+
+				double dep_j = arr_j + v[j].serv;
+				if (dep_j + v[j].con[enddepot]->determin > v[enddepot].UTW[d]) continue;
+
+				// simple score: prize per travel with depot look-ahead
+				const double tt_ij = v[i].con[j]->determin;
+				const double tt_jD = v[j].con[enddepot]->determin;
+				const double scorej = (double)v[j].score;
+
+				double s = (tt_ij + 0.5 * tt_jD + eps) / (scorej + eps);
+				cand.push_back({ j, s });
+			}
+
+			// ---------- Start depot: keep all feasible ----------
+			if (i == 0)
+			{
+				std::sort(cand.begin(), cand.end(),
+					[](const Cand& a, const Cand& b) { return a.s < b.s; });
+
+				v[i].nb[d].clear();
+				v[i].nb[d].reserve(cand.size() + 1);
+
+				for (const auto& c : cand)
+					v[i].nb[d].push_back(&v[c.j]);
+
+				v[i].nb[d].push_back(&v[enddepot]);
+
+				v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+				v[i].nbi[d].reset();
+				for (auto* pj : v[i].nb[d]) v[i].nbi[d][pj->index] = true;
+				v[i].nbi[d][i] = true;
+
+				continue;
+			}
+
+			// ---------- Other vertices: keep top K ----------
+			if ((int)cand.size() > K)
+			{
+				std::nth_element(cand.begin(), cand.begin() + K, cand.end(),
+					[](const Cand& a, const Cand& b) { return a.s < b.s; });
+				cand.resize(K);
+			}
+
+			std::sort(cand.begin(), cand.end(),
+				[](const Cand& a, const Cand& b) { return a.s < b.s; });
+
+			v[i].nb[d].clear();
+			v[i].nb[d].reserve(cand.size() + 1);
+
+			for (const auto& c : cand)
+				v[i].nb[d].push_back(&v[c.j]);
+
+			v[i].nb[d].push_back(&v[enddepot]);
+
+			v[i].nbi[d] = boost::dynamic_bitset<>(maxvertices);
+			v[i].nbi[d].reset();
+			for (auto* pj : v[i].nb[d]) v[i].nbi[d][pj->index] = true;
+			v[i].nbi[d][i] = true; // self for swap
+		}
+
+		// ---------- End depot ----------
+		v[enddepot].nb[d].clear();
+		v[enddepot].nb[d].push_back(&v[enddepot]);
+
+		v[enddepot].nbi[d].resize(maxvertices);
+		v[enddepot].nbi[d].reset();
+		v[enddepot].nbi[d].set(enddepot);
+	}
+
+	// ---------- Write to file ----------
+	std::ofstream file(path + "nb" + name);
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		for (int d = 0; d < maxtours; ++d)
+		{
+			file << v[i].nb[d].size() << "\n";
+			for (int j = 0; j < (int)v[i].nb[d].size(); ++j)
+				file << v[i].nb[d][j]->index << ";";
+			file << "\n";
+		}
+	}
+	file.close();
+}
+
 
 void Ins::read_neighbourhood(string path,string name)
 {

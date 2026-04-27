@@ -950,13 +950,12 @@ void Ins::construct_time_dependent_traveltime(Graph& graph)
 
 void Ins::create_neighbourhood(std::string path, std::string name)
 {
-
 	const int N = maxvertices - 2;                 // regular vertices
 	const int enddepot = maxvertices - 1;
 
 	// Global bounds & shaping
-	const int   K_min = 50;
-	const int   K_max = 200;                       // a bit higher for large sets
+	const int   K_min = 200;
+	const int   K_max = 500;                       // a bit higher for large sets
 	const double beta = 3.0;
 	const double gamma = 2.0;
 	const double eps = 1e-9;
@@ -1232,7 +1231,7 @@ void Ins::create_neighbourhood_simple(std::string path, std::string name)
 
 	for (int d = 0; d < maxtours; ++d)
 	{
-#pragma omp parallel for schedule(guided)
+		#pragma omp parallel for schedule(guided)
 		for (int i = 0; i < maxvertices - 1; ++i) // skip end depot as origin
 		{
 			v[i].nb.resize(maxtours);

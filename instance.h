@@ -28,7 +28,7 @@ public:
 		double break_start = 0.0;
 		double break_end = DBL_MAX;
 
-		double horizon_slack = 0.0;
+		double horizon_slack = 0.01;
 		bool disable_unused_tours = true;
 
 		// New affine congestion parameters

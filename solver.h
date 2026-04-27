@@ -82,7 +82,7 @@ public:
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
 	void perturbe(Sol& sol);
-	Res solve(int bestknown = 1, double max_time_sec=1000.0);
+	Res solve(int bestknown, double max_time_sec=10000, int forced_crit = -1, int nb_mask = 7);
 	std::string name = "Tabu";
 };
 

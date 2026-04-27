@@ -347,7 +347,14 @@ void solve_dataset(int max_rep = 5)
 			*/
 
 			Tabu tabu(instance, 20000, 2, 0.1, 0.9, 10);
-			it->result[rep] = tabu.solve(it->bestknown,maxtime);
+			it->result[rep] = tabu.solve(it->bestknown,maxtime,-1,7);
+			/*
+			forced_crit = -1 for adaptive
+				forced_crit = 0 for SCORE
+				forced_crit = 1 for TIME
+				forced_crit = 2 for VOLUME
+				forced_crit = 3 for WEIGHT
+			*/
 			//it->result[rep].sol.write_to_cplex(textfile.name);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
@@ -364,6 +371,7 @@ void solve_dataset(int max_rep = 5)
 		}
 	}
 	//calculate results over all replicates
+	double avg_cpu = 0.0;
 	double avg_avg_gap = 0.0;
 	double sd_avg_gap = 0.0;
 	output.open("output.txt", ios::out | ios::app);
@@ -373,17 +381,19 @@ void solve_dataset(int max_rep = 5)
 		it->calculate_statistics();
 		output<<it->filename<<";" << it->avgscore << ";" << it->avgtime<< ";"<<it->avggap<<";"<<it->sdgap << '\n';
 		avg_avg_gap += it->avggap;
+		avg_cpu += it->avgtime;
 		
 	}
 	avg_avg_gap /= set.size();
+	avg_cpu /= set.size();
 	for (it = set.begin(); it != set.end(); ++it)
 	{
 		sd_avg_gap += pow(it->avggap-avg_avg_gap, 2);
 	}
 	sd_avg_gap = sqrt(sd_avg_gap / (set.size() - 1));
-	output << "avg avg gap: " << avg_avg_gap<< " sd avg gap: "<< sd_avg_gap << '\n';
+	output << "avg avg gap: " << avg_avg_gap<< " sd avg gap: "<< sd_avg_gap<< " avg cpu: " << avg_cpu << '\n';
 	output.close();
-	cout << "avg avg gap is: " << avg_avg_gap<<" sd avg gap: "<<sd_avg_gap << endl;
+	cout << "avg avg gap is: " << avg_avg_gap<<" sd avg gap: "<<sd_avg_gap << " avg cpu: " << avg_cpu << endl;
 }
 
 void case_study(int max_rep = 5) 
@@ -982,6 +992,6 @@ int main()
 	//doe(5);
 	//doe2(5);
 	//case_study(10);
-	//ctop_optimal(1);
+	//ctop_optimal(5);
 
 }

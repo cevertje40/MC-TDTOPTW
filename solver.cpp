@@ -704,14 +704,11 @@ inline Pressures compute_pressures(const Sol& s) {
 	return { t_p, w_p, v_p };
 }
 
-Res Tabu::solve(int bestknown, double max_time_sec)
+Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask)
 {
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 	s.reset();
-	//s.read_from_file();
-	//s.check();
-	//s.write_to_file();
 
 	auto elapsed_sec = [&]() -> double
 		{
@@ -724,30 +721,39 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		};
 
 	parallel_construct(s);
-	gb = s;//set global best to initial solution
-	//gb.check();
+	gb = s;
+
 	ElitePool elites;
 	elites.consider(s, ins->maxvertices);
 
-	//criteria selector based on constraint pressure
+	// criteria selector based on constraint pressure
 	enum Crit { SCORE = 0, TIME = 1, VOLUME = 2, WEIGHT = 3, N_CRIT = 4 };
 	struct CritStats { double ema_gain = 0.0; long used = 0; };
 	std::array<CritStats, N_CRIT> crit_stats{};
 
-	const double EPS_GAIN = 1e-6;// to avoid zero gains
+	const double EPS_GAIN = 1e-6; // to avoid zero gains
 
-	uniform_int_distribution<> nbpicker(1,3);//random move selector
-	TabuVector tabulist(ins->maxtours,ins->maxvertices,nb_tabu_it);//tabulist init
+	TabuVector tabulist(ins->maxtours, ins->maxvertices, nb_tabu_it);
 
-	int noimpr = 0;//number of iterations with no improvement
-	int iter = 0;//number of iterations
-	int nonb1 = 0;//non improving counter for move 1
-	int nonb2 = 0;//non improving counter for move 2
-	int nonb3 = 0;//non improving counter for move 3
+	int noimpr = 0;
+	int iter = 0;
+	int nonb1 = 0;
+	int nonb2 = 0;
+	int nonb3 = 0;
 	int no_feasible_moves_in_a_row = 0;
 	int restart_count = 0;
 	double restart_dist_sum = 0.0;
 
+	// enabled replacement neighborhoods
+	std::vector<int> enabled_nb;
+	if (nb_mask & 1) enabled_nb.push_back(1); // 1-1
+	if (nb_mask & 2) enabled_nb.push_back(2); // 2-1
+	if (nb_mask & 4) enabled_nb.push_back(3); // 1-2
+
+	if (enabled_nb.empty())
+	{
+		throw std::runtime_error("Tabu::solve called with nb_mask disabling all replacement neighborhoods.");
+	}
 
 	while (noimpr < max_noimpr && !time_up())
 	{
@@ -755,21 +761,28 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		{
 			break;
 		}
-		Sol backup = s;;//backup current solution
+
+		Sol backup = s;
 		int prev_score = s.score;
 		bool moved = false;
-		//select criterion based on constraint pressure
+
+		// --- criterion selection ---
 		auto P = compute_pressures(s);
-		auto ctx_mult = [&](int crit)->double {
-			if (crit == TIME)   return 1.0 + std::max(0.0, P.time_p - thresh) * gamma;
-			if (crit == VOLUME) return 1.0 + std::max(0.0, P.volume_p - thresh) * gamma;
-			if (crit == WEIGHT) return 1.0 + std::max(0.0, P.weight_p - thresh) * gamma;
-			return 1.0; // SCORE neutral
+
+		auto ctx_mult = [&](int crit) -> double
+			{
+				if (crit == TIME)   return 1.0 + std::max(0.0, P.time_p - thresh) * gamma;
+				if (crit == VOLUME) return 1.0 + std::max(0.0, P.volume_p - thresh) * gamma;
+				if (crit == WEIGHT) return 1.0 + std::max(0.0, P.weight_p - thresh) * gamma;
+				return 1.0; // SCORE neutral
 			};
 
-		auto perf = [&](int crit)->double { return crit_stats[crit].ema_gain + EPS_GAIN; };
+		auto perf = [&](int crit) -> double
+			{
+				return crit_stats[crit].ema_gain + EPS_GAIN;
+			};
 
-		std::array<double, N_CRIT> w = 
+		std::array<double, N_CRIT> w =
 		{
 			perf(SCORE) * ctx_mult(SCORE),
 			perf(TIME) * ctx_mult(TIME),
@@ -777,176 +790,181 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 			perf(WEIGHT) * ctx_mult(WEIGHT)
 		};
 
-		// 1) Sanitize: set negatives/NaN/inf to 0
-		for (double& wi : w) {
-			if (!(wi > 0.0) || !std::isfinite(wi)) wi = 0.0;  // catches NaN/inf/neg
+		// sanitize
+		for (double& wi : w)
+		{
+			if (!(wi > 0.0) || !std::isfinite(wi)) wi = 0.0;
 		}
 
-		// 2) Normalize by max so the largest weight is 1.0 (keeps magnitudes healthy)
+		// normalize
 		double maxw = *std::max_element(w.begin(), w.end());
-		if (maxw > 0.0) {
+		if (maxw > 0.0)
+		{
 			for (double& wi : w) wi /= maxw;
 		}
 
-		// 3) Mix with a uniform floor so nothing collapses to zero
-		//    (p' = 0.85*p + 0.15*1.0)
+		// mix with floor
 		for (double& wi : w) wi = 0.85 * wi + 0.15;
 
-		auto pick_weighted = [&](const std::array<double, N_CRIT>& ww)->int {
-			double sum = 0.0;
-			for (double x : ww) sum += x;
-			if (!(sum > 0.0)) 
+		auto pick_weighted = [&](const std::array<double, N_CRIT>& ww) -> int
 			{
-				return std::uniform_int_distribution<int>(0, N_CRIT - 1)(engine);
-			}
-			double u = std::uniform_real_distribution<double>(0.0, sum)(engine);
-			double acc = 0.0;
-			for (int i = 0; i < N_CRIT; ++i) 
-			{
-				acc += ww[i];
-				if (u < acc) return i;
-			}
-			return N_CRIT - 1; // fallback
+				double sum = 0.0;
+				for (double x : ww) sum += x;
+
+				if (!(sum > 0.0))
+				{
+					return std::uniform_int_distribution<int>(0, N_CRIT - 1)(engine);
+				}
+
+				double u = std::uniform_real_distribution<double>(0.0, sum)(engine);
+				double acc = 0.0;
+				for (int i = 0; i < N_CRIT; ++i)
+				{
+					acc += ww[i];
+					if (u < acc) return i;
+				}
+				return N_CRIT - 1;
 			};
 
-		int crit_id = pick_weighted(w);
+		int crit_id = -1;
+		if (forced_crit >= 0 && forced_crit < N_CRIT)
+		{
+			crit_id = forced_crit;   // fixed criterion for ablation
+		}
+		else
+		{
+			crit_id = pick_weighted(w); // adaptive behavior
+		}
+
 		auto kind = static_cast<RatioKind>(crit_id);
-		//select neighborhood structure at random
-		int pick=nbpicker(engine);
-		//int pick = 2;//to debug
-		//build admissable neighborhoods using the selected neighborhoodstructure
-		
+
+		// select enabled replacement neighborhood at random
+		int pick = enabled_nb[std::uniform_int_distribution<int>(0, (int)enabled_nb.size() - 1)(engine)];
+
 		switch (pick)
 		{
-			case 1:
+		case 1:
+		{
+			auto nb = one_one_replace_gen_nb(s, tabulist, gb.score, kind);
+			if (nb.size() == 0)
 			{
-				auto nb = one_one_replace_gen_nb(s,tabulist,gb.score,kind);
-				if (nb.size() == 0)
-				{
-					//perturbe(s);
-					//s.check();
-					++nonb1;
-					++no_feasible_moves_in_a_row;
-				}
-				else
-				{
-					no_feasible_moves_in_a_row = 0;
-					executeMove(nb, s, tabulist);
-					moved = true;
-					tabulist.nextIteration();
-				}
-				break;
+				++nonb1;
+				++no_feasible_moves_in_a_row;
 			}
-			case 2:
+			else
 			{
-				auto nb = two_one_replace_gen_nb(s,tabulist,gb.score,kind);
-				if (nb.size() == 0)
-				{
-					//perturbe(s);
-					//s.check();
-					++nonb2;
-					++no_feasible_moves_in_a_row;
-				}
-				else
-				{
-					no_feasible_moves_in_a_row = 0;
-					executeMove(nb, s, tabulist);
-					moved = true;
-					tabulist.nextIteration();
-				}
-				break;
+				no_feasible_moves_in_a_row = 0;
+				executeMove(nb, s, tabulist);
+				moved = true;
+				tabulist.nextIteration();
 			}
-			case 3:
+			break;
+		}
+		case 2:
+		{
+			auto nb = two_one_replace_gen_nb(s, tabulist, gb.score, kind);
+			if (nb.size() == 0)
 			{
-				auto nb = one_two_replace_gen_nb(s,tabulist,gb.score,kind);
-				if (nb.size() == 0)
-				{
-					//perturbe(s);
-					//s.check();
-					++nonb3;
-					++no_feasible_moves_in_a_row;
-				}
-				else
-				{
-					no_feasible_moves_in_a_row = 0;
-					executeMove(nb, s, tabulist);
-					moved = true;
-					tabulist.nextIteration();
-				}
-				break;
+				++nonb2;
+				++no_feasible_moves_in_a_row;
 			}
-		}//end switch
-	
-		
-		if (no_feasible_moves_in_a_row > 5) 
+			else
+			{
+				no_feasible_moves_in_a_row = 0;
+				executeMove(nb, s, tabulist);
+				moved = true;
+				tabulist.nextIteration();
+			}
+			break;
+		}
+		case 3:
+		{
+			auto nb = one_two_replace_gen_nb(s, tabulist, gb.score, kind);
+			if (nb.size() == 0)
+			{
+				++nonb3;
+				++no_feasible_moves_in_a_row;
+			}
+			else
+			{
+				no_feasible_moves_in_a_row = 0;
+				executeMove(nb, s, tabulist);
+				moved = true;
+				tabulist.nextIteration();
+			}
+			break;
+		}
+		default:
+			throw std::runtime_error("Invalid neighborhood selector value in Tabu::solve.");
+		}
+
+		if (no_feasible_moves_in_a_row > 5)
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
-			//int idx = elites.pick_farthest_idx(s, ins->maxvertices);
-			if (idx >= 0) 
-			{ 
+			if (idx >= 0)
+			{
 				std::unordered_set<uint64_t> A; ElitePool::fill_arcs(s, ins->maxvertices, A);
 				std::unordered_set<uint64_t> B; ElitePool::fill_arcs(elites.get(idx), ins->maxvertices, B);
 				double dist = ElitePool::arc_distance_frac(A, B);
 				restart_dist_sum += dist;
 				++restart_count;
 				s = elites.get(idx);
-				elites.mark_used(idx); 
-				
+				elites.mark_used(idx);
 			}
-			else 
-			{ 
-				s = gb; 
+			else
+			{
+				s = gb;
 			}
 			tabulist.clear();
 			no_feasible_moves_in_a_row = 0;
-			
 			continue;
 		}
-		
-		
-		// --- RVND: randomize LS order, restart when any op improves ---
+
+		// --- RVND ---
 		enum class LsOp { TwoOpt, Swap, Swap2, Relocate };
 		std::array<LsOp, 4> ops = { LsOp::TwoOpt, LsOp::Swap, LsOp::Swap2, LsOp::Relocate };
 
 		bool improved_any = true;
-		while (improved_any) 
+		while (improved_any)
 		{
 			improved_any = false;
 			std::shuffle(ops.begin(), ops.end(), engine);
 
-			for (auto op : ops) 
+			for (auto op : ops)
 			{
 				bool improved = false;
-				switch (op) 
+				switch (op)
 				{
-					case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);    break;   // or moves.two_opt_nb(s,1)
-					case LsOp::Swap:     improved = swap_nb(s, 1);       break;
-					case LsOp::Swap2:    improved = swap2_nb(s, 1);      break;
-					case LsOp::Relocate: improved = relocate_nb(s, 1);   break;
+				case LsOp::TwoOpt:   improved = two_opt_nb(s, 1);   break;
+				case LsOp::Swap:     improved = swap_nb(s, 1);      break;
+				case LsOp::Swap2:    improved = swap2_nb(s, 1);     break;
+				case LsOp::Relocate: improved = relocate_nb(s, 1);  break;
 				}
-				if (improved) 
-				{                     // RVND "restart-on-improvement"
+				if (improved)
+				{
 					improved_any = true;
 					break;
 				}
 			}
 		}
-		
-		//update constraint pressure
-		//cout << "it: " << iter << " score: " << s.score << " best: " << gb.score << " noimpr: " << noimpr << endl;
-		if (moved) 
+
+		// update criterion stats only in adaptive mode
+		if (forced_crit < 0)
 		{
-			double gain = std::max(0, s.score - prev_score);
-			crit_stats[crit_id].ema_gain =
-				(1.0 - ema_rho) * crit_stats[crit_id].ema_gain + ema_rho * gain;
-			crit_stats[crit_id].used++;
+			if (moved)
+			{
+				double gain = std::max(0, s.score - prev_score);
+				crit_stats[crit_id].ema_gain =
+					(1.0 - ema_rho) * crit_stats[crit_id].ema_gain + ema_rho * gain;
+				crit_stats[crit_id].used++;
+			}
+			else
+			{
+				for (int c = 0; c < N_CRIT; ++c)
+					crit_stats[c].ema_gain *= (1.0 - 0.05 * ema_rho);
+			}
 		}
-		else 
-		{
-			// gentle global decay
-			for (int c = 0; c < N_CRIT; ++c)
-				crit_stats[c].ema_gain *= (1.0 - 0.05 * ema_rho);
-		}
+
 		if (s.score > gb.score)
 		{
 			gb = s;
@@ -956,22 +974,19 @@ Res Tabu::solve(int bestknown, double max_time_sec)
 		{
 			++noimpr;
 		}
+
 		if ((iter & 2) == 0) elites.consider(s, ins->maxvertices);
 		elites.tick();
 		++iter;
-		/*
-		if ((iter % 2000) == 0 && restart_count > 0) 
-		{
-			std::cout<< s.score  << " [Restart] count=" << restart_count<< " avg_dist=" << (restart_dist_sum / restart_count) << "\n";
-		}
-		*/
-		//cout << iter << endl;
-	}//end while smaller than max_noimpr
+	}
+
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
-	//gb.write_to_cplex();
-	std::cout<<"iter without replacement nb: " << nonb1<<" <> " << nonb2<<" <> " << nonb3 <<" total iterations: "<< iter << endl;
-	//std::cout << gb << endl;
+
+	std::cout << "iter without replacement nb: "
+		<< nonb1 << " <> " << nonb2 << " <> " << nonb3
+		<< " total iterations: " << iter << std::endl;
+
 	return Res(gb, cpuTime, bestknown);
 }
 

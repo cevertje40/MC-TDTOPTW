@@ -1,2 +1,3 @@
-..\..\datasets\MCTDTOPTW\
-20.2.2.1.txt	291
+..\..\datasets\CTOP\LargeScale CTOP\set2\
+b66.txt	1686
+b67.txt	1613

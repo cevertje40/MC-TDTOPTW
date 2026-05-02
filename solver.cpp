@@ -898,6 +898,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 			throw std::runtime_error("Invalid neighborhood selector value in Tabu::solve.");
 		}
 
+		
 		if (no_feasible_moves_in_a_row > 5)
 		{
 			int idx = elites.pick_idx(s, ins->maxvertices, engine);
@@ -919,6 +920,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 			no_feasible_moves_in_a_row = 0;
 			continue;
 		}
+		
 
 		// --- RVND ---
 		enum class LsOp { TwoOpt, Swap, Swap2, Relocate };

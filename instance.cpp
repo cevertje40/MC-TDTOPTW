@@ -954,8 +954,8 @@ void Ins::create_neighbourhood(std::string path, std::string name)
 	const int enddepot = maxvertices - 1;
 
 	// Global bounds & shaping
-	const int   K_min = 200;
-	const int   K_max = 500;                       // a bit higher for large sets
+	const int   K_min = 50;
+	const int   K_max = 200;                       // a bit higher for large sets
 	const double beta = 3.0;
 	const double gamma = 2.0;
 	const double eps = 1e-9;

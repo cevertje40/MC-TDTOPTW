@@ -157,7 +157,6 @@ private:
 	double temp_factor; //initial temperature factor
 	double temp_min;//minimum temperature
 	double beta_frac; //fraction of visited customers
-	int beta_cap;// hard cap on beta
 	double lambda;//weight update learning rate
 
 	Sol s;//current iteration solution

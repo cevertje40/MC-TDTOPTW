@@ -346,8 +346,8 @@ void solve_dataset(int max_rep = 5)
 				maxtime = 5.0;
 			
 
-			Tabu tabu(instance, 20000, 2, 0.1, 0.9, 10);
-			it->result[rep] = tabu.solve(it->bestknown,maxtime,-1,7);
+			//Tabu tabu(instance, 20000, 2, 0.1, 0.9, 10);
+			//it->result[rep] = tabu.solve(it->bestknown,maxtime,-1,7);
 			/*
 			forced_crit = -1 for adaptive
 				forced_crit = 0 for SCORE
@@ -359,8 +359,8 @@ void solve_dataset(int max_rep = 5)
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
-			//Alns alns(instance,5000,0.9997,150,500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
-			//it->result[rep] = alns.solve(it->bestknown,maxtime);
+			Alns alns(instance,5000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
+			it->result[rep] = alns.solve(it->bestknown,maxtime);
 
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;

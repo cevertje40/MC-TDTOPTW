@@ -120,7 +120,6 @@ public:
 	bool check();
 	void read_from_file(const std::string& dataset);
 	void write_to_file(const std::string& dataset);
-	void write_to_cplex(const std::string& dataset);
 	void check_availability();
 	SolutionPerfStats repair_and_collect_stats();
 	friend std::ostream& operator<<(std::ostream& output, Sol& sol);

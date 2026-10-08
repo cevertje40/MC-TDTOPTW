@@ -32,128 +32,193 @@ Sol::Sol(Ins& ins):ins(&ins)
 
 void Sol::read_from_file(const std::string& dataset)
 {
-	vector<vector<int>> inputv(ins->maxtours);
-	vector<vector<int>> inputb(ins->maxtours);
-	ifstream ifs;
-	std::string name = "sol_" + dataset;
-	ifs.open(name, ifstream::in);
-	if (ifs.is_open())
+	struct RouteData
 	{
-		for (int t = 0; t < ins->maxtours; ++t)
-		{
-			int seqsize;
-			string line;
-			//read in number of vertices in tour
-			getline(ifs, line);
-			stringstream str(line);
-			str >> seqsize;
-			//read in vertex indices
-			getline(ifs, line);
-			str = stringstream(line);
-			for (int i = 0; i < seqsize; ++i)
-			{
-				int index;
-				str >> index;
-				inputv[t].push_back(index);
-			}
-			//read in vertex action
-			getline(ifs, line);
-			str = stringstream(line);
-			for (int i = 0; i < seqsize; ++i)
-			{
-				int action;
-				str >> action;
-				inputb[t].push_back(action);
-			}
-		}
-		ifs.close();
-	}
-	else
+		std::vector<int> vertices;
+		std::vector<double> departures;
+		std::vector<int> slots;
+		int breakvertex = -1;
+	};
+
+	const std::string filename = "sol_" + dataset;
+	std::ifstream ifs(filename);
+
+	if (!ifs.is_open())
 	{
-		printf("\ninput error in filenames file");
+		std::cerr << "Could not open solution file: " << filename << '\n';
+		return;
 	}
-	//construct the tours
+
+	double fileObjective = 0.0;
+	if (!(ifs >> fileObjective))
+		throw std::runtime_error("Could not read objective from " + filename);
+
+	std::vector<RouteData> routes(ins->maxtours);
+
+	// Parse the whole file before modifying the current solution.
 	for (int t = 0; t < ins->maxtours; ++t)
 	{
-		Sol::Tour* tour = &tours[t];
-		double currenttime = ins->t[t].EDT;
-		Ins::Vertex* last = tour->seq[0];
+		int seqsize = 0;
+		if (!(ifs >> seqsize) || seqsize < 2)
+			throw std::runtime_error("Invalid route size in " + filename);
 
-		const double EDT = ins->t[t].EDT;
-		const double LAT = ins->t[t].LAT;
-		const double B = ins->breakdur;
-		const double BE = ins->breakend;
-		const int ENDDEP = ins->maxvertices - 1;
-		for (int i = 1; i < inputv[t].size(); ++i)
+		RouteData& route = routes[t];
+		route.vertices.resize(seqsize);
+		route.departures.resize(seqsize - 1);
+		route.slots.resize(seqsize - 1);
+
+		for (int& vertex : route.vertices)
 		{
-			Ins::Vertex* candidate = &ins->v[inputv[t][i]];
-			tour->seq.push_back(candidate);
-			available[candidate->index] = false;
-			tour->score += candidate->score;
-			score += candidate->score;
-			tour->max_shift.push_back(0);//dummy die dan in calc max shift upgedate wordt
-			tour->volume += candidate->volume;
-			tour->weight += candidate->weight;
-			tour->action.push_back(inputb[t][i]);
-			//deptime calc
-			double arrivaltime = ins->arrival_time(last->con[candidate->index], currenttime);
-			double startservice = 0.0;
-			double startbreak = 0.0;
-			double endbreak = 0.0;
-			if (inputb[t][i] == 1)
+			if (!(ifs >> vertex))
+				throw std::runtime_error("Could not read route vertices from " + filename);
+		}
+
+		for (double& departure : route.departures)
+		{
+			if (!(ifs >> departure))
+				throw std::runtime_error("Could not read departure times from " + filename);
+		}
+
+		for (int& slot : route.slots)
+		{
+			if (!(ifs >> slot))
+				throw std::runtime_error("Could not read time-slot indices from " + filename);
+		}
+
+		if (!(ifs >> route.breakvertex))
+			throw std::runtime_error("Could not read break vertex from " + filename);
+	}
+
+	const int endDepot = ins->maxvertices - 1;
+
+	// Validate depot endpoints, break locations, and customer uniqueness.
+	std::vector<bool> seenCustomer(ins->maxvertices, false);
+
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		const RouteData& route = routes[t];
+
+		if (route.vertices.front() != 0 || route.vertices.back() != endDepot)
+			throw std::runtime_error("A route does not start and end at the depots");
+
+		int breakPositions = 0;
+		for (int pos = 0; pos < static_cast<int>(route.vertices.size()); ++pos)
+		{
+			const int vertex = route.vertices[pos];
+
+			if (vertex < 0 || vertex >= ins->maxvertices)
+				throw std::runtime_error("Invalid vertex index in " + filename);
+
+			if (vertex == route.breakvertex)
+				++breakPositions;
+
+			if (pos > 0 && pos < static_cast<int>(route.vertices.size()) - 1)
 			{
-				tour->breakindex = i;
-				const bool endp = (candidate->index == ENDDEP);
+				if (seenCustomer[vertex])
+					throw std::runtime_error("A customer occurs more than once in " + filename);
 
-				// break can start upon arrival; at non-depot clamp to breakstart
-				if (!endp && arrivaltime < ins->breakstart)
+				seenCustomer[vertex] = true;
+			}
+		}
+
+		if (breakPositions != 1)
+			throw std::runtime_error("Break vertex must occur exactly once on its route");
+	}
+
+	// Reset solution and availability state.
+	score = 0;
+	std::fill(available.begin(), available.end(), true);
+
+	for (int t = 0; t < ins->maxtours; ++t)
+	{
+		Tour& tour = tours[t];
+		const RouteData& route = routes[t];
+		const int n = static_cast<int>(route.vertices.size());
+		const double EDT = ins->t[t].EDT;
+
+		tour.seq.clear();
+		tour.action.assign(n, 0);
+		tour.deptime.clear();
+		tour.max_shift.assign(n, 0.0);
+
+		tour.score = 0;
+		tour.weight = 0.0;
+		tour.volume = 0.0;
+		tour.breakindex = -1;
+
+		// Build the route and mark its break location.
+		for (int pos = 0; pos < n; ++pos)
+		{
+			const int vertex = route.vertices[pos];
+			tour.seq.push_back(&ins->v[vertex]);
+
+			if (vertex == route.breakvertex)
+			{
+				tour.action[pos] = 1;
+				tour.breakindex = pos;
+			}
+
+			if (pos > 0 && pos < n - 1)
+			{
+				available[vertex] = false;
+				tour.score += ins->v[vertex].score;
+				tour.weight += ins->v[vertex].weight;
+				tour.volume += ins->v[vertex].volume;
+				score += ins->v[vertex].score;
+			}
+		}
+
+		// Replay the route using the same timing rules as Tour::check().
+		tour.deptime.push_back(0.0);
+		double currenttime = EDT;
+
+		for (int pos = 1; pos < n; ++pos)
+		{
+			Ins::Vertex* previous = tour.seq[pos - 1];
+			Ins::Vertex* current = tour.seq[pos];
+
+			const double arrival = ins->arrival_time(
+				previous->con[current->index],
+				currenttime);
+
+			double startservice = 0.0;
+
+			if (tour.action[pos] == 1)
+			{
+				const bool atEndDepot = (current->index == endDepot);
+
+				// At customers, wait until brk_start if arriving earlier.
+				// At the end depot, the break may start upon arrival.
+				double startbreak = arrival;
+				if (!atEndDepot && startbreak < ins->breakstart)
 					startbreak = ins->breakstart;
-				else
-					startbreak = arrivaltime;
 
-				endbreak = startbreak + B;
+				if (startbreak > ins->breakend + 1e-6)
+					throw std::runtime_error(
+						"Break starts after brk_end on route " + std::to_string(t));
 
-				// Apply LTW at start-of-service
-				startservice = (endbreak < candidate->LTW[t]) ? candidate->LTW[t] : endbreak;
+				const double endbreak = startbreak + ins->breakdur;
+				startservice = std::max(endbreak, current->LTW[t]);
 			}
 			else
 			{
-				// No break: just LTW
-				startservice = (arrivaltime < candidate->LTW[t]) ? candidate->LTW[t] : arrivaltime;
+				startservice = std::max(arrival, current->LTW[t]);
 			}
-			arrivaltime = startservice + candidate->serv;
-			tour->deptime.push_back(arrivaltime - EDT);
-			currenttime = arrivaltime;
-			last = candidate;
-		}//end tour creation
-		tour->calc_maxshift();
-	}//end for all tours
-}//end input custom
 
-void Sol::write_to_file(const std::string& dataset)
-{
-	ofstream output;
-	std::string name = "sol_" + dataset;
-	output.open(name, ios::out);
-	for (int t = 0; t < ins->maxtours; ++t)
-	{
-		Sol::Tour* tour = &tours[t];
-		output << tour->seq.size()<<"\n";
-		for (int i = 0; i < tour->seq.size();++i)
-		{
-			output<<tour->seq[i]->index << " ";
+			if (startservice > current->UTW[t] + 1e-6)
+				throw std::runtime_error(
+					"Latest service time violated on route " + std::to_string(t));
+
+			currenttime = startservice + current->serv;
+			tour.deptime.push_back(currenttime - EDT);
 		}
-		output << "\n";
-		for (int i = 0; i < tour->seq.size(); ++i)
-		{
-			output << tour->action[i] << " ";
-		}
-		output << "\n";
+
+		tour.calc_maxshift();
 	}
-	output.close();
+
 }
 
-void Sol::write_to_cplex(const std::string& dataset)
+void Sol::write_to_file(const std::string& dataset)
 {
 	std::ofstream output;
 	std::string name = "sol_" + dataset;   
@@ -941,6 +1006,7 @@ bool Tour::check()
 			if ((arrivaltime < ins->breakstart)&&(current->index != ins->maxvertices - 1))
 			{//break can not start before breakstart
 				waitingtime += ins->breakstart - arrivaltime;
+				//cout << "tour: " << index<< "waiting time before breakstart: " << waitingtime << endl;
 				startbreak = ins->breakstart;
 			}
 			else
@@ -956,7 +1022,7 @@ bool Tour::check()
 			if (endbreak < current->LTW[index])
 			{
 				waitingtime += current->LTW[index] - endbreak;
-				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
+				//cout<<"tour: "<< index << "waiting time before opening time: " << "i: " << i + 1 << " , " << seq[i + 1]->index << " <=> " << waitingtime << endl;
 				startservice = current->LTW[index];
 			}
 			else
@@ -969,7 +1035,7 @@ bool Tour::check()
 			if (arrivaltime < current->LTW[index])
 			{
 				waitingtime += current->LTW[index] - arrivaltime;
-				//cout << "waiting time for: "<<"i"<<i+1<<" , " <<seq[i + 1]->index << " <=> " << waitingtime << endl;
+				//cout <<"tour: "<< index << "waiting time before opening time: " << "i: " << i + 1 << " , " << seq[i + 1]->index << " <=> " << waitingtime << endl;
 				startservice = current->LTW[index];
 			}
 			else
@@ -1068,13 +1134,13 @@ bool Tour::check()
 	double departuretime = 0;
 	max_shiftcheck.back() = (ins->t[index].T_max - deptime.back());
 	double arrivaltime = ins->t[index].LAT - (action.back() * ins->breakdur);//if you break at the end depot subtract breakduration
-	if (action.back() == 1)//break op enddepot
+	if (action.back() == 1)//break at end depot
 	{
 		if (ins->t[index].LAT > ins->breakend + ins->breakdur)
 		{
-			//cout<<"path: "<<d<< " bij calc maxshift break op enddepot verhindert een maxshift: " << endl;
+			//cout<<"path: "<<d<< " break position limits maxshift: " << endl;
 			max_shiftcheck.back() = (ins->breakend + ins->breakdur) - (ins->t[index].EDT+deptime.back());
-			arrivaltime = ins->breakend;//zoals hieronder service of enkel break in dit geval ervan aftrekken
+			arrivaltime = ins->breakend;
 		}
 	}
 	Ins::Vertex* y;
@@ -1096,7 +1162,7 @@ bool Tour::check()
 		{
 			if (departuretime > ins->breakend + ins->breakdur)
 			{
-				//cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
+				//cout << "break positioning limits maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
 				departuretime = ins->breakend + ins->breakdur;
 			}
 		}

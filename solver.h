@@ -144,9 +144,6 @@ int weighted_pick(const std::array<double, N>& w, std::mt19937& engine)
 	return (int)N - 1;
 }
 
-
-
-
 class Alns : public Moves
 {
 private:
@@ -199,15 +196,11 @@ private:
 	Ins::Vertex* highest_score_to_burden_selection_from_pool(const std::vector<Ins::Vertex*>& pool) const;
 	Ins::Vertex* lowest_resource_selection_from_pool(const std::vector<Ins::Vertex*>& pool) const;
 	Ins::Vertex* dynamic_travel_time_profit_selection_from_pool(const Sol& sol, const std::vector<Ins::Vertex*>& pool, const std::vector<RemovedCustomer>& removed) const;
-
 	Ins::Vertex* apply_selection_operator_from_pool(const Sol& sol, const std::vector<Ins::Vertex*>& pool, SelectionOp sel_op, const std::vector<RemovedCustomer>& removed) const;
 
 	//insertion operators
-	
-
 	std::vector<double> collect_feasible_insertion_shifts(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
 	bool evaluate_insertion_position(const Sol& sol, Ins::Vertex* y, int d, int j, const std::vector<RemovedCustomer>& removed, GreedyInsertion& out) const;
-
 	GreedyInsertion best_position_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
 	GreedyInsertion first_feasible_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
 	GreedyInsertion last_feasible_insertion(const Sol& sol, Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;

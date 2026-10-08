@@ -30,27 +30,36 @@ void Moves::parallel_construct(Sol& sol)
 			double currenttime = tour.deptime.back() + ins->t[d].EDT;
 			Ins::Vertex* last = tour.seq.back();
 
-			double arr = ins->arrival_time(last->con[cand->index], currenttime);
-			int need_break = -1;
-			if ((tour.breakindex == -1) && ((arr >= ins->breakstart) || (cand->LTW[d] - ins->breakdur >= ins->breakstart)))
+			double at = ins->arrival_time(last->con[cand->index], currenttime);
+			int need_break = 0;
+			if (tour.breakindex == -1 && at >= ins->breakstart - 1e-9)
 			{
-				arr += ins->breakdur;
+				// Arrival is in the break window: take the break at this customer.
+				if (at > ins->breakend + 1e-9) return false;
+
+				at += ins->breakdur;
 				need_break = 1;
 			}
-			else
+
+			// Apply the customer's time window after any break.
+			if (at < cand->LTW[d]) at = cand->LTW[d];
+			if (at > cand->UTW[d] + 1e-9) return false;
+
+			at += cand->serv;
+
+			double enddep =ins->arrival_time(cand->con[ins->maxvertices - 1], at);
+
+			if (tour.breakindex == -1 && need_break == 0)
 			{
-				need_break = 0;
+				// The break would be taken upon arrival at the end depot.
+				if (enddep > ins->breakend + 1e-9) return false;
+
+				enddep += ins->breakdur;
 			}
-			if (arr < cand->LTW[d]) arr = cand->LTW[d];
-			if (arr > cand->UTW[d] + 1e-9) return false;
 
-			arr += cand->serv;
-
-			double enddep = ins->arrival_time(cand->con[ins->maxvertices - 1], arr);
-			if ((tour.breakindex == -1) && (need_break == 0)) enddep += ins->breakdur;
 			if (enddep > ins->t[d].LAT + 1e-9) return false;
 
-			new_deptime = arr - ins->t[d].EDT; // includes break if taken
+			new_deptime = at - ins->t[d].EDT; // includes break if taken
 			brk = need_break;
 			return true;
 		};

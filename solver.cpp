@@ -721,6 +721,8 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 		};
 
 	parallel_construct(s);
+	//s.read_from_file("20.3.1.3.txt");
+	//s.check();
 	gb = s;
 
 	ElitePool elites;
@@ -983,6 +985,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 	}
 
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
+	cout << gb << endl;
 	gb.check();
 
 	std::cout << "iter without replacement nb: "

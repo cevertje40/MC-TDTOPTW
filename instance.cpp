@@ -5,7 +5,7 @@ using namespace std;
 void Ins::read_time_independent_traveltime()
 {
 	// read in time-independent (freeflow) travel time
-	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	string filepath = "..\\datasets\\MCTDTOPTW\\";
 	ifstream titt;
 	titt.open(filepath + "titt" + to_string(maxvertices) + ".TXT", ifstream::in);
 	if (titt.is_open())
@@ -39,7 +39,7 @@ void Ins::read_time_independent_traveltime()
 
 void Ins::read_time_dependent_traveltime()
 {
-	string filepath = "..\\..\\datasets\\MCTDTOPTW\\";
+	string filepath = "..\\datasets\\MCTDTOPTW\\";
 	ifstream tt(filepath + "tt" + to_string(maxvertices) + ".TXT");
 	if (!tt.is_open()) {
 		cout << term::fg(term::Color::red) << "could not open time-dependent travel time file" << endl;

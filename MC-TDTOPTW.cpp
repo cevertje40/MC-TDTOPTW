@@ -359,7 +359,7 @@ void solve_dataset(int max_rep = 5)
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
 			//it->result[rep] = ils.solve(it->bestscore);
-			Alns alns(instance,5000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
+			Alns alns(instance,200000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
 			it->result[rep] = alns.solve(it->bestknown,maxtime);
 
 			avggap += it->result[rep].gap;
@@ -987,7 +987,7 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	solve_dataset(5);
+	solve_dataset(1);
 	//ctop_gap();
 	//doe(5);
 	//doe2(5);

@@ -176,6 +176,21 @@ private:
 	
 	std::vector<std::pair<int, int>> collect_removable_positions(Sol& sol);
 	const RemovedCustomer* find_removed_info(Ins::Vertex* y, const std::vector<RemovedCustomer>& removed) const;
+
+	struct RemovalCandidate
+	{
+		double priority;
+		int tourSlot;
+		int position;
+	};
+
+
+	bool time_feasible(const Sol::Tour& tour) const;
+	bool try_remove_positions(Sol& sol, int tourSlot,std::vector<int> positions);
+	bool try_remove_vertex(Sol& sol, int tourSlot, int position);
+	bool try_ranked_removal(Sol& sol,std::vector<RemovalCandidate> candidates,bool preferLargest,std::vector<RemovedCustomer>& removed);
+
+
 	//removal operators
 	std::vector<RemovedCustomer> random_remove(Sol& sol, int beta);
 	std::vector<RemovedCustomer> worst_remove_burden(Sol& sol, int beta);
@@ -219,6 +234,12 @@ private:
 	bool accept_candidate(const Sol& cur, const Sol& cand, double T);
 
 	void update_operator_weights(double lambda);
+
+	//local search functions
+	GreedyInsertion minimum_shift_insertion(const Sol& sol,Ins::Vertex* y,const std::vector<RemovedCustomer>& removed) const;
+	bool ls_remove_one_and_refill(Sol& sol);
+	bool ls_replace_with_higher_score(Sol& sol);
+	bool ls_remove_two_insert_one(Sol& sol);
 
 public:
 	Alns(Ins& ins, int iter_max_best, double alpha, int segment_len, int iter_per_segment,double sigma1, double sigma2, double sigma3, double temp_factor,double temp_min, double beta_frac,double lambda);

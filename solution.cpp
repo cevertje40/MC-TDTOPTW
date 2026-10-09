@@ -646,6 +646,7 @@ void Tour::update_break()  // reposition break, update times and max_shift
 		// unconditional fallback: end depot (special-case semantics will apply)
 		action.back() = 1;
 		breakindex = n - 1;
+		//cout << "no feasible break position found, forcing end depot, solution might be infeasbible" << endl;
 	}
 
 	// --- forward recompute from breakindex-1 with break semantics ---

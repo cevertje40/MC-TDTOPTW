@@ -985,7 +985,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 	}
 
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
-	cout << gb << endl;
+	//cout << gb << endl;
 	gb.check();
 
 	std::cout << "iter without replacement nb: "

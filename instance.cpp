@@ -2,10 +2,9 @@
 
 using namespace std;
 
-void Ins::read_time_independent_traveltime()
+void Ins::read_time_independent_traveltime(std::string filepath, std::string name)
 {
 	// read in time-independent (freeflow) travel time
-	string filepath = "..\\datasets\\MCTDTOPTW\\";
 	ifstream titt;
 	titt.open(filepath + "titt" + to_string(maxvertices) + ".TXT", ifstream::in);
 	if (titt.is_open())
@@ -24,6 +23,7 @@ void Ins::read_time_independent_traveltime()
 				c[counter].from = i;
 				c[counter].to = j;
 				str >> c[counter].determin;
+				c[counter].determin /= 3600000.0;
 				str.ignore();
 				v[i].con[j] = &c[counter];
 			}
@@ -37,10 +37,9 @@ void Ins::read_time_independent_traveltime()
 }//end read time independent
 
 
-void Ins::read_time_dependent_traveltime()
+void Ins::read_time_dependent_traveltime(std::string filepath, std::string name)
 {
-	string filepath = "..\\datasets\\MCTDTOPTW\\";
-	ifstream tt(filepath + "tt" + to_string(maxvertices) + ".TXT");
+	ifstream tt(filepath + "tts" + to_string(maxvertices) + ".TXT");
 	if (!tt.is_open()) {
 		cout << term::fg(term::Color::red) << "could not open time-dependent travel time file" << endl;
 		return;
@@ -53,9 +52,23 @@ void Ins::read_time_dependent_traveltime()
 			stringstream str(line);
 
 			vector<double> dump(maxtimeslots);
-			for (double& val : dump) {
+			/*
+			for (double& val : dump) 
+			{
 				str >> val;
 				str.ignore();  // ignore delimiter (assumes comma or space)
+			}
+			*/
+
+			vector<double> dump2(maxtimeslots);
+			for (int t = 0; t < maxtimeslots; ++t)
+			{
+				string meanToken;
+				string stddevToken;
+				getline(str, meanToken, ';');
+				getline(str, stddevToken, ';');
+				dump[t] =stod(meanToken) / 3600000.0;
+				dump2[t] =stod(stddevToken) / 3600000.0;
 			}
 
 			auto& mu = v[i].con[j]->mu;
@@ -142,6 +155,77 @@ Ins::Ins(MCTDTOPTW textfile)
 	else
 	{
 		cout << " can not open MC-TDTOPTW instance file" << endl;
+	}
+}
+
+
+Ins::Ins(TDOPTW textfile)
+{
+	//read in vertex and tour information from txt file and populate v and t objects
+	ifstream ifs;
+	ifs.open(textfile.path + textfile.name, ifstream::in);
+	if (ifs.is_open())
+	{
+		string line;
+		getline(ifs, line);
+		stringstream str(line);//first line
+		str >> maxvertices;//maxvertices
+		getline(ifs, line);
+		maxtours=1;//maxtours
+		v.resize(maxvertices);
+		t.resize(maxtours);
+		c.resize(maxvertices * maxvertices);
+		str = stringstream(line);
+		str >> t[0].T_max;
+		t[0].T_max /= 3600000.0;
+		maxscore = 0;
+		for (int vertex = 0; vertex < maxvertices; ++vertex)
+		{
+			getline(ifs, line);//maxvertices lines vertex info
+			str = stringstream(line);
+			v[vertex].index = vertex;
+
+			string id;
+			string score;
+			string penalty;
+			string serv;
+			string ltw;
+			string utw;
+			getline(str, id, ';');
+			getline(str, score, ';');
+			getline(str, penalty, ';');
+			getline(str, serv, ';');
+			getline(str, ltw, ';');
+			getline(str, utw, ';');
+			v[vertex].id = stoi(id);
+			v[vertex].score = stoi(score);
+			v[vertex].serv = stod(serv)/3600000.0;
+			v[vertex].LTW.resize(1);
+			v[vertex].UTW.resize(1);
+			v[vertex].LTW[0] = stod(ltw)/3600000.0;
+			v[vertex].UTW[0] = stod(utw)/3600000.0;
+			v[vertex].serv = std::round(v[vertex].serv * 100.0) / 100.0;
+			v[vertex].weight = 0.0;
+			v[vertex].volume = 0.0;
+			maxscore += v[vertex].score;
+		}
+		
+		t[0].index = 0;
+		t[0].id = 1;
+		t[0].EDT = v.back().LTW[0];
+		t[0].LAT = t[0].EDT + t[0].T_max;
+		t[0].startv = &v[0];
+		t[0].endv = &v[maxvertices - 1];
+		t[0].W_max = 9999;
+		t[0].V_max = 9999;
+		breakdur = 0.0;
+		breakstart = time_periods[0];
+		breakend = time_periods[0] + t[0].T_max;
+		ifs.close();
+	}
+	else
+	{
+		cout << " can not open TDOPTW instance file" << endl;
 	}
 }
 
@@ -1401,10 +1485,10 @@ void Ins::alter_instance()
 	
 }
 
-void Ins::unalter_instance()
+void Ins::unalter_instance(std::string path, std::string name)
 {
 	breakdur = 0.75;
 	
-	read_time_dependent_traveltime();
+	read_time_dependent_traveltime(path, name);
 	
 }

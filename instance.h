@@ -12,7 +12,14 @@ public:
 		
 	};
 
-	struct CTOP {
+	struct TDOPTW
+	{
+		std::string path;
+		std::string name;	
+	};
+
+	struct CTOP 
+	{
 		std::string path;
 		std::string name;
 	};
@@ -112,20 +119,21 @@ public:
 	std::vector<Tour> t;//tour objects
 
 	
-	Ins(struct MCTDTOPTW);//construct instance by reading file
-	Ins(struct CTOP);//convert CTOP instance
+	Ins(struct MCTDTOPTW);//construct MCTDTOPTW instance by reading file
+	Ins(struct TDOPTW);//convert TDOPTW instance by reading file
+	Ins(struct CTOP);//convert CTOP instance by reading file
 	Ins(struct KnownOptimalCTOP);
 
 	void construct_time_independent_traveltime(Graph& graph);
 	void construct_time_dependent_traveltime(Graph& graph);
-	void read_time_independent_traveltime();
-	void read_time_dependent_traveltime();
+	void read_time_independent_traveltime(std::string path, std::string name);
+	void read_time_dependent_traveltime(std::string path, std::string name);
 	void create_neighbourhood(std::string path, std::string name);
 	void create_neighbourhood_simple(std::string path, std::string name);
 	void read_neighbourhood(std::string path, std::string name);
 
 	void alter_instance();
-	void unalter_instance();
+	void unalter_instance(std::string path, std::string name);
 
 	PlantedReplayResult replay_planted_route_break_first_customer(const std::vector<int>& route,int tour_idx,bool verbose) const;
 

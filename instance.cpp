@@ -23,7 +23,6 @@ void Ins::read_time_independent_traveltime(std::string filepath, std::string nam
 				c[counter].from = i;
 				c[counter].to = j;
 				str >> c[counter].determin;
-				c[counter].determin /= 3600000.0;
 				str.ignore();
 				v[i].con[j] = &c[counter];
 			}
@@ -39,7 +38,7 @@ void Ins::read_time_independent_traveltime(std::string filepath, std::string nam
 
 void Ins::read_time_dependent_traveltime(std::string filepath, std::string name)
 {
-	ifstream tt(filepath + "tts" + to_string(maxvertices) + ".TXT");
+	ifstream tt(filepath + "tt" + to_string(maxvertices) + ".TXT");
 	if (!tt.is_open()) {
 		cout << term::fg(term::Color::red) << "could not open time-dependent travel time file" << endl;
 		return;
@@ -50,27 +49,12 @@ void Ins::read_time_dependent_traveltime(std::string filepath, std::string name)
 			string line;
 			getline(tt, line);
 			stringstream str(line);
-
 			vector<double> dump(maxtimeslots);
-			/*
 			for (double& val : dump) 
 			{
 				str >> val;
 				str.ignore();  // ignore delimiter (assumes comma or space)
 			}
-			*/
-
-			vector<double> dump2(maxtimeslots);
-			for (int t = 0; t < maxtimeslots; ++t)
-			{
-				string meanToken;
-				string stddevToken;
-				getline(str, meanToken, ';');
-				getline(str, stddevToken, ';');
-				dump[t] =stod(meanToken) / 3600000.0;
-				dump2[t] =stod(stddevToken) / 3600000.0;
-			}
-
 			auto& mu = v[i].con[j]->mu;
 			auto& oneplusmu = v[i].con[j]->oneplusmu;
 			auto& nu = v[i].con[j]->nu;
@@ -162,6 +146,7 @@ Ins::Ins(MCTDTOPTW textfile)
 Ins::Ins(TDOPTW textfile)
 {
 	//read in vertex and tour information from txt file and populate v and t objects
+	//all times are in ms
 	ifstream ifs;
 	ifs.open(textfile.path + textfile.name, ifstream::in);
 	if (ifs.is_open())
@@ -204,7 +189,7 @@ Ins::Ins(TDOPTW textfile)
 			v[vertex].UTW.resize(1);
 			v[vertex].LTW[0] = stod(ltw)/3600000.0;
 			v[vertex].UTW[0] = stod(utw)/3600000.0;
-			v[vertex].serv = std::round(v[vertex].serv * 100.0) / 100.0;
+			//v[vertex].serv = std::round(v[vertex].serv * 100.0) / 100.0;
 			v[vertex].weight = 0.0;
 			v[vertex].volume = 0.0;
 			maxscore += v[vertex].score;
@@ -226,6 +211,114 @@ Ins::Ins(TDOPTW textfile)
 	else
 	{
 		cout << " can not open TDOPTW instance file" << endl;
+	}
+
+
+	// read in time-independent travel time in ms
+	ifstream titt;
+	titt.open(textfile.path + "titt" + to_string(maxvertices) + ".TXT", ifstream::in);
+	if (titt.is_open())
+	{
+		//cout << "reading time-independent travel time" << endl;
+		//assign connections to vertex objects and read free flow travel time
+		for (int i = 0; i < maxvertices; ++i)
+		{
+			v[i].con.resize(maxvertices);
+			string line;
+			getline(titt, line);
+			stringstream str(line);
+			for (int j = 0; j < maxvertices; ++j)
+			{
+				int counter = i * maxvertices + j;
+				c[counter].from = i;
+				c[counter].to = j;
+				str >> c[counter].determin;
+				c[counter].determin /= 3600000.0;
+				str.ignore();
+				v[i].con[j] = &c[counter];
+			}
+		}
+		titt.close();
+	}
+	else
+	{
+		cout << term::fg(term::Color::red) << "could not open time-independent travel time file" << endl;
+	}
+
+	//read time dependent travel time (file still works with miliseconds)
+	const std::string filename = textfile.path + "tt" + std::to_string(maxvertices) + ".TXT";
+
+	std::ifstream tt(filename);
+	if (!tt.is_open())
+	{
+		std::cerr << "Could not open time-dependent travel-time file: "
+			<< filename << '\n';
+		return;
+	}
+
+	// The file is a flat semicolon-separated list. Replace delimiters
+	// with whitespace so stream extraction works across the whole file.
+	std::string contents((std::istreambuf_iterator<char>(tt)),std::istreambuf_iterator<char>());
+
+	std::replace(contents.begin(), contents.end(), ';', ' ');
+	std::istringstream values(contents);
+
+	const std::size_t expected =static_cast<std::size_t>(maxvertices) *	static_cast<std::size_t>(maxvertices) *	static_cast<std::size_t>(maxtimeslots);
+
+	std::vector<double> travelTimes(expected);
+	for (double& value : travelTimes)
+	{
+		if (!(values >> value))
+		{
+			std::cerr << "Travel-time file has fewer values than expected: "
+				<< filename << '\n';
+			return;
+		}
+	}
+
+	double extraValue;
+	if (values >> extraValue)
+	{
+		std::cerr << "Travel-time file has more values than expected: "	<< filename << '\n';
+		return;
+	}
+
+	std::size_t offset = 0;
+
+	for (int i = 0; i < maxvertices; ++i)
+	{
+		for (int j = 0; j < maxvertices; ++j)
+		{
+			auto& connection = *v[i].con[j];
+			auto& mu = connection.mu;
+			auto& oneplusmu = connection.oneplusmu;
+			auto& nu = connection.nu;
+
+			mu.resize(maxtimeslots);
+			oneplusmu.resize(maxtimeslots);
+			nu.resize(maxtimeslots);
+
+			for (int t = 0; t < maxtimeslots; ++t)
+			{
+				const double tt_t = travelTimes[offset + t]/3600000.0;
+				if (t == maxtimeslots - 1)
+				{
+					mu[t] = 0.0;
+					oneplusmu[t] = 1.0;
+					nu[t] = tt_t;
+				}
+				else
+				{
+					const double tt_next = travelTimes[offset + t + 1]/3600000.0;
+					const double delta_time =time_periods[t + 1] - time_periods[t];
+					mu[t] = (tt_next - tt_t) / delta_time;
+					oneplusmu[t] = 1.0 + mu[t];
+					nu[t] = tt_t - mu[t] * time_periods[t];
+				}
+			}
+
+			offset += maxtimeslots;
+		}
 	}
 }
 

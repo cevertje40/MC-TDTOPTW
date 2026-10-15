@@ -1,2 +1,2 @@
-..\datasets\MCTDTOPTW\
-100.3.3.3.txt	959
+..\datasets\TDOPSWTW\
+50.2.3.txt	340

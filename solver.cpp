@@ -704,6 +704,7 @@ inline Pressures compute_pressures(const Sol& s) {
 	return { t_p, w_p, v_p };
 }
 
+
 Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask)
 {
 	using clock = std::chrono::steady_clock;
@@ -722,6 +723,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 
 	parallel_construct(s);
 	//s.read_from_file("20.3.1.3.txt");
+	
 	//s.check();
 	gb = s;
 

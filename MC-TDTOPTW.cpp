@@ -1013,13 +1013,10 @@ void tdoptw_gap(int max_rep=5)
 		{
 			Ins::TDOPTW textfile = { it->path,it->filename };
 			Ins instance(textfile);
-			instance.read_time_independent_traveltime(it->path, it->filename);
-			instance.read_time_dependent_traveltime(it->path, it->filename);
 			//instance.create_neighbourhood_simple(textfile.path, textfile.name);
 			instance.create_neighbourhood(textfile.path, textfile.name);
 			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
 			//it->result[rep]=acs.solve(it->bestscore);
-
 
 			double maxtime = 9999;
 
@@ -1033,14 +1030,8 @@ void tdoptw_gap(int max_rep=5)
 			*/
 
 			Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
-			it->result[rep] = tabu.solve(it->bestknown, maxtime, -1, 7);
-			/*
-			forced_crit = -1 for adaptive
-				forced_crit = 0 for SCORE
-				forced_crit = 1 for TIME
-				forced_crit = 2 for VOLUME
-				forced_crit = 3 for WEIGHT
-			*/
+			it->result[rep] = tabu.solve(it->bestknown, maxtime, 1, 7);//forced_crit = 1 for TIME
+			
 			//it->result[rep].sol.write_to_file(textfile.name);
 			//cout << it->result[rep].sol << endl;
 			//Ils ils(instance, 10000, 100, 20, 30);
@@ -1089,7 +1080,7 @@ int main()
 	//debug_instance();
 	//debug_ctop();
 	//solve_dataset(30);
-	tdoptw_gap(1);
+	tdoptw_gap(10);
 	//ctop_gap();
 	//doe(5);
 	//doe2(5);

@@ -1023,15 +1023,16 @@ void tdoptw_gap(int max_rep=5)
 
 			double maxtime = 9999;
 
+			/*
 			if (instance.maxvertices == 20)
 				maxtime = 1;
 			else if (instance.maxvertices == 50)
 				maxtime = 2.0;
 			else
 				maxtime = 5.0;
+			*/
 
-
-			Tabu tabu(instance, 200000, 2, 0.1, 0.9, 10);
+			Tabu tabu(instance, 10000, 2, 0.1, 0.9, 10);
 			it->result[rep] = tabu.solve(it->bestknown, maxtime, -1, 7);
 			/*
 			forced_crit = -1 for adaptive
@@ -1088,7 +1089,7 @@ int main()
 	//debug_instance();
 	//debug_ctop();
 	//solve_dataset(30);
-	tdoptw_gap(10);
+	tdoptw_gap(1);
 	//ctop_gap();
 	//doe(5);
 	//doe2(5);

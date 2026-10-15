@@ -757,8 +757,14 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 		throw std::runtime_error("Tabu::solve called with nb_mask disabling all replacement neighborhoods.");
 	}
 
+	
 	while (noimpr < max_noimpr && !time_up())
 	{
+		if (iter == 10000)
+		{
+			cout << "stopped due to iter 10000" << endl;
+			break;
+		}
 		if (gb.score == ins->maxscore)
 		{
 			break;

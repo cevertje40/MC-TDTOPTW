@@ -346,8 +346,8 @@ void solve_dataset(int max_rep = 5)
 				maxtime = 5.0;
 			
 
-			Tabu tabu(instance, 200000, 2, 0.1, 0.9, 10);
-			it->result[rep] = tabu.solve(it->bestknown,maxtime,-1,7);
+			//Tabu tabu(instance, 200000, 2, 0.1, 0.9, 10);
+			//it->result[rep] = tabu.solve(it->bestknown,maxtime,-1,7);
 			/*
 			forced_crit = -1 for adaptive
 				forced_crit = 0 for SCORE
@@ -357,8 +357,8 @@ void solve_dataset(int max_rep = 5)
 			*/
 			//it->result[rep].sol.write_to_file(textfile.name);
 			//cout << it->result[rep].sol << endl;
-			//Ils ils(instance, 10000, 100, 20, 30);
-			//it->result[rep] = ils.solve(it->bestscore);
+			Ils ils(instance, 200000, 100, 20, 30);
+			it->result[rep] = ils.solve(it->bestknown);
 			//Alns alns(instance,200000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
 			//it->result[rep] = alns.solve(it->bestknown,maxtime);
 
@@ -1079,8 +1079,8 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	//solve_dataset(30);
-	tdoptw_gap(10);
+	solve_dataset(1);
+	//tdoptw_gap(10);
 	//ctop_gap();
 	//doe(5);
 	//doe2(5);

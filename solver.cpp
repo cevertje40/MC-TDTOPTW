@@ -520,10 +520,13 @@ void Ils::shake(Sol& sol, int post, int cons)
 			if (breakupdate)
 			{
 				tour.update_break();
+				tour.check();
 			}
 			else
 			{
 				tour.update(post - 1, int(tour.seq.size()));
+				tour.calc_maxshift();
+				tour.check();
 			}
 			//tour.calc_maxshift();
 		}//end if tour is not empty
@@ -557,13 +560,15 @@ Res Ils::solve(int bestknown)
 		else
 		{
 			shake(s, post, cons);
+			
 		}
 		two_opt_nb(s,1);
 		swap_nb(s,1);
 		swap2_nb(s,1);
 		relocate_nb(s,1);
 		insert_nb(s,1);
-		one_one_replace_nb(s, 1);
+		s.check();
+		//one_one_replace_nb(s, 1);
 		//two_one_replace_nb(s, 1);
 		//one_two_replace(s, 1);
 		if (s.score > gb.score)

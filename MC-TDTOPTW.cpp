@@ -332,22 +332,19 @@ void solve_dataset(int max_rep = 5)
 			instance.read_time_dependent_traveltime(it->path, it->filename);
 			//instance.create_neighbourhood_simple(textfile.path, textfile.name);
 			instance.create_neighbourhood(textfile.path, textfile.name);
-			//Aco acs(instance, 1, 3, 0.1, 20, 10000, 0.25, 0.05);
-			//it->result[rep]=acs.solve(it->bestscore);
 			
-
-			double maxtime=9999;
+			double max_time_sec =9999;
 			
 			if (instance.maxvertices == 20)
-				maxtime = 1;
+				max_time_sec = 1;
 			else if (instance.maxvertices == 50)
-				maxtime = 2.0;
+				max_time_sec = 2.0;
 			else
-				maxtime = 5.0;
+				max_time_sec = 5.0;
 			
 
 			//Tabu tabu(instance, 200000, 2, 0.1, 0.9, 10);
-			//it->result[rep] = tabu.solve(it->bestknown,maxtime,-1,7);
+			//it->result[rep] = tabu.solve(it->bestknown,max_time_sec,-1,7);
 			/*
 			forced_crit = -1 for adaptive
 				forced_crit = 0 for SCORE
@@ -357,10 +354,12 @@ void solve_dataset(int max_rep = 5)
 			*/
 			//it->result[rep].sol.write_to_file(textfile.name);
 			//cout << it->result[rep].sol << endl;
-			Ils ils(instance, 200000, 100, 20, 30);
-			it->result[rep] = ils.solve(it->bestknown);
+			//Ils ils(instance, 200000, 100, 20, 30);
+			//it->result[rep] = ils.solve(it->bestknown, max_time_sec);
 			//Alns alns(instance,200000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
-			//it->result[rep] = alns.solve(it->bestknown,maxtime);
+			//it->result[rep] = alns.solve(it->bestknown,max_time_sec);
+			Aco aco(instance, 1, 3, 0.1, 20, 2000000, 0.25, 0.05);
+			it->result[rep] = aco.solve(it->bestknown, max_time_sec);
 
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;

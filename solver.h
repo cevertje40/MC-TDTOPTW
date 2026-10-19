@@ -41,7 +41,7 @@ public:
 	Aco(Ins& ins, double alpha, double beta, double rho, int max_ants, int max_sol, double max_ni_p,double p_best);
 	void update_global_best();
 	void pheromone_update();
-	Res solve(int bestknown=1);
+	Res solve(int bestknown=1, double max_time_sec=9999.0);
 	std::string name = "ACO";
 };
 
@@ -59,7 +59,7 @@ private:
 	void shake(Sol& sol, int post, int cons);
 public:
 	Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3);
-	Res solve(int bestknown=1);
+	Res solve(int bestknown=1,double max_time_sec=9999.0);
 	std::string name = "ILS";
 };
 
@@ -82,7 +82,7 @@ public:
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
 	void perturbe(Sol& sol);
-	Res solve(int bestknown, double max_time_sec=10000, int forced_crit = -1, int nb_mask = 7);
+	Res solve(int bestknown, double max_time_sec=9999.0, int forced_crit = -1, int nb_mask = 7);
 	std::string name = "Tabu";
 };
 
@@ -243,7 +243,7 @@ private:
 
 public:
 	Alns(Ins& ins, int iter_max_best, double alpha, int segment_len, int iter_per_segment,double sigma1, double sigma2, double sigma3, double temp_factor,double temp_min, double beta_frac,double lambda);
-	Res solve(int bestknown = 1, double max_time_sec=5.0);
+	Res solve(int bestknown = 1, double max_time_sec=9999.0);
 };
 
 

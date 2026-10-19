@@ -276,12 +276,26 @@ ostream& operator<<(ostream& output, Res& res)
 	return output;
 }
 
-Res Aco::solve(int bestknown)
+Res Aco::solve(int bestknown, double max_time_sec)
 {
-	clock_t start, end;
-	start = clock();
+	using clock = std::chrono::steady_clock;
+	auto t0 = clock::now();
+	auto elapsed_sec = [&]() -> double
+	{
+			return std::chrono::duration<double>(clock::now() - t0).count();
+	};
+
+	auto time_up = [&]() -> bool
+	{
+			return elapsed_sec() >= max_time_sec;
+	};
+
 	for (int iter = 0; iter < max_it; ++iter)//iteration loop
 	{
+		if (time_up())
+		{
+			break;
+		}
 		#pragma omp parallel
 		{//start parallel session
 			#pragma omp for nowait
@@ -289,12 +303,36 @@ Res Aco::solve(int bestknown)
 			{
 				s[ant].reset();
 				construct(s[ant]);
+				if (!s[ant].check())
+				{
+					cout << "construct" << endl;
+				}
 				//two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
+				if (!s[ant].check())
+				{
+					cout << "swap" << endl;
+				}
 				swap2_nb(s[ant], 1);
+				if (!s[ant].check())
+				{
+					cout << "swap2" << endl;
+				}
 				relocate_nb(s[ant], 1);
+				if (!s[ant].check())
+				{
+					cout << "relocate" << endl;
+				}
 				insert_nb(s[ant], 1);
+				if (!s[ant].check())
+				{
+					cout << "insert" << endl;
+				}
 				one_one_replace_nb(s[ant], 1);
+				if (!s[ant].check()) 
+				{
+					cout << "replace" << endl;
+				}
 				//two_one_replace_nb(s[ant], 1);
 				//one_two_replace(s[ant], 1);
 				//exchange_nb(s[ant], 1);
@@ -311,9 +349,8 @@ Res Aco::solve(int bestknown)
 		update_global_best();//best solution is stored
 		pheromone_update();// iteration best solution its arcs are augmented
 	}
-	end = clock();
-	double cpuTime;
-	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
+
+	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	std::cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
@@ -520,13 +557,11 @@ void Ils::shake(Sol& sol, int post, int cons)
 			if (breakupdate)
 			{
 				tour.update_break();
-				tour.check();
 			}
 			else
 			{
 				tour.update(post - 1, int(tour.seq.size()));
 				tour.calc_maxshift();
-				tour.check();
 			}
 			//tour.calc_maxshift();
 		}//end if tour is not empty
@@ -540,10 +575,20 @@ Ils::Ils(Ins& ins, int max_sol, int threshold1, int threshold2, int threshold3):
 	s = Sol(ins);//iter sol
 }
 
-Res Ils::solve(int bestknown)
+Res Ils::solve(int bestknown, double max_time_sec)
 {
-	clock_t start, end;
-	start = clock();
+	using clock = std::chrono::steady_clock;
+	auto t0 = clock::now();
+	auto elapsed_sec = [&]() -> double
+		{
+			return std::chrono::duration<double>(clock::now() - t0).count();
+		};
+
+	auto time_up = [&]() -> bool
+		{
+			return elapsed_sec() >= max_time_sec;
+		};
+
 	s.reset();
 	//parallel_construct(s);
 	serial_construct(s);
@@ -552,6 +597,11 @@ Res Ils::solve(int bestknown)
 	int cons = 1;//cons -->amount of vertices to be removed
 	for (int iter = 0; iter < max_it; ++iter)//iteration loop
 	{
+		if(time_up())
+		{
+			break;
+		}
+
 		//cout << iter << endl;
 		if ((noimpr > threshold2) && ((noimpr + 1) % threshold3 == 0))
 		{
@@ -567,8 +617,7 @@ Res Ils::solve(int bestknown)
 		swap2_nb(s,1);
 		relocate_nb(s,1);
 		insert_nb(s,1);
-		s.check();
-		//one_one_replace_nb(s, 1);
+		one_one_replace_nb(s, 1);
 		//two_one_replace_nb(s, 1);
 		//one_two_replace(s, 1);
 		if (s.score > gb.score)
@@ -610,9 +659,7 @@ Res Ils::solve(int bestknown)
 			post -=minpathsize;
 		}
 	}
-	end = clock();
-	double cpuTime;
-	cpuTime = difftime(end, start) / CLOCKS_PER_SEC;
+	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
 	std::cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
@@ -767,11 +814,13 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 	
 	while (noimpr < max_noimpr && !time_up())
 	{
+		/*
 		if (iter == 10000)
 		{
 			cout << "stopped due to iter 10000" << endl;
 			break;
 		}
+		*/
 		if (gb.score == ins->maxscore)
 		{
 			break;
@@ -1001,9 +1050,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 	//cout << gb << endl;
 	gb.check();
 
-	std::cout << "iter without replacement nb: "
-		<< nonb1 << " <> " << nonb2 << " <> " << nonb3
-		<< " total iterations: " << iter << std::endl;
+	std::cout << "iter without replacement nb: "<< nonb1 << " <> " << nonb2 << " <> " << nonb3	<< " total iterations: " << iter << std::endl;
 
 	return Res(gb, cpuTime, bestknown);
 }

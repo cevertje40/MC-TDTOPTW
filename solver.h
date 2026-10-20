@@ -76,12 +76,10 @@ private:
 	
 	Sol s;//current iteration solution
 	Sol gb;//global best solution
-	
 
 public:
 	
 	Tabu(Ins& ins, int max_noimpr, int nb_tabu_it,double ema_rho, double thresh, double gamma);
-	void perturbe(Sol& sol);
 	Res solve(int bestknown, double max_time_sec=9999.0, int forced_crit = -1, int nb_mask = 7);
 	std::string name = "Tabu";
 };

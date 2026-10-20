@@ -303,46 +303,11 @@ Res Aco::solve(int bestknown, double max_time_sec)
 			{
 				s[ant].reset();
 				construct(s[ant]);
-				if (!s[ant].check())
-				{
-					cout << "construct" << endl;
-				}
-				//two_opt_nb(s[ant], 1);
 				swap_nb(s[ant],1);
-				if (!s[ant].check())
-				{
-					cout << "swap" << endl;
-				}
 				swap2_nb(s[ant], 1);
-				if (!s[ant].check())
-				{
-					cout << "swap2" << endl;
-				}
 				relocate_nb(s[ant], 1);
-				if (!s[ant].check())
-				{
-					cout << "relocate" << endl;
-				}
 				insert_nb(s[ant], 1);
-				if (!s[ant].check())
-				{
-					cout << "insert" << endl;
-				}
 				one_one_replace_nb(s[ant], 1);
-				if (!s[ant].check()) 
-				{
-					cout << "replace" << endl;
-				}
-				//two_one_replace_nb(s[ant], 1);
-				//one_two_replace(s[ant], 1);
-				//exchange_nb(s[ant], 1);
-				//two_opt_nb(s[ant], 1);
-				//swap_nb(s[ant], 1);
-				//swap2_nb(s[ant], 1);
-				//move_nb(s[ant], 1);
-				//insert_nb(s[ant], 1);
-				//exchange_nb(s[ant], 1);
-				//insert_nb(s[ant], 1);
 			}
 		}
 		//cout << iter << endl;
@@ -673,55 +638,13 @@ Tabu::Tabu(Ins& ins, int max_noimpr, int nb_tabu_it, double ema_rho, double thre
 	s = Sol(ins);//iter sol
 }
 
-void Tabu::perturbe(Sol& sol)
-{
-	constexpr double removalRate = 0.02; // Remove up to 20% of vertices from a tour
-	std::uniform_real_distribution<double> prob(0.0, 1.0);
-	std::uniform_int_distribution<> offset(1, 2); // how far from the worst to go
-	for (int d = 0; d < ins->maxtours; ++d)
-	{
-		Sol::Tour& tour = sol.tours[d];
-		int end = (int)tour.seq.size();
-		// Skip if tour is tiny
-		if (end <= 3) continue;
-		// Identify vertex inefficiencies
-		struct Entry {
-			int pos;
-			double inefficiency;
-		};
-		std::vector<Entry> ineff;
-		for (int i = 1; i < end - 1; ++i)
-		{
-			Ins::Vertex* a = tour.seq[i - 1];
-			Ins::Vertex* b = tour.seq[i];
-			double usedTT = (tour.deptime[i] - (b->serv + tour.action[i] * ins->breakdur)) - tour.deptime[i - 1];
-			double minTT = a->con[b->index]->determin;
-			double ratio = usedTT / max(1.0, minTT);
-			ineff.push_back({ i, ratio });
-		}
-		// Sort by inefficiency (descending)
-		std::sort(ineff.begin(), ineff.end(), [](const Entry& lhs, const Entry& rhs) {
-			return lhs.inefficiency > rhs.inefficiency;
-			});
-		int numToRemove = max(1, int(removalRate * ineff.size()));
-		unordered_set<int> removed;
-		for (int i = 0; i < numToRemove; ++i)
-		{
-			int index = ineff[i + offset(engine) % min(3, (int)ineff.size())].pos;
-			// Avoid removing the same twice
-			if (removed.count(index)) continue;
-			sol.remove_vertex(tour, index);
-			removed.insert(index);
-		}
-	}
-}
-
 template<typename MoveType>
 void executeMove(boost::heap::priority_queue<MoveType>& nb, Sol& s, TabuVector& tabulist) 
 {
 	auto exec_nb = nb.top();
 	//cout << nb.top().score<<" " << nb.top().tour << " " << nb.top().ratio << endl;;
 	exec_nb.execute(s);
+	//s.check();
 	for (int i = 0; i < exec_nb.move.first.size(); ++i)
 	{
 		tabulist.addTabu(exec_nb.move.first[i]->index,exec_nb.tour);//out
@@ -1206,8 +1129,7 @@ bool Alns::try_remove_positions(Sol& sol, int tourSlot, std::vector<int> positio
 	}
 	else if (positions.size() == 2)
 	{
-		trial.remove_vertices(
-			trial.tours[tourSlot], positions[0], positions[1]);
+		trial.remove_vertices(trial.tours[tourSlot], positions[0], positions[1]);
 	}
 	else
 	{

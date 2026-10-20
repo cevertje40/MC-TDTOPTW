@@ -496,7 +496,8 @@ bool Moves::one_one_replace_nb(Sol& sol, int mode)
 				//for all existing regular member vertices: remove 1 and revaluate solution
 				Tour tourrem = sol.tours[sol.tourindex[d]];
 				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
-				tourrem.remove_vertex(h);
+				if (!tourrem.remove_vertex(h))//only continue when the removal is feasible
+					continue;
 				int endj = (int)tourrem.seq.size();
 				for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
 				{
@@ -507,48 +508,69 @@ bool Moves::one_one_replace_nb(Sol& sol, int mode)
 					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
 					{
 						Ins::Vertex* y = x->nb[t][i];//potential insertion at position j
-						if ((sol.available[y->index] * y->score > r->score) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & score increase
+						if ((sol.available[y->index] && y->score > r->score) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & score increase
 						{
 							if ((tourrem.weight + y->weight <= ins->t[t].W_max) && (tourrem.volume + y->volume <= ins->t[t].V_max))//cap constraint check
 							{
 								//gather departure time
 								double currenttime = tourrem.deptime[j] + ins->t[t].EDT;//service bij x zit hier al in
 								//travel time from x to y
-								double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-								if (arrivaltime < y->LTW[t])//break inserten kan niet dus break kan ltw niet dichter brengen
+								double at = ins->arrival_time(x->con[y->index], currenttime);
+
+								if (at < y->LTW[t])
+									at = y->LTW[t];
+
+								if (at > y->UTW[t] + 1e-9)
+									continue;
+
+								at += y->serv;
+								at = ins->arrival_time(y->con[z->index], at);
+
+								if (breakz)
 								{
-									arrivaltime = y->LTW[t];
+									const bool at_end_depot = (z->index == ins->maxvertices - 1);
+
+									// At a customer, the break cannot start before breakstart.
+									// At the end depot, it may start upon arrival.
+									if (!at_end_depot && at < ins->breakstart)
+										at = ins->breakstart;
+
+									if (at > ins->breakend + 1e-9)
+										continue;
+
+									at += ins->breakdur;
 								}
-								if (arrivaltime > y->UTW[t])
+
+								if (at < z->LTW[t])
+									at = z->LTW[t];
+
+								// Check the start of service at z, after any break and waiting.
+								if (at > z->UTW[t] + 1e-9)
+									continue;
+
+								at += z->serv;
+
+								const double shift =
+									(at - ins->t[t].EDT) - tourrem.deptime[j + 1];
+
+								if (shift > tourrem.max_shift[j + 1] + 1e-9)
+									continue;
+
+								improvement = true;
+								double ratio = y->score - r->score;
+								if (ratio > bestratio)
 								{
-									continue;//infeasible
-								}
-								arrivaltime += y->serv;
-								//travel time from y to z
-								arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-								if (arrivaltime + breakz * (ins->breakdur) < z->LTW[t])
-								{
-									arrivaltime = z->LTW[t] - (breakz * ins->breakdur);
-								}
-								arrivaltime += z->serv + breakz * ins->breakdur;
-								double shift = (arrivaltime - ins->t[t].EDT) - tourrem.deptime[j + 1];//increase in travel time
-								if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
-								{
-									improvement = true;
-									double ratio = y->score - r->score;
-									if (ratio > bestratio)
+									bestratio = ratio;
+									besttour = &sol.tours[sol.tourindex[d]];
+									best_pos_rem = h;
+									best_pos_ins = j;//index after removal
+									bestcandidate = y;
+									if (mode == 0)//first improvement, otherwise best improvement
 									{
-										bestratio = ratio;
-										besttour = &sol.tours[sol.tourindex[d]];
-										best_pos_rem = h;
-										best_pos_ins = j;//index after removal
-										bestcandidate = y;
-										if (mode == 0)//first improvement, otherwise best improvement
-										{
-											goto one_one_replace;
-										}
+										goto one_one_replace;
 									}
 								}
+								
 							}//end cap constraints
 						}//end availability &score check
 					}//for all nb
@@ -570,265 +592,441 @@ bool Moves::one_one_replace_nb(Sol& sol, int mode)
 bool Moves::two_one_replace_nb(Sol& sol, int mode)
 {
 	bool improvement = true;
-	bool succes = false;
+	bool success = false;
+
 	while (improvement)
 	{
 		improvement = false;
-		double bestratio = 0.0;
+
 		int best_pos_rem1 = -1;
 		int best_pos_rem2 = -1;
 		int best_pos_ins = -1;
-		Ins::Vertex* bestcandidate = NULL;
-		Sol::Tour* besttour = NULL;
+		Ins::Vertex* best_candidate = nullptr;
+		Sol::Tour* best_tour = nullptr;
+		double best_gain = 0.0;
+
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
-			int t = sol.tourindex[d];//pick a random tour
-			int end = (int)sol.tours[sol.tourindex[d]].seq.size();
-			for (int g = 1; g < end - 1; ++g)// for all  inlcuded regular vertices in sol
+			const int t = sol.tourindex[d];
+			Sol::Tour& original_tour = sol.tours[t];
+			const int end = static_cast<int>(original_tour.seq.size());
+
+			for (int g = 1; g < end - 1; ++g)
 			{
-				int end = (int)sol.tours[sol.tourindex[d]].seq.size();
-				for (int h = 1; h < end - 1; ++h)// for all  inlcuded regular vertices in sol
+				for (int h = g + 1; h < end - 1; ++h)
 				{
-					if (g != h)
+					// Evaluate removals on a copy; the original solution stays intact.
+					Sol::Tour tourrem = original_tour;
+					Ins::Vertex* r = tourrem.seq[g];
+					Ins::Vertex* s = tourrem.seq[h];
+					const int lost_score = r->score + s->score;
+
+					if (!tourrem.remove_vertices(g, h))
+						continue;
+
+					const std::vector<double> wait_suffix =
+						tourrem.compute_wait_suffix();
+
+					const int endj = static_cast<int>(tourrem.seq.size());
+					const auto& Td = ins->t[t];
+					const double EDT = Td.EDT;
+
+					for (int j = 0; j < endj - 1; ++j)
 					{
-						//for all existing regular member vertices: remove 1 and revaluate solution
-						
-						Sol::Tour tourrem = sol.tours[sol.tourindex[d]];
-						Ins::Vertex* r = tourrem.seq[g];//to be removed vertex 1
-						Ins::Vertex* s = tourrem.seq[h];//to be removed vertex 2
-						int lostscore = r->score + s->score;
-						tourrem.remove_vertex(g);
-						if (g < h)
+						Ins::Vertex* x = tourrem.seq[j];
+						Ins::Vertex* z = tourrem.seq[j + 1];
+						const bool break_at_z = (tourrem.action[j + 1] != 0);
+
+						const double current_time = tourrem.deptime[j] + EDT;
+						const double base_up =
+							ins->arrival_time(x->con[z->index], current_time)
+							- current_time;
+
+						const int nb_size = static_cast<int>(x->nb[t].size());
+
+						for (int i = 0; i < nb_size - 1; ++i)
 						{
-							tourrem.remove_vertex(h - 1);
-						}
-						else
-						{
-							tourrem.remove_vertex(h);
-						}
-						int endj = (int)tourrem.seq.size();
-						for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
-						{
-							Ins::Vertex* x = tourrem.seq[j];//predecessor y
-							Ins::Vertex* z = tourrem.seq[j + 1];//successor y
-							int breakz = tourrem.action[j + 1];
-							int nb_size = (int)x->nb[t].size();
-							for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+							Ins::Vertex* y = x->nb[t][i];
+
+							// A replacement must insert an unselected customer and
+							// improve the objective.
+							if (!sol.available[y->index] || y->score <= lost_score)
+								continue;
+
+							if (!x->nbi[t][y->index] ||
+								!y->nbi[t][z->index])
+								continue;
+
+							if (tourrem.weight + y->weight > Td.W_max + 1e-9)
+								continue;
+							if (tourrem.volume + y->volume > Td.V_max + 1e-9)
+								continue;
+
+							// Cheap lower bound on the added travel/service time.
+							const double ins_lb =
+								x->con[y->index]->determin
+								+ y->serv
+								+ y->con[z->index]->determin;
+							const double dt_lb =
+								std::max(0.0, ins_lb - base_up);
+
+							if (dt_lb >
+								wait_suffix[j + 1] +
+								tourrem.max_shift[j + 1] + 1e-9)
 							{
-								Ins::Vertex* y = x->nb[t][i];//potential insertion at position j
-								if ((sol.available[y->index] * y->score > lostscore) && (x->nbi[t][y->index]) && (y->nbi[t][z->index]))//availability & score increase
-								{
-									if ((tourrem.weight + y->weight <= ins->t[t].W_max) && (tourrem.volume + y->volume <= ins->t[t].V_max))//cap constraint check
-									{
-										//gather departure time
-										double currenttime = tourrem.deptime[j] + ins->t[t].EDT;//service bij x zit hier al in
-										//travel time from x to y
-										double arrivaltime = ins->arrival_time(x->con[y->index], currenttime);
-										if (arrivaltime < y->LTW[t])//break inserten kan niet dus break kan ltw niet dichter brengen
-										{
-											arrivaltime = y->LTW[t];
-										}
-										if (arrivaltime > y->UTW[t])
-										{
-											continue;//infeasible
-										}
-										arrivaltime += y->serv;
-										//travel time from y to z
-										arrivaltime = ins->arrival_time(y->con[z->index], arrivaltime);
-										if (arrivaltime + breakz * (ins->breakdur) < z->LTW[t])
-										{
-											arrivaltime = z->LTW[t] - (breakz * ins->breakdur);
-										}
-										arrivaltime += z->serv + breakz * ins->breakdur;
-										double shift = (arrivaltime - ins->t[t].EDT) - tourrem.deptime[j + 1];//increase in travel time
-										if (shift <= tourrem.max_shift[j + 1])//check of het punt geinsert kan worden
-										{
-											improvement = true;
-											double ratio = y->score - lostscore;
-											if (ratio > bestratio)
-											{
-												bestratio = ratio;
-												besttour = &sol.tours[sol.tourindex[d]];
-												best_pos_rem1 = g;
-												best_pos_rem2 = h;
-												best_pos_ins = j;//index after removal
-												bestcandidate = y;
-												if (mode == 0)//first improvement, otherwise best improvement
-												{
-													goto two_one_replace;
-												}
-											}
-										}
-									}//end cap constraints
-								}//end availability &score check
-							}//for all nb
-						}//end for all positions in tourrem
-					}//end if g & h are different
-				}//end for all included regular vertices in sol
-			}//end for all included regular vertices in sol
-		}//end for all tours
+								continue;
+							}
+
+							// Check arrival and service at the inserted customer.
+							double at = ins->arrival_time(
+								x->con[y->index], current_time);
+
+							if (at < y->LTW[t])
+								at = y->LTW[t];
+							if (at > y->UTW[t] + 1e-9)
+								continue;
+
+							at += y->serv;
+
+							// Check the existing successor, including its break.
+							at = ins->arrival_time(y->con[z->index], at);
+
+							if (break_at_z)
+							{
+								const bool at_end_depot =
+									(z->index == ins->maxvertices - 1);
+
+								if (!at_end_depot && at < ins->breakstart)
+									at = ins->breakstart;
+
+								if (at > ins->breakend + 1e-9)
+									continue;
+
+								at += ins->breakdur;
+							}
+
+							if (at < z->LTW[t])
+								at = z->LTW[t];
+							if (at > z->UTW[t] + 1e-9)
+								continue;
+
+							at += z->serv;
+
+							const double shift =
+								(at - EDT) - tourrem.deptime[j + 1];
+
+							if (shift >
+								tourrem.max_shift[j + 1] + 1e-9)
+							{
+								continue;
+							}
+
+							const double gain = y->score - lost_score;
+							if (gain > best_gain)
+							{
+								improvement = true;
+								best_gain = gain;
+								best_tour = &original_tour;
+								best_pos_rem1 = g;
+								best_pos_rem2 = h;
+								best_pos_ins = j;
+								best_candidate = y;
+
+								if (mode == 0)
+									goto apply_two_one_replace;
+							}
+						}
+					}
+				}
+			}
+		}
+
 		if (improvement)
 		{
-			two_one_replace:
-			sol.remove_vertex(*besttour, best_pos_rem1);
-			if (best_pos_rem1 < best_pos_rem2)
-			{
-				sol.remove_vertex(*besttour,best_pos_rem2-1);
-			}
-			else
-			{
-				sol.remove_vertex(*besttour,best_pos_rem2);
-			}
-			sol.insert_vertex(*besttour, bestcandidate, best_pos_ins);
-			succes = true;
+		apply_two_one_replace:
+			sol.remove_vertices(
+				*best_tour, best_pos_rem1, best_pos_rem2);
+			sol.insert_vertex(
+				*best_tour, best_candidate, best_pos_ins);
+			success = true;
 		}
-	}//end while improvement
-	return succes;
-}//end two_one_replace_nb
+	}
+
+	return success;
+}// end two_one_replace_nb
 
 bool Moves::one_two_replace(Sol& sol, int mode)
 {
 	bool improvement = true;
-	bool succes = false;
+	bool success = false;
+
 	while (improvement)
 	{
 		improvement = false;
-		double bestratio = 0.0;
+
+		double best_gain = 0.0;
 		int best_pos_rem = -1;
 		int best_pos_ins1 = -1;
 		int best_pos_ins2 = -1;
-		Ins::Vertex* bestcandidate1 = NULL;
-		Ins::Vertex* bestcandidate2 = NULL;
-		Sol::Tour* besttour = NULL;
+		Ins::Vertex* best_candidate1 = nullptr;
+		Ins::Vertex* best_candidate2 = nullptr;
+		Sol::Tour* best_tour = nullptr;
+
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
-			int t = sol.tourindex[d];//pick a random tour
-			int endh = (int)sol.tours[t].seq.size();
-			for (int h = 1; h < endh - 1; ++h)// for all included regular vertices in sol
+			const int t = sol.tourindex[d];
+			Sol::Tour& original_tour = sol.tours[t];
+			const int endh = static_cast<int>(original_tour.seq.size());
+			const auto& Td = ins->t[t];
+			const double EDT = Td.EDT;
+
+			for (int h = 1; h < endh - 1; ++h)
 			{
-				//for all existing regular member vertices: remove 1 and revaluate solution
-				Sol::Tour tourrem = sol.tours[sol.tourindex[d]];
-				Ins::Vertex* r = tourrem.seq[h];//to be removed vertex
-				tourrem.remove_vertex(h);
-				int endj = (int)tourrem.seq.size();
-				for (int j = 0; j < endj - 1; ++j)// for positions in tourrem
+				// Test removal on a copy; false means the removal leaves
+				// the route infeasible.
+				Sol::Tour tourrem = original_tour;
+				Ins::Vertex* r = tourrem.seq[h];
+
+				if (!tourrem.remove_vertex(h))
+					continue;
+
+				const std::vector<double> wait_suffix_rem =
+					tourrem.compute_wait_suffix();
+				const int endj = static_cast<int>(tourrem.seq.size());
+
+				for (int j = 0; j < endj - 1; ++j)
 				{
-					Ins::Vertex* x1 = tourrem.seq[j];//predecessor y
-					Ins::Vertex* z1 = tourrem.seq[j + 1];//successor y
-					int breakz1 = tourrem.action[j + 1];
-					int nb_size = (int)x1->nb[t].size();
-					for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
+					Ins::Vertex* x1 = tourrem.seq[j];
+					Ins::Vertex* z1 = tourrem.seq[j + 1];
+					const bool break_at_z1 = (tourrem.action[j + 1] != 0);
+
+					const double t0_1 = tourrem.deptime[j] + EDT;
+					const double base_up_1 =
+						ins->arrival_time(x1->con[z1->index], t0_1) - t0_1;
+
+					const int nb1 = static_cast<int>(x1->nb[t].size());
+
+					for (int i = 0; i < nb1 - 1; ++i)
 					{
-						Ins::Vertex* y1 = x1->nb[t][i];//potential insertion at position j
-						if ((sol.available[y1->index]) && (y1->nbi[t][z1->index]))//availability & nb check
+						Ins::Vertex* y1 = x1->nb[t][i];
+
+						if (!sol.available[y1->index] ||
+							!x1->nbi[t][y1->index] ||
+							!y1->nbi[t][z1->index])
 						{
-							if ((tourrem.weight + y1->weight <= ins->t[t].W_max) && (tourrem.volume + y1->volume <= ins->t[t].V_max))//cap constraint check
+							continue;
+						}
+
+						if (tourrem.weight + y1->weight > Td.W_max + 1e-9)
+							continue;
+						if (tourrem.volume + y1->volume > Td.V_max + 1e-9)
+							continue;
+
+						// Cheap lower bound for the first insertion.
+						const double ins_lb_1 =
+							x1->con[y1->index]->determin
+							+ y1->serv
+							+ y1->con[z1->index]->determin;
+						const double dt_lb_1 =
+							std::max(0.0, ins_lb_1 - base_up_1);
+
+						if (dt_lb_1 >
+							wait_suffix_rem[j + 1] +
+							tourrem.max_shift[j + 1] + 1e-9)
+						{
+							continue;
+						}
+
+						// Exact first-insertion schedule check.
+						double at1 = ins->arrival_time(
+							x1->con[y1->index], t0_1);
+
+						if (at1 < y1->LTW[t])
+							at1 = y1->LTW[t];
+						if (at1 > y1->UTW[t] + 1e-9)
+							continue;
+
+						at1 += y1->serv;
+						at1 = ins->arrival_time(y1->con[z1->index], at1);
+
+						if (break_at_z1)
+						{
+							const bool at_end_depot =
+								(z1->index == ins->maxvertices - 1);
+
+							if (!at_end_depot && at1 < ins->breakstart)
+								at1 = ins->breakstart;
+
+							if (at1 > ins->breakend + 1e-9)
+								continue;
+
+							at1 += ins->breakdur;
+						}
+
+						if (at1 < z1->LTW[t])
+							at1 = z1->LTW[t];
+						if (at1 > z1->UTW[t] + 1e-9)
+							continue;
+
+						at1 += z1->serv;
+
+						const double shift1 =
+							(at1 - EDT) - tourrem.deptime[j + 1];
+
+						if (shift1 >
+							tourrem.max_shift[j + 1] + 1e-9)
+						{
+							continue;
+						}
+
+						// Apply the first insertion to a copy before evaluating
+						// positions for the second insertion.
+						Sol::Tour tourremins = tourrem;
+						tourremins.insert_vertex(y1, j);
+
+						const std::vector<double> wait_suffix =
+							tourremins.compute_wait_suffix();
+						const int endk =
+							static_cast<int>(tourremins.seq.size());
+
+						for (int k = 0; k < endk - 1; ++k)
+						{
+							Ins::Vertex* x2 = tourremins.seq[k];
+							Ins::Vertex* z2 = tourremins.seq[k + 1];
+							const bool break_at_z2 =
+								(tourremins.action[k + 1] != 0);
+
+							const double t0_2 =
+								tourremins.deptime[k] + EDT;
+							const double base_up_2 =
+								ins->arrival_time(
+									x2->con[z2->index], t0_2) - t0_2;
+
+							const int nb2 =
+								static_cast<int>(x2->nb[t].size());
+
+							for (int ii = 0; ii < nb2 - 1; ++ii)
 							{
-								//gather departure time
-								double currenttime = tourrem.deptime[j] + ins->t[t].EDT;//service bij x zit hier al in
-								//travel time from x1 to y1
-								double arrivaltime = ins->arrival_time(x1->con[y1->index], currenttime);
-								if (arrivaltime < y1->LTW[t])//break inserten kan niet dus break kan ltw niet dichter brengen
+								Ins::Vertex* y2 = x2->nb[t][ii];
+
+								if (y2 == y1 ||
+									!sol.available[y2->index] ||
+									!x2->nbi[t][y2->index] ||
+									!y2->nbi[t][z2->index])
 								{
-									arrivaltime = y1->LTW[t];
+									continue;
 								}
-								if (arrivaltime > y1->UTW[t])
+
+								if (tourremins.weight + y2->weight >
+									Td.W_max + 1e-9)
 								{
-									continue;//infeasible
+									continue;
 								}
-								arrivaltime += y1->serv;
-								double arrivaltimey = arrivaltime;
-								//travel time from y1 to z
-								arrivaltime = ins->arrival_time(y1->con[z1->index], arrivaltime);
-								if (arrivaltime + breakz1 * (ins->breakdur) < z1->LTW[t])
+								if (tourremins.volume + y2->volume >
+									Td.V_max + 1e-9)
 								{
-									arrivaltime = z1->LTW[t] - (breakz1 * ins->breakdur);
+									continue;
 								}
-								arrivaltime += z1->serv + breakz1 * ins->breakdur;
-								double shift = (arrivaltime - ins->t[t].EDT) - tourrem.deptime[j + 1];//increase in travel time
-								if (shift <= tourrem.max_shift[j + 1])//check if first vertex can be inserted
+
+								const double ins_lb_2 =
+									x2->con[y2->index]->determin
+									+ y2->serv
+									+ y2->con[z2->index]->determin;
+								const double dt_lb_2 =
+									std::max(0.0, ins_lb_2 - base_up_2);
+
+								if (dt_lb_2 >
+									wait_suffix[k + 1] +
+									tourremins.max_shift[k + 1] + 1e-9)
 								{
-									//execute the first insertion
-									Sol::Tour tourremins = tourrem;
-									tourremins.insert_vertex(y1, j);
-									int endk = (int)tourremins.seq.size();
-									//check if second vertex can be inserted in this new tour
-									for (int k = 0; k < endk - 1; ++k)// for all positions in tourremins
+									continue;
+								}
+
+								// Exact second-insertion schedule check.
+								double at2 = ins->arrival_time(
+									x2->con[y2->index], t0_2);
+
+								if (at2 < y2->LTW[t])
+									at2 = y2->LTW[t];
+								if (at2 > y2->UTW[t] + 1e-9)
+									continue;
+
+								at2 += y2->serv;
+								at2 = ins->arrival_time(
+									y2->con[z2->index], at2);
+
+								if (break_at_z2)
+								{
+									const bool at_end_depot =
+										(z2->index == ins->maxvertices - 1);
+
+									if (!at_end_depot &&
+										at2 < ins->breakstart)
 									{
-										Ins::Vertex* x2 = tourremins.seq[k];//predecessor y2
-										Ins::Vertex* z2 = tourremins.seq[k + 1];//successor y2
-										int breakz2 = tourremins.action[k + 1];
-										int nb_size = (int)x2->nb[t].size();
-										for (int i = 0; i < nb_size - 1; ++i)//for all neighbours of the included vertex (non-enddepot)
-										{
-											Ins::Vertex* y2 = x2->nb[t][i];//potential insertion at position k
-											if ((y1->score + y2->score) > r->score)
-											{
-												if ((sol.available[y2->index]) && (y2->nbi[t][z2->index]) && (y2 != y1))//availability & nb check & two insertions need to be different vertices
-												{
-													if ((tourremins.weight + y2->weight <= ins->t[t].W_max) && (tourremins.volume + y2->volume <= ins->t[t].V_max))//cap constraint check
-													{
-														//gather departure time
-														double currenttime = tourremins.deptime[k] + ins->t[t].EDT;//service bij x zit hier al in
-														//travel time from x to y2
-														double arrivaltime = ins->arrival_time(x2->con[y2->index], currenttime);
-														if (arrivaltime < y2->LTW[t])//break inserten kan niet dus break kan ltw niet dichter brengen
-														{
-															arrivaltime = y2->LTW[t];
-														}
-														if (arrivaltime > y2->UTW[t])
-														{
-															continue;//infeasible
-														}
-														arrivaltime += y2->serv;
-														//travel time from y2 to z
-														arrivaltime = ins->arrival_time(y2->con[z2->index], arrivaltime);
-														if (arrivaltime + breakz2 * (ins->breakdur) < z2->LTW[t])
-														{
-															arrivaltime = z2->LTW[t] - (breakz2 * ins->breakdur);
-														}
-														arrivaltime += z2->serv + breakz2 * ins->breakdur;
-														double shift = (arrivaltime - ins->t[t].EDT) - tourremins.deptime[k + 1];//increase in travel time
-														if (shift <= tourremins.max_shift[k + 1])//check of het punt geinsert kan worden
-														{
-															improvement = true;
-															double ratio = (y1->score + y2->score) - r->score;
-															if (ratio > bestratio)
-															{
-																bestratio = ratio;
-																besttour = &sol.tours[sol.tourindex[d]];
-																best_pos_rem = h;
-																best_pos_ins1 = j;
-																best_pos_ins2 = k;//index after first insertion
-																bestcandidate1 = y1;
-																bestcandidate2 = y2;
-																goto one_two_replace;
-															}//end if bestratio improved
-														}//end if insertion 2
-													}//end cap check 2
-												}//end availability check
-											}//end if score improvement
-										}//end nb check 2
-									}//end for all positions in tourremins 2
-								}//end if shift succes first insertion
-							}//end cap check 1
-						}//end availability & nb check 1
-					}//end nb 1
-				}//end for all positions in tourrem 1
-			}//end for all included vertices
-		}//end for all tours
+										at2 = ins->breakstart;
+									}
+
+									if (at2 > ins->breakend + 1e-9)
+										continue;
+
+									at2 += ins->breakdur;
+								}
+
+								if (at2 < z2->LTW[t])
+									at2 = z2->LTW[t];
+								if (at2 > z2->UTW[t] + 1e-9)
+									continue;
+
+								at2 += z2->serv;
+
+								const double shift2 =
+									(at2 - EDT) -
+									tourremins.deptime[k + 1];
+
+								if (shift2 >
+									tourremins.max_shift[k + 1] + 1e-9)
+								{
+									continue;
+								}
+
+								const double gain =
+									y1->score + y2->score - r->score;
+
+								if (gain > best_gain)
+								{
+									improvement = true;
+									best_gain = gain;
+									best_tour = &original_tour;
+									best_pos_rem = h;
+									best_pos_ins1 = j;
+									best_pos_ins2 = k;
+									best_candidate1 = y1;
+									best_candidate2 = y2;
+
+									if (mode == 0)
+										goto apply_one_two_replace;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		if (improvement)
 		{
-			one_two_replace:
-			sol.remove_vertex(*besttour, best_pos_rem);
-			sol.insert_vertex(*besttour,bestcandidate1, best_pos_ins1);
-			sol.insert_vertex(*besttour,bestcandidate2, best_pos_ins2);
-			//sol.check();
-			//cout << "debug here" << endl;
+		apply_one_two_replace:
+			sol.remove_vertex(*best_tour, best_pos_rem);
+			sol.insert_vertex(
+				*best_tour, best_candidate1, best_pos_ins1);
+			sol.insert_vertex(
+				*best_tour, best_candidate2, best_pos_ins2);
+			success = true;
 		}
-	}//end while improvement
-	return succes;
-}//end one_two_replace_nb
+	}
+
+	return success;
+}//end one_two_replace
 
 bool Moves::or_opt(Sol& sol, int mode)
 {
@@ -1053,7 +1251,10 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_one_rep_nb>Moves::one_one
 			{
 				Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];
-				tourrem.remove_vertex(h);
+				if (!tourrem.remove_vertex(h))
+				{
+					continue;
+				}
 				std::vector<double> wait_suffix_r = tourrem.compute_wait_suffix();
 
 				int endj2 = (int)tourrem.seq.size();
@@ -1223,7 +1424,10 @@ template<RatioFn RATIO>boost::heap::priority_queue<Two_one_rep_nb>Moves::two_one
 					Sol::Tour tourrem = sol.tours[d];
 					Ins::Vertex* r = tourrem.seq[g];
 					Ins::Vertex* s = tourrem.seq[h];
-					tourrem.remove_vertices(g, h);
+					if (!tourrem.remove_vertices(g, h))
+					{
+						continue;
+					}
 
 					std::vector<double> wait_suffix = tourrem.compute_wait_suffix();
 
@@ -1384,7 +1588,10 @@ template<RatioFn RATIO>boost::heap::priority_queue<One_two_rep_nb>Moves::one_two
 				// build tour after removing r
 				Sol::Tour tourrem = sol.tours[d];
 				Ins::Vertex* r = tourrem.seq[h];
-				tourrem.remove_vertex(h);
+				if (!tourrem.remove_vertex(h))
+				{
+					continue;
+				}
 				const double W_free_after_rem = Wmax - (sol.tours[d].weight - r->weight);
 				const double V_free_after_rem = Vmax - (sol.tours[d].volume - r->volume);
 				// suffix waiting (upper bound) on tourrem
@@ -2132,8 +2339,8 @@ bool Moves::swap_nb(Sol& sol, int mode)
 		while (improvement)
 		{
 			double bestdelta = 0.0;
-			int besti=-1;
-			int bestj=-1;
+			int besti = -1;
+			int bestj = -1;
 			improvement = false;
 			int end = (int)tour.seq.size();
 			for (int i = 1; i < end - 2; ++i)// every vertex except depots and second last real vertex
@@ -2154,8 +2361,8 @@ bool Moves::swap_nb(Sol& sol, int mode)
 					if ((k->nbi[d][z->index]) && (m->nbi[d][y->index]) && (z->nbi[d][l->index]) && (y->nbi[d][n->index]))
 					{//capacity constraints remain equal
 
-						double lb = k->con[z->index]->determin + z->con[l->index]->determin +m->con[y->index]->determin + y->con[n->index]->determin- (k->con[y->index]->determin + y->con[l->index]->determin +m->con[z->index]->determin + z->con[n->index]->determin);
-						if (-lb >= + 1e-9)
+						double lb = k->con[z->index]->determin + z->con[l->index]->determin + m->con[y->index]->determin + y->con[n->index]->determin - (k->con[y->index]->determin + y->con[l->index]->determin + m->con[z->index]->determin + z->con[n->index]->determin);
+						if (-lb >= +1e-9)
 						{
 							double delta_tt = 0.0;
 							double departuretime = ins->t[d].EDT + tour.deptime[i - 1];//bij punt voor y
@@ -2190,7 +2397,7 @@ bool Moves::swap_nb(Sol& sol, int mode)
 							newtraveltime = currenttime - departuretime;
 							oldtraveltime = (ins->t[d].EDT + tour.deptime[j + 1]) - departuretime;
 							delta_tt = oldtraveltime - newtraveltime;
-							if (delta_tt > bestdelta+ 1e-9)//local evaluation
+							if (delta_tt > bestdelta + 1e-9)//local evaluation
 							{
 								bool reqbreak = true;
 								currenttime = ins->t[d].EDT;
@@ -2200,7 +2407,7 @@ bool Moves::swap_nb(Sol& sol, int mode)
 									Ins::Vertex* second = tour.seq[map_idx(l + 1)];//can be the end depot
 									double arrivaltime = ins->arrival_time(first->con[second->index], currenttime);
 									//account for break
-									if ((reqbreak) && ((max(second->LTW[d] - ins->breakdur,arrivaltime) >= ins->breakstart + 1e-9) || (second->index == ins->maxvertices - 1)))
+									if ((reqbreak) && ((max(second->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart + 1e-9) || (second->index == ins->maxvertices - 1)))
 									{
 										arrivaltime += ins->breakdur;
 										reqbreak = false;
@@ -2223,7 +2430,7 @@ bool Moves::swap_nb(Sol& sol, int mode)
 								}
 								newtraveltime = currenttime - departuretime;
 								oldtraveltime = ((ins->t[d].EDT + tour.deptime[end - 1]) - departuretime);
-								delta_tt = oldtraveltime-newtraveltime;
+								delta_tt = oldtraveltime - newtraveltime;
 								if (delta_tt >= bestdelta + 1e-9)//global evaluation
 								{
 									improvement = true;
@@ -2242,7 +2449,7 @@ bool Moves::swap_nb(Sol& sol, int mode)
 			}// end i
 			if (improvement)
 			{
-				swap:
+			swap:
 				//Sol remember = sol;
 				tour.swap_vertices(besti, bestj);
 				/*
@@ -2263,7 +2470,8 @@ bool Moves::swap_nb(Sol& sol, int mode)
 	return succes;
 }//end swap
 
-bool Moves::two_opt_nb(Sol& sol,int mode)
+
+bool Moves::two_opt_nb(Sol& sol, int mode)
 {
 	bool succes = false;
 	for (int d = 0; d < ins->maxtours; ++d)
@@ -2289,7 +2497,7 @@ bool Moves::two_opt_nb(Sol& sol,int mode)
 					Ins::Vertex* n = tour.seq[j + 1];//suc partner 2
 					if ((k->nbi[d][z->index]) && (z->nbi[d][m->index]) && (l->nbi[d][y->index]) && (y->nbi[d][n->index]))
 					{
-						double lb = (k->con[y->index]->determin + z->con[n->index]->determin)- (k->con[z->index]->determin + y->con[n->index]->determin);
+						double lb = (k->con[y->index]->determin + z->con[n->index]->determin) - (k->con[z->index]->determin + y->con[n->index]->determin);
 						if (lb > 1e-9)
 						{
 							//calculate reversed subpath
@@ -2316,7 +2524,7 @@ bool Moves::two_opt_nb(Sol& sol,int mode)
 								arrivaltime = ins->arrival_time(first->con[second->index], currenttime);
 								if ((reqbreak) && ((max(second->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart + 1e-9) || (second->index == ins->maxvertices - 1)))
 								{
-									if (reqbreak && max(second->LTW[d] - ins->breakdur, arrivaltime) > ins->breakend+ 1e-9)
+									if (reqbreak && max(second->LTW[d] - ins->breakdur, arrivaltime) > ins->breakend + 1e-9)
 									{
 										currenttime = DBL_MAX;
 										break;
@@ -2358,7 +2566,7 @@ bool Moves::two_opt_nb(Sol& sol,int mode)
 			if (improvement)
 			{
 				//Sol remember = sol;
-				tour.opt_vertices(besti,bestj);
+				tour.opt_vertices(besti, bestj);
 				//double actualdecrease = remember.tours[d].deptime.back() - tour.deptime.back();
 				/*
 				if (!sol.check())
@@ -2377,7 +2585,7 @@ bool Moves::two_opt_nb(Sol& sol,int mode)
 	return succes;
 }
 
-bool Moves::shift_nb(Sol& sol, int mode)
+bool Moves::relocate_nb(Sol& sol, int mode)//move vertex x from tour d to tour e in order to save travel time
 {
 	bool improvement = true;
 	bool succes = false;
@@ -2386,152 +2594,7 @@ bool Moves::shift_nb(Sol& sol, int mode)
 		improvement = false;
 		double bestdecrease = 1e-9;
 		Sol::Tour* bestd = NULL;
-		int besti=-1;
-		int bestj=-1;
-		int bestbreakindex=-1;
-		for (int d = 0; d < ins->maxtours; ++d)
-		{
-			Sol::Tour* tourd = &sol.tours[d];
-			int end = (int)tourd->seq.size();
-			for (int i = 1; i < end - 2; ++i)
-			{
-				for (int j = i+1; j < end - 1; ++j)
-				{
-					// --- index mapping: view of sequence after moving i after j ---
-					auto at = [&](int v) -> Ins::Vertex* 
-						{
-						if (v < i)             return tourd->seq[v];
-						if (v >= i && v < j)   return tourd->seq[v + 1];
-						if (v == j)             return tourd->seq[i];
-						/* v > j */             return tourd->seq[v];
-						};
-
-					bool reqbreak = (tourd->breakindex >= i);
-					int breakindex = tourd->breakindex;
-					double departuretime = ins->t[d].EDT + tourd->deptime[i - 1];
-					double arrivaltime=0.0;
-					for (int v = i; v <= j + 1; ++v)
-					{
-						Ins::Vertex* o = at(v - 1);
-						Ins::Vertex* p = at(v);
-						arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
-						if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
-						{
-							if (arrivaltime > ins->breakend)
-							{
-								arrivaltime = DBL_MAX;
-								break;
-							}
-							reqbreak = false;
-							breakindex = v;
-							arrivaltime += ins->breakdur;
-						}
-						if (arrivaltime < p->LTW[d])
-						{
-							arrivaltime = p->LTW[d];
-						}
-						if (arrivaltime > p->UTW[d])
-						{
-							arrivaltime = DBL_MAX;
-							break;
-						}
-						arrivaltime += p->serv;
-						departuretime = arrivaltime;
-					}
-					double localdecreasetotal = tourd->deptime[j + 1] - (arrivaltime - ins->t[d].EDT);
-					if (localdecreasetotal > bestdecrease)
-					{
-						departuretime = arrivaltime;
-						for (int v = j+2; v < end ; ++v)
-						{
-							Ins::Vertex* o = at(v - 1);
-							Ins::Vertex* p = at(v);
-							arrivaltime = ins->arrival_time(o->con[p->index], departuretime);
-							if ((reqbreak) && ((max(p->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart) || (p->index == ins->maxvertices - 1)))
-							{
-								if (arrivaltime > ins->breakend)
-								{
-									arrivaltime = DBL_MAX;
-									break;
-								}
-								breakindex = v;
-								reqbreak = false;
-								arrivaltime += ins->breakdur;
-							}
-							if (arrivaltime < p->LTW[d])
-							{
-								arrivaltime = p->LTW[d];
-							}
-							if (arrivaltime > p->UTW[d])
-							{
-								arrivaltime = DBL_MAX;
-								break;
-							}
-							arrivaltime += p->serv;
-							departuretime = arrivaltime;
-						}
-						double globaldecrease = tourd->deptime.back() - (arrivaltime - ins->t[d].EDT);
-						if (globaldecrease > bestdecrease)
-						{
-							bestdecrease = globaldecrease;
-							bestd = tourd;
-							besti = i;
-							bestj = j;
-							bestbreakindex=breakindex;
-							improvement = true;
-							if (mode == 0)
-							{
-								goto shift;
-							}
-						}//end global check
-					}//end local check
-				}//end for j
-			}//end for i
-		}//end for all tours
-		if (improvement)
-		{
-		shift:
-			//Sol remember = sol;
-			Ins::Vertex* moved = bestd->seq[besti];
-			bestd->seq.erase(bestd->seq.begin() + besti);
-			bestd->seq.insert(bestd->seq.begin() + bestj, moved);
-			bestd->update_break(bestbreakindex);
-			/*
-			double actualdecrease = 0.0;
-			for (int t = 0; t < (int)sol.tours.size(); ++t)
-			{
-				actualdecrease += remember.tours[t].deptime.back() - sol.tours[t].deptime.back();
-			}
-			if (fabs(bestdecrease - actualdecrease) > 0.01)
-			{
-				cout << "error shift" << endl;
-			}
-			*/
-			if ((bestd->breakindex == int(bestd->seq.size()) - 1) && (ins->t[bestd->index].LAT > ins->breakend + ins->breakdur))
-			{
-				//cout << "break pulled" << endl;
-				pull_break(sol, bestd->index);
-			}
-			//if (!sol.check())
-			//{
-				//cout << "error in shift_nb" << endl;
-			//}
-			succes = true;
-		}//end if improvement
-	}//end while improvement
-	return succes;
-}
-
-bool Moves::relocate_nb(Sol& sol,int mode)//move vertex x from tour d to tour e in order to save travel time
-{
-	bool improvement = true;
-	bool succes = false;
-	while (improvement)
-	{
-		improvement = false;
-		double bestdecrease = 1e-9;
-		Sol::Tour *bestd=NULL;
-		Sol::Tour *beste=NULL;
+		Sol::Tour* beste = NULL;
 		int besti;
 		int bestj;
 		for (int d = 0; d < ins->maxtours; ++d)
@@ -2542,13 +2605,19 @@ bool Moves::relocate_nb(Sol& sol,int mode)//move vertex x from tour d to tour e 
 				Ins::Vertex* w = tourd->seq[i];
 				Ins::Vertex* x = tourd->seq[i + 1];
 				Ins::Vertex* y = tourd->seq[i + 2];
+
+				//check enddepot time on path d
+				Tour temptourd = *tourd;
+				if (!temptourd.remove_vertex(i + 1))
+					continue;
+
 				double ttwxy = (tourd->deptime[i + 2] - (y->serv + tourd->action[i + 2] * ins->breakdur + x->serv + tourd->action[i + 1] * ins->breakdur)) - tourd->deptime[i];
 				for (int e = 0; e < ins->maxtours; ++e)
 				{
 					if (d != e)
 					{
 						Sol::Tour* toure = &sol.tours[e];
-						for (int j = 0; j < int(toure->seq.size()) - 2; ++j)
+						for (int j = 0; j < int(toure->seq.size()) - 1; ++j)
 						{
 							Ins::Vertex* a = toure->seq[j];
 							Ins::Vertex* b = toure->seq[j + 1];
@@ -2563,91 +2632,106 @@ bool Moves::relocate_nb(Sol& sol,int mode)//move vertex x from tour d to tour e 
 									if (lb > 1e-9)
 									{
 										//local evaluation on path e, break remains unchanged
-										double ttab = (toure->deptime[j + 1] - (b->serv + toure->action[j + 1] * ins->breakdur)) - toure->deptime[j];
-										//calculate axb
-										double departuretime = ins->t[e].EDT + toure->deptime[j];
-										//traveltime a to x
-										double arrivaltime = ins->arrival_time(a->con[x->index], departuretime);
-										if (arrivaltime < x->LTW[e])
-										{
-											arrivaltime = x->LTW[e];
-										}
-										if (arrivaltime > x->UTW[e] + 1e-9)
-										{
-											continue;
-										}
-										double ttaxb = arrivaltime - departuretime;
-										//insert vertex without break
-										arrivaltime += x->serv;
-										departuretime = arrivaltime;
-										//traveltime from x to b
-										arrivaltime = ins->arrival_time(x->con[b->index], departuretime);
-										if (arrivaltime + toure->action[j + 1] * ins->breakdur < b->LTW[e])
-										{
-											arrivaltime = b->LTW[e] - (toure->action[j + 1] * ins->breakdur);
-										}
-										if (arrivaltime > b->UTW[e] + 1e-9)
-										{
-											continue;
-										}
-										ttaxb += arrivaltime - departuretime;
-										double arrivalb = arrivaltime + b->serv + toure->action[j + 1] * ins->breakdur;
+										const double departure_a =
+											ins->t[e].EDT + toure->deptime[j];
 
-										//local evaluation on path d
-										//due to potential traveltime decrease break can come to early
-										bool reqbreak = false;
-										if (tourd->breakindex >= i + 1)
-										{
-											reqbreak = true;
-										}
-										//calculate wy
-										departuretime = ins->t[d].EDT + tourd->deptime[i];
-										//traveltime w to y
-										arrivaltime = ins->arrival_time(w->con[y->index], departuretime);
-										//break niet meetellen voor local evaluation
-										if ((reqbreak) && ((max(y->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart + 1e-9) || (y->index == ins->maxvertices - 1)))
-										{//break na y wordt bij global evaluation in rekening gebracht
-											if (arrivaltime > ins->breakend + 1e-9)//pushing to break to right after removal does not work
-											{
-												continue;
-											}
-											reqbreak = false;
-											arrivaltime += ins->breakdur;
-										}
-										if (arrivaltime < y->LTW[d])
-										{
-											arrivaltime = y->LTW[d];
-										}
-										if (arrivaltime > y->UTW[d] + 1e-9)
-										{
+										// Arrival and service at the inserted customer x.
+										double arrival_x = ins->arrival_time(
+											a->con[x->index], departure_a);
+
+										if (arrival_x < x->LTW[e])
+											arrival_x = x->LTW[e];
+										if (arrival_x > x->UTW[e] + 1e-9)
 											continue;
+
+										const double departure_x = arrival_x + x->serv;
+
+										// Arrival at b, then break/waiting and service start.
+										const double arrival_b =
+											ins->arrival_time(x->con[b->index], departure_x);
+
+										double service_start_b;
+
+										if (toure->action[j + 1])
+										{
+											const bool at_end_depot =
+												(b->index == ins->maxvertices - 1);
+
+											double break_start = arrival_b;
+											if (!at_end_depot && break_start < ins->breakstart)
+												break_start = ins->breakstart;
+
+											if (break_start > ins->breakend + 1e-9)
+												continue;
+
+											service_start_b =
+												std::max(break_start + ins->breakdur, b->LTW[e]);
 										}
-										double ttwy = arrivaltime - departuretime;
-										//double arrivaly = arrivaltime + y->serv;
+										else
+										{
+											service_start_b = std::max(arrival_b, b->LTW[e]);
+										}
+
+										if (service_start_b > b->UTW[e] + 1e-9)
+											continue;
+
+										// Match ttab, which excludes b's service and break.
+										const double ttabx = service_start_b - toure->action[j + 1] * ins->breakdur - departure_a;
+
+										// Departure from b after service; the break is already included
+										// in service_start_b.
+										const double arrivalb = service_start_b + b->serv;
+
+										// Local evaluation on path d, using the schedule produced by the actual removal operation.
+										const int y_after_removal = i + 1;
+										const bool break_at_y = (temptourd.action[y_after_removal] != 0);
+										const double ttwy = (temptourd.deptime[y_after_removal] - y->serv - (break_at_y ? ins->breakdur : 0.0)) - temptourd.deptime[i];
+										const double ttab =	(toure->deptime[j + 1]- b->serv - toure->action[j + 1] * ins->breakdur)	- toure->deptime[j];
 										double shift = (arrivalb - ins->t[e].EDT) - toure->deptime[j + 1];
-										double localdecreasetotal = ttwxy + ttab - (ttwy + ttaxb);
+										double localdecreasetotal = ttwxy + ttab - (ttwy + ttabx);
 										if ((shift <= toure->max_shift[j + 1] + 1e-9) && (localdecreasetotal > bestdecrease + 1e-9))//local improvement check
 										{
-											//check enddepot time on path d
-											Tour temptourd = *tourd;
-											temptourd.remove_vertex(i + 1);
 											double globaldecreasetotal = (tourd->deptime.back() - temptourd.deptime.back());
-
 											//check enddepot time on path e
-											double currenttime = arrivalb;
-											for (int m = j + 2; m < (int)toure->seq.size(); ++m)
+											double currenttime = arrivalb; // departure from b after its service
+											bool suffix_feasible = true;
+
+											for (int m = j + 2; m < static_cast<int>(toure->seq.size()); ++m)
 											{
-												//gather departure time and corresponding time slot
 												Ins::Vertex* o = toure->seq[m - 1];
 												Ins::Vertex* p = toure->seq[m];
-												//travel time from van o to p
-												double arrivaltime = ins->arrival_time(o->con[p->index], currenttime);
-												if (arrivaltime + toure->action[m] * ins->breakdur < p->LTW[e])
+
+												double at = ins->arrival_time(o->con[p->index], currenttime);
+
+												if (toure->action[m])
 												{
-													arrivaltime = p->LTW[e] - (toure->action[m] * ins->breakdur);
+													const bool at_end_depot =(p->index == ins->maxvertices - 1);
+													double break_start = at;
+													if (!at_end_depot && break_start < ins->breakstart)
+														break_start = ins->breakstart;
+
+													if (break_start > ins->breakend + 1e-9)
+													{
+														suffix_feasible = false;
+														break;
+													}
+
+													at = break_start + ins->breakdur;
 												}
-												arrivaltime += p->serv + toure->action[m] * ins->breakdur;
-												currenttime = arrivaltime;
+
+												const double service_start = std::max(at, p->LTW[e]);
+												if (service_start > p->UTW[e] + 1e-9)
+												{
+													suffix_feasible = false;
+													break;
+												}
+
+												currenttime = service_start + p->serv;
+											}
+
+											if (!suffix_feasible ||	currenttime - ins->t[e].EDT > ins->t[e].T_max + 1e-9)
+											{
+												continue;
 											}
 											//cout << "enddepot time e: " << currenttime - t[e].EDT << endl;
 											//cout << "increase e: " << (currenttime - t[e].EDT) - sol.traveltime[e].back() << endl;
@@ -2676,7 +2760,7 @@ bool Moves::relocate_nb(Sol& sol,int mode)//move vertex x from tour d to tour e 
 		}// end for masterpath d
 		if (improvement)
 		{
-			move:
+		move:
 			//Sol remember = sol;
 			Ins::Vertex* candidate = bestd->seq[besti];
 			sol.remove_vertex(*bestd, besti);//remove vertex from path d
@@ -2710,9 +2794,10 @@ bool Moves::relocate_nb(Sol& sol,int mode)//move vertex x from tour d to tour e 
 		}//end if improvement
 	}//end while improvement
 	return succes;
-}//end move_nb
+}//end relocate_nb
 
-bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours in order to save traveltime
+
+bool Moves::swap2_nb(Sol& sol, int mode)//swap 2 vertices from two distinct tours in order to save traveltime
 {
 	bool improvement = true;
 	bool succes = false;
@@ -2720,10 +2805,10 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 	{
 		improvement = false;
 		double bestdecrease = 1e-9;
-		Sol::Tour *bestd=NULL;
-		Sol::Tour *beste=NULL;
-		int besti=-1;
-		int bestj=-1;
+		Sol::Tour* bestd = NULL;
+		Sol::Tour* beste = NULL;
+		int besti = -1;
+		int bestj = -1;
 		for (int d = 0; d < ins->maxtours; ++d)
 		{
 			Sol::Tour* tourd = &sol.tours[d];
@@ -2732,7 +2817,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 				Ins::Vertex* w = tourd->seq[i];
 				Ins::Vertex* x = tourd->seq[i + 1];//vertex from tour d that will be swapped to tour e
 				Ins::Vertex* y = tourd->seq[i + 2];
-				for (int e = d+1; e < ins->maxtours; ++e)
+				for (int e = d + 1; e < ins->maxtours; ++e)
 				{
 					Sol::Tour* toure = &sol.tours[e];
 					for (int j = 0; j < toure->seq.size() - 2; ++j)
@@ -2740,11 +2825,11 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 						Ins::Vertex* a = toure->seq[j];
 						Ins::Vertex* b = toure->seq[j + 1];//vertex from tour e that will be swapped to tour d
 						Ins::Vertex* c = toure->seq[j + 2];
-						if ((a->nbi[e][x->index]) && (x->nbi[e][c->index]) && (w->nbi[d][b->index])&&(b->nbi[d][y->index]))
+						if ((a->nbi[e][x->index]) && (x->nbi[e][c->index]) && (w->nbi[d][b->index]) && (b->nbi[d][y->index]))
 						{
-							if ((toure->weight + (x->weight-b->weight) <= ins->t[e].W_max + 1e-9) && (toure->volume + (x->volume-b->volume) <= ins->t[e].V_max + 1e-9)&&(tourd->weight + (b->weight - x->weight) <= ins->t[d].W_max + 1e-9)&&(tourd->volume + (b->volume - x->volume) <= ins->t[d].V_max + 1e-9))
+							if ((toure->weight + (x->weight - b->weight) <= ins->t[e].W_max + 1e-9) && (toure->volume + (x->volume - b->volume) <= ins->t[e].V_max + 1e-9) && (tourd->weight + (b->weight - x->weight) <= ins->t[d].W_max + 1e-9) && (tourd->volume + (b->volume - x->volume) <= ins->t[d].V_max + 1e-9))
 							{//check if a potential increase in volume and weight is allowed on each tour
-									
+
 								double old_d = w->con[x->index]->determin + x->con[y->index]->determin;
 								double new_d = w->con[b->index]->determin + b->con[y->index]->determin;
 								double old_e = a->con[b->index]->determin + b->con[c->index]->determin;
@@ -2753,7 +2838,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 								if (lb > 1e-9)
 								{
 									//local evaluation on path d
-									
+
 									//the break can come too early due to potential traveltime decrease 
 									bool reqbreakd = false;
 									int breakindexd = tourd->breakindex;
@@ -2888,7 +2973,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 											arrivaltime_d += p->serv;
 											departuretime_d = arrivaltime_d;
 										}
-										
+
 										//check enddepot time on path e
 										bool feasible_e = true;
 										double departuretime_e = arrivaltimec;
@@ -2925,7 +3010,7 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 										{
 											continue;   // skip the rest of this candidate (go to next j)
 										}
-										double globaldecreasetotal =(tourd->deptime.back() - (arrivaltime_d - ins->t[d].EDT)) +(toure->deptime.back() - (arrivaltime_e - ins->t[e].EDT));
+										double globaldecreasetotal = (tourd->deptime.back() - (arrivaltime_d - ins->t[d].EDT)) + (toure->deptime.back() - (arrivaltime_e - ins->t[e].EDT));
 										//global improvement check
 										if (globaldecreasetotal > bestdecrease + 1e-9)
 										{
@@ -2952,8 +3037,8 @@ bool Moves::swap2_nb(Sol& sol,int mode)//swap 2 vertices from two distinct tours
 		{
 		swap2:
 			//Sol remember = sol;
-			Ins::Vertex *x = bestd->seq[besti];
-			Ins::Vertex *b = beste->seq[bestj];
+			Ins::Vertex* x = bestd->seq[besti];
+			Ins::Vertex* b = beste->seq[bestj];
 			sol.replace_vertex(*bestd, b, besti);
 			sol.replace_vertex(*beste, x, bestj);
 			//sol.replace_vertex(*bestd,b,besti,bestbreakindexd);

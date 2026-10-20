@@ -570,11 +570,10 @@ void Tour::update_break(int newbreakindex)
 	calc_maxshift();
 }
 
-void Tour::update_break()  // reposition break, update times and max_shift
+bool Tour::update_break()  // reposition break, update times and max_shift
 {
-	
 	const int n = (int)seq.size();
-
+	bool feasible = true;
 	// reset actions
 	std::fill(action.begin(), action.end(), 0);
 	breakindex = -1;
@@ -631,9 +630,25 @@ void Tour::update_break()  // reposition break, update times and max_shift
 	// --- choose first position with enough budget; else force end depot (cannot fail) ---
 	const double B = ins->breakdur;
 	bool placed = false;
-	for (int u = earliestbreakindex; u <= n - 1; ++u) 
-	{ // end depot included
-		if (max_shift[u] + wait_after_start[u] + 1e-9 >= B) 
+	const double eps = 1e-9;
+
+	for (int u = earliestbreakindex; u < n; ++u)
+	{
+		const bool at_end_depot =(seq[u]->index == ins->maxvertices - 1);
+
+		double break_start = arr0[u];
+		if (!at_end_depot && break_start < ins->breakstart)
+			break_start = ins->breakstart;
+
+		if (break_start > ins->breakend + eps)
+			continue;
+
+		const double service_start =std::max(break_start + B, seq[u]->LTW[index]);
+
+		if (service_start > seq[u]->UTW[index] + eps)
+			continue;
+
+		if (max_shift[u] + wait_after_start[u] + eps >= B)
 		{
 			action[u] = 1;
 			breakindex = u;
@@ -643,6 +658,9 @@ void Tour::update_break()  // reposition break, update times and max_shift
 	}
 	if (!placed) 
 	{
+		//route is infeasible as break can not be placed
+		feasible = false;
+		return feasible;
 		// unconditional fallback: end depot (special-case semantics will apply)
 		action.back() = 1;
 		breakindex = n - 1;
@@ -711,6 +729,7 @@ void Tour::update_break()  // reposition break, update times and max_shift
 		double cap_at_next = (ins->t[index].EDT + deptime[breakindex + 1] + max_shift[breakindex + 1]) - (seq[breakindex + 1]->serv + (action[breakindex + 1] ? B : 0.0));
 		update_maxshift(0, breakindex, cap_at_next);
 	}
+	return feasible;
 }
 
 void Tour::update_maxshift(int start, int end, double arrivaltime)
@@ -807,8 +826,9 @@ void Tour::insert_vertex(Ins::Vertex* candidate, int position)
 	update_maxshift(0, position + 1, arrivaltime);//update maxshift for all positions before insertion
 }
 
-void Tour::remove_vertex(int position)
+bool Tour::remove_vertex(int position)
 {
+	bool feasible = true;
 	bool reqbreak = false;
 	if (position <= breakindex)
 	{
@@ -824,18 +844,23 @@ void Tour::remove_vertex(int position)
 	weight -= candidate->weight;
 	if (reqbreak)
 	{
-		update_break();
+		feasible=update_break();
 	}
 	else
 	{
 		update(position - 1, int(seq.size()));//update travel time for all vertices after deletion
 		calc_maxshift();
 	}
+	return feasible;
 }//end remove_vertex tour version
 
-void Tour::remove_vertices(int position1, int position2)
+bool Tour::remove_vertices(int position1, int position2)
 {
-	if (position1 == position2) return;         // or assert
+	bool feasible = true;
+	if (position1 == position2)
+	{
+		return feasible;
+	}
 	if (position1 > position2) swap(position1, position2);
 	Ins::Vertex* candidate1 = seq[position1];
 	Ins::Vertex* candidate2 = seq[position2];
@@ -854,7 +879,8 @@ void Tour::remove_vertices(int position1, int position2)
 	deptime.erase(deptime.begin() + position1);//insert temporary value
 	max_shift.erase(max_shift.begin() + position1);
 	action.erase(action.begin() + position1);//insert regular visit action change later when necessary
-	update_break();
+	feasible = update_break();
+	return feasible;
 }
 
 void Tour::replace_vertex(Ins::Vertex* candidate, int position)
@@ -1376,23 +1402,27 @@ void Sol::replace_vertex(Tour& tour, Ins::Vertex* candidate, int position, int b
 	tour.replace_vertex(candidate, position, breakindex);
 }
 
-void Sol::remove_vertex(Sol::Tour& tour, int position)
+bool Sol::remove_vertex(Sol::Tour& tour, int position)
 {
+	bool feasible = true;
 	Ins::Vertex* candidate = tour.seq[position];
 	available[candidate->index] = true;//make vertex back available
 	score -= candidate->score;// update score of the new solution
-	tour.remove_vertex(position);
+	feasible = tour.remove_vertex(position);
+	return feasible;
 }
 
-void Sol::remove_vertices(Tour& tour, int position1, int position2)
+bool Sol::remove_vertices(Tour& tour, int position1, int position2)
 {
+	bool feasible = true;
 	Ins::Vertex* candidate1 = tour.seq[position1];
 	Ins::Vertex* candidate2 = tour.seq[position2];
 	available[candidate1->index] = true;//make vertex back available
 	score -= candidate1->score;// update score of the new solution
 	available[candidate2->index] = true;//make vertex back available
 	score -= candidate2->score;// update score of the new solution
-	tour.remove_vertices(position1,position2);
+	feasible = tour.remove_vertices(position1,position2);
+	return feasible;
 }
 
 void Sol::reset() 

@@ -333,18 +333,18 @@ void solve_dataset(int max_rep = 5)
 			//instance.create_neighbourhood_simple(textfile.path, textfile.name);
 			instance.create_neighbourhood(textfile.path, textfile.name);
 			
-			double max_time_sec =9999;
+			double max_time_sec =9999.0;
 			
 			if (instance.maxvertices == 20)
-				max_time_sec = 1;
+				max_time_sec = 1.0;
 			else if (instance.maxvertices == 50)
 				max_time_sec = 2.0;
 			else
 				max_time_sec = 5.0;
 			
 
-			//Tabu tabu(instance, 200000, 2, 0.1, 0.9, 10);
-			//it->result[rep] = tabu.solve(it->bestknown,max_time_sec,-1,7);
+			Tabu tabu(instance, 200000, 2, 0.1, 0.9, 10);
+			it->result[rep] = tabu.solve(it->bestknown,max_time_sec,-1,7);
 			/*
 			forced_crit = -1 for adaptive
 				forced_crit = 0 for SCORE
@@ -358,8 +358,8 @@ void solve_dataset(int max_rep = 5)
 			//it->result[rep] = ils.solve(it->bestknown, max_time_sec);
 			//Alns alns(instance,200000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
 			//it->result[rep] = alns.solve(it->bestknown,max_time_sec);
-			Aco aco(instance, 1, 3, 0.1, 20, 2000000, 0.25, 0.05);
-			it->result[rep] = aco.solve(it->bestknown, max_time_sec);
+			//Aco aco(instance, 1, 3, 0.1, 20, 2000000, 0.25, 0.05);
+			//it->result[rep] = aco.solve(it->bestknown, max_time_sec);
 
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;

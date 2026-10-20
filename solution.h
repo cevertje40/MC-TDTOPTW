@@ -82,12 +82,12 @@ class Tour
 	int breakindex;//position of break in tour
 	void update(int start, int end);//keep break fixed and update time and maxshift for positions after start
 	void update_break(int newbreakindex);//update solution and position break at input breakindex
-	void update_break();//complete update of the tour with optimized break repositioning, only works for feasible tours
+	bool update_break();//complete update of the tour with optimized break repositioning, only works for feasible tours
 	void update_maxshift(int start, int end, double arrivaltime);//update maxshift for positions before end
 	void calc_maxshift();//for specific tour of solution
 	void insert_vertex(Ins::Vertex* candidate,int position);
-	void remove_vertex(int position);
-	void remove_vertices(int position1, int position2);
+	bool remove_vertex(int position);
+	bool remove_vertices(int position1, int position2);
 	void replace_vertex(Ins::Vertex* candidate, int position);
 	void replace_vertex(Ins::Vertex* candidate, int position,int breakindex);
 	void opt_vertices(int i, int j);//assumption i < j
@@ -114,8 +114,8 @@ public:
 	void insert_vertex(Tour &tour, Ins::Vertex* candidate, int position);
 	void replace_vertex(Tour &tour, Ins::Vertex* candidate, int position);
 	void replace_vertex(Tour &tour, Ins::Vertex* candidate, int position, int breakindex);
-	void remove_vertex(Tour &tour, int position);//update score and availability
-	void remove_vertices(Tour &tour, int position1, int position2);//update score and availability
+	bool remove_vertex(Tour &tour, int position);//update score and availability
+	bool remove_vertices(Tour &tour, int position1, int position2);//update score and availability
 	void reset();
 	bool check();
 	void read_from_file(const std::string& dataset);

@@ -317,7 +317,7 @@ Res Aco::solve(int bestknown, double max_time_sec)
 
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
-	std::cout << gb << endl;
+	//std::cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
 	return Res(gb, cpuTime, bestknown);
 }
@@ -626,7 +626,7 @@ Res Ils::solve(int bestknown, double max_time_sec)
 	}
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	gb.check();
-	std::cout << gb << endl;
+	//std::cout << gb << endl;
 	//cout << "best score: "<<gb.score<<"after: "<<cpuTime << endl;
 	return Res(gb, cpuTime, bestknown);
 }
@@ -697,9 +697,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 		};
 
 	parallel_construct(s);
-	//s.read_from_file("20.3.1.3.txt");
 	
-	//s.check();
 	gb = s;
 
 	ElitePool elites;
@@ -972,6 +970,7 @@ Res Tabu::solve(int bestknown, double max_time_sec, int forced_crit, int nb_mask
 	double cpuTime = std::chrono::duration<double>(clock::now() - t0).count();
 	//cout << gb << endl;
 	gb.check();
+	
 
 	std::cout << "iter without replacement nb: "<< nonb1 << " <> " << nonb2 << " <> " << nonb3	<< " total iterations: " << iter << std::endl;
 
@@ -2524,8 +2523,7 @@ Res Alns::solve(int bestknown, double max_time_sec)
 				break;
 			}
 
-			const int beta_max =
-				std::max(1, static_cast<int>(std::floor(beta_frac * nVisited)));
+			const int beta_max =std::max(1, static_cast<int>(std::floor(beta_frac * nVisited)));
 			std::uniform_int_distribution<int> beta_picker(1, beta_max);
 			const int beta = beta_picker(engine);
 
@@ -2544,7 +2542,7 @@ Res Alns::solve(int bestknown, double max_time_sec)
 			case 6: removed = random_route_remove(cand, beta); break;
 			case 7: removed = sequence_remove(cand, beta); break;
 			}
-			cand.check();
+			
 			// Select node-selection and insertion operators independently.
 			const int sel_idx = weighted_pick(sel_w, engine);
 			const int ins_idx = weighted_pick(ins_w, engine);

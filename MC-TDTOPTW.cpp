@@ -335,6 +335,7 @@ void solve_dataset(int max_rep = 5)
 			
 			double max_time_sec =9999.0;
 			
+			
 			if (instance.maxvertices == 20)
 				max_time_sec = 1.0;
 			else if (instance.maxvertices == 50)
@@ -360,6 +361,9 @@ void solve_dataset(int max_rep = 5)
 			//it->result[rep] = alns.solve(it->bestknown,max_time_sec);
 			//Aco aco(instance, 1, 3, 0.1, 20, 2000000, 0.25, 0.05);
 			//it->result[rep] = aco.solve(it->bestknown, max_time_sec);
+
+			const SolutionPerfStats audit = it->result[rep].sol.collect_solution_stats();
+
 
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
@@ -881,9 +885,11 @@ void ctop_gap(int max_rep=5)
 			//it->result[rep] = ils.solve(it->bestscore);
 			Tabu tabu(instance, 10000, 2, 0.1, 0.8, 5);
 			it->result[rep] = tabu.solve(it->bestknown);
+			//Alns alns(instance,5000,0.9997,150,1500,8.0,4.0,1.0,100.0,0.0001,0.15,0.8);
+			//it->result[rep] = alns.solve(it->bestknown);
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
-			cout << "name: " << it->filename << " best score: " << it->bestknown<<" " << tabu.name << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
+			cout << "name: " << it->filename << " best score: " << it->bestknown<<" score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
 			output.open("output.txt", ios::out | ios::app);
 			output << it->filename << ";" << it->bestknown << ";" << it->result[rep].sol.score << ";" << it->result[rep].time << ";" << it->result[rep].gap << "\n";
 			output.close();
@@ -1080,10 +1086,10 @@ int main()
 	//debug_ctop();
 	solve_dataset(1);
 	//tdoptw_gap(10);
-	//ctop_gap();
+	//ctop_gap(1);
 	//doe(5);
 	//doe2(5);
-	//case_study(10);
+	case_study(10);
 	//ctop_optimal(5);
 
 }

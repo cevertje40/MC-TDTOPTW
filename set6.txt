@@ -1,4 +1,4 @@
-..\..\datasets\CTOP\LargeScale CTOP\set3\
+..\datasets\CTOP\LargeScale CTOP\set3\
 b1.txt	2530
 b2.txt	2614
 b3.txt	2520

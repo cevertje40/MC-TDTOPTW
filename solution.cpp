@@ -410,6 +410,123 @@ SolutionPerfStats Sol::repair_and_collect_stats()
 	return stats;
 }
 
+
+SolutionPerfStats Sol::collect_solution_stats() const
+{
+	SolutionPerfStats stats{};
+	stats.route_stats.reserve(tours.size());
+	stats.route_count = static_cast<int>(tours.size());
+
+	double sum_route_duration = 0.0;
+	double sum_route_time_util = 0.0;
+	double sum_weight_util = 0.0;
+	double sum_volume_util = 0.0;
+	double sum_waiting = 0.0;
+	double sum_customer_tw_slack = 0.0;
+	double sum_break_start = 0.0;
+	double sum_break_position = 0.0;
+	int routes_with_break_start = 0;
+	int routes_with_break_position = 0;
+	int routes_break_at_end = 0;
+	int total_customer_tw_slack_count = 0;
+	double min_customer_tw_slack = DBL_MAX;
+	double min_max_shift = DBL_MAX;
+
+	for (const Tour& tour : tours)
+	{
+		RoutePerfStats route = tour.collect_route_stats();
+		stats.route_stats.push_back(route);
+
+		stats.total_score += route.collected_score;
+		stats.total_served_customers += route.served_customers;
+		if (route.served_customers > 0)
+			++stats.nonempty_route_count;
+		sum_route_duration += route.route_duration;
+		sum_route_time_util += route.route_time_utilization;
+		sum_weight_util += route.weight_utilization;
+		sum_volume_util += route.volume_utilization;
+		sum_waiting += route.total_waiting_time;
+		if (route.customer_tw_slack_count > 0)
+		{
+			sum_customer_tw_slack +=
+				route.avg_customer_tw_slack * route.customer_tw_slack_count;
+			total_customer_tw_slack_count += route.customer_tw_slack_count;
+		}
+
+		stats.max_route_time_utilization =
+			std::max(stats.max_route_time_utilization, route.route_time_utilization);
+		stats.max_weight_utilization =
+			std::max(stats.max_weight_utilization, route.weight_utilization);
+		stats.max_volume_utilization =
+			std::max(stats.max_volume_utilization, route.volume_utilization);
+		if (route.route_time_utilization >= 0.90)
+			++stats.routes_time_util_ge_90pct;
+		if (route.weight_utilization >= 0.90)
+			++stats.routes_weight_util_ge_90pct;
+		if (route.volume_utilization >= 0.90)
+			++stats.routes_volume_util_ge_90pct;
+		if (route.customer_tw_slack_count > 0)
+			min_customer_tw_slack =
+			std::min(min_customer_tw_slack, route.min_customer_tw_slack);
+		if (route.max_shift_count > 0)
+			min_max_shift = std::min(min_max_shift, route.min_max_shift);
+
+		if (route.break_start_time >= 0.0)
+		{
+			sum_break_start += route.break_start_time;
+			++routes_with_break_start;
+		}
+		if (route.break_position_norm >= 0.0)
+		{
+			sum_break_position += route.break_position_norm;
+			++routes_with_break_position;
+		}
+		if (route.break_at_end_depot)
+			++routes_break_at_end;
+	}
+
+	const int route_count = static_cast<int>(stats.route_stats.size());
+	if (stats.total_served_customers > 0)
+	{
+		stats.avg_score_per_served_customer =
+			static_cast<double>(stats.total_score) / stats.total_served_customers;
+		stats.avg_waiting_time_per_customer =
+			sum_waiting / stats.total_served_customers;
+	}
+	stats.min_customer_tw_slack = min_customer_tw_slack < DBL_MAX
+		? min_customer_tw_slack : -1.0;
+	stats.min_max_shift = min_max_shift < DBL_MAX ? min_max_shift : -1.0;
+	stats.avg_customer_tw_slack = total_customer_tw_slack_count > 0
+		? sum_customer_tw_slack / total_customer_tw_slack_count : -1.0;
+
+	if (route_count > 0)
+	{
+		// These means include empty route opportunities, so they describe average
+		// utilization across the entire predefined fleet/day set.
+		stats.avg_route_duration = sum_route_duration / route_count;
+		stats.avg_route_time_utilization = sum_route_time_util / route_count;
+		stats.avg_weight_utilization = sum_weight_util / route_count;
+		stats.avg_volume_utilization = sum_volume_util / route_count;
+		stats.pct_break_at_end_depot =
+			100.0 * routes_break_at_end / route_count;
+		stats.pct_routes_time_util_ge_90pct =
+			100.0 * stats.routes_time_util_ge_90pct / route_count;
+		stats.pct_routes_weight_util_ge_90pct =
+			100.0 * stats.routes_weight_util_ge_90pct / route_count;
+		stats.pct_routes_volume_util_ge_90pct =
+			100.0 * stats.routes_volume_util_ge_90pct / route_count;
+	}
+
+	if (routes_with_break_start > 0)
+		stats.avg_break_start_time = sum_break_start / routes_with_break_start;
+	if (routes_with_break_position > 0)
+		stats.avg_break_position_norm =
+		sum_break_position / routes_with_break_position;
+
+	return stats;
+}
+
+
 ostream& operator<<(ostream& output, Sol& sol)
 {
 	const char sep = ' ';

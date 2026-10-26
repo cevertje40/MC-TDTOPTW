@@ -39,6 +39,19 @@ struct RoutePerfStats
 	double break_position_norm = -1.0;   // normalized customer position
 	bool break_at_end_depot = false;
 
+
+	int route_index = -1;
+	double weight_slack = 0.0;
+	double volume_slack = 0.0;
+	double min_customer_tw_slack = -1.0;
+	double avg_customer_tw_slack = -1.0;
+	int customer_tw_slack_count = 0;
+	int customers_tw_slack_le_0_1 = 0; // customer service-window slack <= 0.1 h
+	double min_max_shift = -1.0;
+	int max_shift_count = 0;
+	double break_start_slack = -1.0;
+
+
 	RemovedVertexStats removed;
 };
 
@@ -64,6 +77,23 @@ struct SolutionPerfStats
 	double avg_removed_depot_tt = 0.0;
 	double avg_removed_position = 0.0;
 	std::vector<RoutePerfStats> route_stats;
+
+	int route_count = 0;
+	int nonempty_route_count = 0;
+	double max_route_time_utilization = 0.0;
+	double max_weight_utilization = 0.0;
+	double max_volume_utilization = 0.0;
+	int routes_time_util_ge_90pct = 0;
+	int routes_weight_util_ge_90pct = 0;
+	int routes_volume_util_ge_90pct = 0;
+	double pct_routes_time_util_ge_90pct = 0.0;
+	double pct_routes_weight_util_ge_90pct = 0.0;
+	double pct_routes_volume_util_ge_90pct = 0.0;
+	double min_customer_tw_slack = -1.0;
+	double avg_customer_tw_slack = -1.0;
+	double min_max_shift = -1.0;
+
+
 };
 
 
@@ -122,5 +152,6 @@ public:
 	void write_to_file(const std::string& dataset);
 	void check_availability();
 	SolutionPerfStats repair_and_collect_stats();
+	SolutionPerfStats collect_solution_stats() const;
 	friend std::ostream& operator<<(std::ostream& output, Sol& sol);
 };

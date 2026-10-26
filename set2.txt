@@ -1,4 +1,4 @@
-..\..\datasets\CTOP\DatasetsCTOP\2set\
+..\datasets\CTOP\DatasetsCTOP\2set\
 b1.txt	133
 b2.txt	121
 b3.txt	126

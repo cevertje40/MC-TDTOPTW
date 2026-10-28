@@ -410,7 +410,6 @@ SolutionPerfStats Sol::repair_and_collect_stats()
 	return stats;
 }
 
-
 SolutionPerfStats Sol::collect_solution_stats() const
 {
 	SolutionPerfStats stats{};
@@ -436,6 +435,8 @@ SolutionPerfStats Sol::collect_solution_stats() const
 	{
 		RoutePerfStats route = tour.collect_route_stats();
 		stats.route_stats.push_back(route);
+		stats.customer_tw_slack_count += route.customer_tw_slack_count;
+		stats.max_shift_count += route.max_shift_count;
 
 		stats.total_score += route.collected_score;
 		stats.total_served_customers += route.served_customers;
@@ -1415,18 +1416,35 @@ std::pair<int, int> Tour::repair(RemovedVertexStats& removed_stats)
 
 RoutePerfStats Tour::collect_route_stats() const
 {
-	RoutePerfStats s;
+	RoutePerfStats s{};
+	// Set explicit sentinels here as well as in the struct definition. This
+	// keeps the audit safe if these stats are declared without default values.
+	s.min_customer_tw_slack = -1.0;
+	s.avg_customer_tw_slack = -1.0;
+	s.customer_tw_slack_count = 0;
+	s.customers_tw_slack_le_0_1 = 0;
+	s.min_max_shift = -1.0;
+	s.max_shift_count = 0;
 
+	s.route_index = index;
 	s.collected_score = score;
 	s.served_customers = std::max(0, static_cast<int>(seq.size()) - 2);
+	const int n = static_cast<int>(seq.size());
+	if (n < 2 || deptime.size() != seq.size() || action.size() != seq.size())
+		throw std::logic_error("Cannot collect route audit: route schedule arrays have inconsistent sizes");
 
 	s.route_time_budget = ins->t[index].T_max;
 
-	double currenttime = ins->t[index].EDT + deptime[0];
+	const double EDT = ins->t[index].EDT;
+	double currenttime = EDT + deptime[0];
 	double total_waiting = 0.0;
 	double break_start_abs = -1.0;
+	double customer_tw_slack_sum = 0.0;
+	double customer_tw_slack_min = DBL_MAX;
+	int customer_tw_slack_count = 0;
+	int customers_tw_slack_le_01 = 0;
 
-	int end = static_cast<int>(seq.size()) - 1;
+	int end = n - 1;
 
 	for (int i = 0; i < end; ++i)
 	{
@@ -1434,37 +1452,88 @@ RoutePerfStats Tour::collect_route_stats() const
 		Ins::Vertex* current = seq[i + 1];
 		int breakcurrent = action[i + 1];
 
-		double raw_arrival = ins->arrival_time(last->con[current->index], currenttime);
+		const double raw_arrival =
+			ins->arrival_time(last->con[current->index], currenttime);
+		double service_start = raw_arrival;
 
-		if (breakcurrent == 1 && break_start_abs < 0.0)
+		if (breakcurrent == 1)
 		{
-			break_start_abs = raw_arrival;
+			const bool at_end_depot =
+				current->index == ins->maxvertices - 1;
+			double break_start = raw_arrival;
+			if (!at_end_depot && break_start < ins->breakstart)
+				break_start = ins->breakstart;
+
+			if (break_start_abs < 0.0)
+				break_start_abs = break_start;
+
+			total_waiting += std::max(0.0, break_start - raw_arrival);
+			const double break_end = break_start + ins->breakdur;
+			service_start = std::max(break_end, current->LTW[index]);
+			total_waiting += std::max(0.0, service_start - break_end);
+		}
+		else
+		{
+			service_start = std::max(raw_arrival, current->LTW[index]);
+			total_waiting += std::max(0.0, service_start - raw_arrival);
 		}
 
-		double adjusted_arrival = raw_arrival;
-		if (adjusted_arrival + breakcurrent * ins->breakdur < current->LTW[index])
+		// Record service-window slack for customer visits only (exclude both depots).
+		if (i + 1 > 0 && i + 1 < end)
 		{
-			double waiting_here = current->LTW[index] - (adjusted_arrival + breakcurrent * ins->breakdur);
-			total_waiting += waiting_here;
-			adjusted_arrival = current->LTW[index] - breakcurrent * ins->breakdur;
+			const double tw_slack = current->UTW[index] - service_start;
+			customer_tw_slack_sum += tw_slack;
+			customer_tw_slack_min = std::min(customer_tw_slack_min, tw_slack);
+			++customer_tw_slack_count;
+			if (tw_slack <= 0.1 + 1e-9)
+				++customers_tw_slack_le_01;
 		}
 
-		currenttime = adjusted_arrival + current->serv + breakcurrent * ins->breakdur;
+		currenttime = service_start + current->serv;
 	}
 
-	s.route_duration = currenttime - ins->t[index].EDT;
+	s.route_duration = currenttime - EDT;
 	if (s.route_time_budget > 1e-9)
 		s.route_time_utilization = s.route_duration / s.route_time_budget;
 
 	s.weight_used = weight;
 	s.weight_capacity = ins->t[index].W_max;
+	s.weight_slack = s.weight_capacity - s.weight_used;
 	if (s.weight_capacity > 1e-9)
 		s.weight_utilization = s.weight_used / s.weight_capacity;
 
 	s.volume_used = volume;
 	s.volume_capacity = ins->t[index].V_max;
+	s.volume_slack = s.volume_capacity - s.volume_used;
 	if (s.volume_capacity > 1e-9)
 		s.volume_utilization = s.volume_used / s.volume_capacity;
+
+	s.min_customer_tw_slack = customer_tw_slack_count > 0
+		? customer_tw_slack_min : -1.0;
+	s.avg_customer_tw_slack = customer_tw_slack_count > 0
+		? customer_tw_slack_sum / customer_tw_slack_count : -1.0;
+	s.customer_tw_slack_count = customer_tw_slack_count;
+	s.customers_tw_slack_le_0_1 = customers_tw_slack_le_01;
+
+	// Recompute a local copy of the backward slack values. This avoids reporting
+	// stale or never-updated max_shift entries while leaving the solution intact.
+	if (max_shift.size() != seq.size())
+		throw std::logic_error("Cannot collect route audit: max_shift size does not match the route");
+	Tour slack_copy = *this;
+	slack_copy.calc_maxshift();
+	double min_shift = DBL_MAX;
+	int max_shift_count = 0;
+	for (int p = 1; p < n; ++p) // all visited vertices after the start depot, including end depot
+	{
+		const double slack = slack_copy.max_shift[p];
+		if (std::isfinite(slack))
+		{
+			min_shift = std::min(min_shift, slack);
+			++max_shift_count;
+		}
+	}
+	s.min_max_shift = min_shift < DBL_MAX ? min_shift : -1.0;
+	s.max_shift_count = max_shift_count;
 
 	s.total_waiting_time = total_waiting;
 	if (s.served_customers > 0)
@@ -1476,6 +1545,7 @@ RoutePerfStats Tour::collect_route_stats() const
 	if (break_start_abs >= 0.0)
 	{
 		s.break_start_time = break_start_abs - ins->t[index].EDT;
+		s.break_start_slack = ins->breakend - break_start_abs;
 	}
 
 	if (s.served_customers > 0 && s.break_taken)
@@ -1491,7 +1561,6 @@ RoutePerfStats Tour::collect_route_stats() const
 
 	return s;
 }
-
 
 
 void Sol::insert_vertex(Sol::Tour &tour, Ins::Vertex* candidate, int position)

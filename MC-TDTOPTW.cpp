@@ -1,6 +1,8 @@
 // MC-TDTOPTW.cpp
 
 #include "solver.h"
+#include "solution_stats_writer.h"
+
 using namespace std;
 
 class Instance
@@ -362,9 +364,11 @@ void solve_dataset(int max_rep = 5)
 			//Aco aco(instance, 1, 3, 0.1, 20, 2000000, 0.25, 0.05);
 			//it->result[rep] = aco.solve(it->bestknown, max_time_sec);
 
-			const SolutionPerfStats audit = it->result[rep].sol.collect_solution_stats();
+			
+			const SolutionPerfStats audit =	it->result[rep].sol.collect_solution_stats();
 
-
+			solution_audit_output::append_solution_stats("output_audit.csv","output_audit_routes.csv",it->filename,rep,it->bestknown,it->result[rep].sol.score,it->result[rep].time,it->result[rep].gap,audit);
+			
 			avggap += it->result[rep].gap;
 			avgscore += it->result[rep].sol.score;
 			cout << "name: " << it->filename << " best score: " << it->bestknown << " score: " << it->result[rep].sol.score << " cpu time: " << it->result[rep].time << " gap: " << it->result[rep].gap << endl;
@@ -1084,12 +1088,12 @@ int main()
 	//Graph bemobile(425479, 519915);
 	//debug_instance();
 	//debug_ctop();
-	solve_dataset(1);
+	solve_dataset(5);
 	//tdoptw_gap(10);
 	//ctop_gap(1);
 	//doe(5);
 	//doe2(5);
-	case_study(10);
+	//case_study(10);
 	//ctop_optimal(5);
 
 }

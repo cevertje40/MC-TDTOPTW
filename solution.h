@@ -80,6 +80,8 @@ struct SolutionPerfStats
 
 	int route_count = 0;
 	int nonempty_route_count = 0;
+	int customer_tw_slack_count = 0;
+	int max_shift_count = 0;
 	double max_route_time_utilization = 0.0;
 	double max_weight_utilization = 0.0;
 	double max_volume_utilization = 0.0;

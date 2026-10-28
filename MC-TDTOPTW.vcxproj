@@ -157,6 +157,7 @@
     <ClInclude Include="moves.h" />
     <ClInclude Include="ratio.h" />
     <ClInclude Include="solution.h" />
+    <ClInclude Include="solution_stats_writer.h" />
     <ClInclude Include="solver.h" />
     <ClInclude Include="tabuvector.h" />
     <ClInclude Include="time.h" />

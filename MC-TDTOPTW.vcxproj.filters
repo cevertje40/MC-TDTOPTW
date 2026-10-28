@@ -68,5 +68,8 @@
     <ClInclude Include="elitepool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="solution_stats_writer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -780,8 +780,8 @@ bool Tour::update_break()  // reposition break, update times and max_shift
 		feasible = false;
 		return feasible;
 		// unconditional fallback: end depot (special-case semantics will apply)
-		action.back() = 1;
-		breakindex = n - 1;
+		//action.back() = 1;
+		//breakindex = n - 1;
 		//cout << "no feasible break position found, forcing end depot, solution might be infeasbible" << endl;
 	}
 
@@ -852,36 +852,42 @@ bool Tour::update_break()  // reposition break, update times and max_shift
 
 void Tour::update_maxshift(int start, int end, double arrivaltime)
 {
-	double departuretime = 0;
-	Ins::Vertex* y;
-	Ins::Vertex* z;
-	for (int i = end; i > start ; --i)
+	const double EDT = ins->t[index].EDT;
+	const double B = ins->breakdur;
+	const double BEND = ins->breakend;
+
+	// Latest feasible absolute arrival at seq[end + 1],
+	// before its break, waiting and service.
+	double arr_cap = arrivaltime;
+
+	for (int i = end; i > start; --i)
 	{
-		//define the 2 elements
-		y = seq[i];
-		int breaki = action[i];
-		z = seq[i+1];
-		departuretime = ins->departure_time(y->con[z->index], arrivaltime);
-		//TW check on departuretime 
-		if (departuretime > y->UTW[index] + y->serv)
+		Ins::Vertex* y = seq[i];
+		Ins::Vertex* z = seq[i + 1];
+		const bool has_break_here = (action[i] == 1);
+
+		// Latest departure from y that reaches z by arr_cap.
+		double L_dep_i =
+			ins->departure_time(y->con[z->index], arr_cap);
+
+		// Service at y must start within its time window.
+		L_dep_i = std::min(
+			L_dep_i,
+			y->UTW[index] + y->serv
+		);
+
+		// Departure slack, after break, waiting and service at y.
+		max_shift[i] = L_dep_i - (EDT + deptime[i]);
+
+		// Latest arrival at y, used for its predecessor.
+		arr_cap = L_dep_i - y->serv;
+
+		if (has_break_here)
 		{
-			departuretime = y->UTW[index] + y->serv;
+			arr_cap = std::min(arr_cap - B, BEND);
 		}
-		//break may limit the maximum allowable shift
-		if (breaki == 1)
-		{
-			if (departuretime > ins->breakend + ins->breakdur)
-			{
-				//cout << "bij calc maxshift break verhindert een maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
-				departuretime = ins->breakend + ins->breakdur;
-			}
-		}
-		//store result
-		max_shift[i] = departuretime - (deptime[i] + ins->t[index].EDT);
-		//reset variable for the calculation of next point
-		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
-	}// end for i
-}//end update max_shift
+	}
+}
 
 void Tour::calc_maxshift() 
 {
@@ -910,40 +916,63 @@ void Tour::calc_maxshift()
 		Ins::Vertex* z = seq[i + 1];
 		const bool has_break_here = (action[i] == 1);
 
-		// latest departure from y that reaches z by arr_cap
-		double L_dep_i = ins->departure_time(y->con[z->index], arr_cap);
+		// Latest departure permitted by the successor and y's service window.
+		double L_dep_i =ins->departure_time(y->con[z->index], arr_cap);
 
-		// cap by y's own UTW + serv (latest start-of-service + service)
 		L_dep_i = std::min(L_dep_i, y->UTW[index] + y->serv);
 
-		// if break at y, departure (after taking the break) cannot exceed BEND + B
-		if (has_break_here) L_dep_i = std::min(L_dep_i, BEND + B);
-
-		// slack at y (relative to current scheduled departure EDT + deptime[i])
+		// Departure slack: service and any break at y are already completed.
 		max_shift[i] = L_dep_i - (EDT + deptime[i]);
 
-		// update latest arrival-before-service for predecessor
-		arr_cap = L_dep_i - (y->serv + (has_break_here ? B : 0.0));
+		// Latest arrival at y, propagated backward to its predecessor.
+		arr_cap = L_dep_i - y->serv;
+
+		if (has_break_here)
+		{
+			arr_cap = std::min(arr_cap - B, BEND);
+		}
+
 	}
 }
 
+// Insert a previously validated customer after the given route position.
+// Preconditions: candidate is unselected, position is before the end depot,
+// and the original route's departures and slack cache are current.
 void Tour::insert_vertex(Ins::Vertex* candidate, int position)
 {
-	seq.insert(seq.begin() + position + 1, candidate);//insert point y after x
-	deptime.insert(deptime.begin() + position + 1, 0);//insert temporary value
-	action.insert(action.begin() + position + 1, 0);//insert regular visit action change later when necessary
-	score += candidate->score;// update score of the new solution
+	const int inserted = position + 1;
+
+	seq.insert(seq.begin() + inserted, candidate);
+	deptime.insert(deptime.begin() + inserted, 0.0);
+	action.insert(action.begin() + inserted, 0);
+	max_shift.insert(max_shift.begin() + inserted, 0.0);
+
+	score += candidate->score;
 	volume += candidate->volume;
 	weight += candidate->weight;
 	if (position < breakindex)
+		++breakindex;
+
+	update(position, static_cast<int>(seq.size()));
+
+	// The first OLD successor retains its suffix, so the delta-updated
+	// departure slack at q gives a valid latest departure bound.
+	const int q = inserted + 1;
+	const double latest_dep_q =	ins->t[index].EDT + deptime[q] + max_shift[q];
+
+	double latest_arrival_q = latest_dep_q - seq[q]->serv;
+	if (action[q] == 1)
 	{
-		breakindex += 1;//due to insertion of 1 vertex the index needs to be incremented with 1
+		latest_arrival_q = std::min(
+			latest_arrival_q - ins->breakdur,
+			ins->breakend
+		);
 	}
-	max_shift.insert(max_shift.begin() + position + 1, 0);
-	update(position, int(seq.size()));//update travel time and maxshift for all positions after insertion
-	double arrivaltime = (deptime[position + 2] + ins->t[index].EDT + max_shift[position + 2]) - (seq[position + 2]->serv + action[position + 2] * ins->breakdur);//service time eraftrekken
-	update_maxshift(0, position + 1, arrivaltime);//update maxshift for all positions before insertion
+
+	// Rebuild the inserted vertex AND all preceding customer positions.
+	update_maxshift(0, inserted, latest_arrival_q);
 }
+
 
 bool Tour::remove_vertex(int position)
 {
@@ -1125,208 +1154,229 @@ vector<double> Tour::compute_wait_suffix() const
 
 bool Tour::check()
 {
+	constexpr double EPS = 1e-6;
 	bool tourok = true;
-	int scorecheck = 0;
-	double weightcheck = 0;
-	double volumecheck = 0;
-	//a. travel time check
-	double currenttime = ins->t[index].EDT + deptime[0];
-	double length = 0;
-	int end = (int)seq.size() - 1;
-	for (int i = 0; i < end; ++i)
-	{
-		scorecheck += seq[i]->score;
-		weightcheck += seq[i]->weight;
-		volumecheck += seq[i]->volume;
-		Ins::Vertex* last = seq[i];
-		Ins::Vertex* current = seq[i + 1];
-		int breakcurrent = action[i + 1];
-		double arrivaltime = ins->arrival_time(last->con[current->index], currenttime);
-		double waitingtime = 0.0;
-		double startbreak = 0.0;
-		double endbreak = 0.0;
-		double startservice = 0.0;
-		double endservice = 0.0;
-		if (breakcurrent) 
-		{
-			if ((arrivaltime < ins->breakstart)&&(current->index != ins->maxvertices - 1))
-			{//break can not start before breakstart
-				waitingtime += ins->breakstart - arrivaltime;
-				//cout << "tour: " << index<< "waiting time before breakstart: " << waitingtime << endl;
-				startbreak = ins->breakstart;
-			}
-			else
-			{//break can start upon arrival or before breakstart at enddepot
-				startbreak = arrivaltime;
-			}
-			if (startbreak > ins->breakend + 1e-6)
-			{
-				cout << "tour: " << index << "FAILURE!!! break start time exceeds breakend for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
-				tourok = false;
-			}
-			endbreak = startbreak + ins->breakdur;
-			if (endbreak < current->LTW[index])
-			{
-				waitingtime += current->LTW[index] - endbreak;
-				//cout<<"tour: "<< index << "waiting time before opening time: " << "i: " << i + 1 << " , " << seq[i + 1]->index << " <=> " << waitingtime << endl;
-				startservice = current->LTW[index];
-			}
-			else
-			{
-				startservice = endbreak;
-			}
-		}
-		else
-		{
-			if (arrivaltime < current->LTW[index])
-			{
-				waitingtime += current->LTW[index] - arrivaltime;
-				//cout <<"tour: "<< index << "waiting time before opening time: " << "i: " << i + 1 << " , " << seq[i + 1]->index << " <=> " << waitingtime << endl;
-				startservice = current->LTW[index];
-			}
-			else
-			{
-				startservice = arrivaltime;
-			}
-		}
-		
-		if (startservice < current->LTW[index]- 1e-6)
-		{
-			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! LTW fail for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
-			tourok = false;
-		}
 
-		if (startservice > current->UTW[index]+ 1e-6)
+	const auto fail = [&](const char* message, int position = -1)
 		{
-			cout << term::fg(term::Color::red) << "tour: " << index << "FAILURE!!! UTW fail for solutionnr: " << i + 1 << " /vertex index: " << current->index << endl;
+			std::cout << term::fg(term::Color::red)<< "tour: " << index << " FAILURE: " << message;
+			if (position >= 0)
+				std::cout << " at position " << position;
+			std::cout << '\n';
 			tourok = false;
-		}
-		endservice = startservice + current->serv;
-		//cout<<i+1<<" calc traveltime: " << endservice-ins->t[d].EDT << " stored: " << tours[d].deptime[i + 1] << endl;
-		currenttime = endservice;
-	}//end for i
-	length = currenttime - ins->t[index].EDT;
-	if (length > ins->t[index].T_max + 1e-6)
-	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "length " << length << " above max: " << ins->t[index].T_max << endl;
-		tourok = false;
+		};
 
-	}
-	if (fabs(length - deptime.back()) > 1e-6)
+	const auto mismatch = [&](const char* name, int position,
+		double calculated, double stored)
+		{
+			std::cout << term::fg(term::Color::red)<< "tour: " << index << " FAILURE: " << name;
+			if (position >= 0)
+				std::cout << " at position " << position;
+			std::cout << " calculated: " << calculated
+				<< " stored: " << stored << '\n';
+			tourok = false;
+		};
+
+	const int n = static_cast<int>(seq.size());
+	if (n < 2)
 	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated length: " << length << " stored length: " << deptime.back() << "max length" << ins->t[index].T_max << endl;
-		tourok = false;
+		fail("route must contain a start and an end depot");
+		return false;
 	}
-	//c. weight checks
-	if (fabs(weightcheck - weight) > 1e-6)
+	if (action.size() != seq.size() ||
+		deptime.size() != seq.size() ||
+		max_shift.size() != seq.size())
 	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "new calculated weight" << weightcheck << "stored weight: " << weight << "max: " << ins->t[index].W_max << endl;
-		tourok = false;
+		fail("seq/action/deptime/max_shift sizes do not match");
+		return false;
 	}
-	if (weight-ins->t[index].W_max> 1e-6)
+	for (int p = 0; p < n; ++p)
 	{
-		tourok = false;
-		cout << term::fg(term::Color::red) << "tour: " << index << "weight " << weight << " above max: " << ins->t[index].W_max << endl;
+		if (seq[p] == nullptr)
+		{
+			fail("null vertex pointer", p);
+			return false;
+		}
+		if (!std::isfinite(deptime[p]))
+		{
+			fail("non-finite stored departure time", p);
+			return false;
+		}
+		if (action[p] != 0 && action[p] != 1)
+		{
+			fail("break indicator must be zero or one", p);
+			return false;
+		}
 	}
-	//d. volume checks
-	if (fabs(volumecheck - volume) > 1e-6)
+
+	const int end = n - 1;
+	if (seq.front() != &ins->v[0] ||
+		seq.back() != &ins->v[ins->maxvertices - 1])
 	{
-		cout << term::fg(term::Color::yellow) << "tour: " << index << "new calculated volume" << volumecheck << "stored volume " << volume << "max: " << ins->t[index].V_max << endl;
-		tourok = false;
+		fail("incorrect start or end depot");
+		return false;
 	}
-	if (volume - ins->t[index].V_max> 1e-6)
+	if (action[0] != 0)
 	{
-		tourok = false;
-		cout << term::fg(term::Color::red) << "tour: " << index << " volume " << volume << " above max: " << ins->t[index].V_max << endl;
+		fail("a break cannot be assigned to the start depot", 0);
+		return false;
 	}
-	//e. break timing check
-	bool breakcheck = false;
+
 	int amountbreaks = 0;
-	for (int i = 0; i <= end; ++i)//break kan op enddepot zitten
+	int actual_break_position = -1;
+	for (int p = 1; p <= end; ++p)
 	{
-		if (action[i] == 1)
+		if (action[p] == 1)
 		{
-			if (breakindex != i)
-			{
-				cout << term::fg(term::Color::red) << "tour: " << index << "breakindex and sol action don't match" << endl;
-				tourok = false;
-			}
 			++amountbreaks;
+			actual_break_position = p;
 		}
 	}
-	//f. amount of breaks check
-	if (amountbreaks == 1)
+	if (amountbreaks != 1)
 	{
-		//cout << yellow << "break ok" << endl;
+		fail("route must contain exactly one break");
+		return false;
 	}
-	else
+	if (breakindex != actual_break_position)
+		fail("breakindex does not match action[]");
+
+	const auto& Td = ins->t[index];
+	const double EDT = Td.EDT;
+	const double B = ins->breakdur;
+	const double BSTART = ins->breakstart;
+	const double BEND = ins->breakend;
+
+	// Recompute customer loads; check duplicate visits within this tour.
+	double weightcheck = 0.0;
+	double volumecheck = 0.0;
+	std::vector<bool> seen(ins->maxvertices, false);
+	for (int p = 1; p < end; ++p)
 	{
-		cout << term::fg(term::Color::red) << "tour: " << index << "amount of breaks not ok" << amountbreaks << endl;
-		tourok = false;
-	}
-	//g. tour should start and end at the respective depots
-	if ((seq[0] == &ins->v[0]) && (seq.back() == &ins->v[ins->maxvertices - 1]))
-	{
-		//cout<<yellow << "start and end ok" << endl;
-	}
-	else
-	{
-		cout << term::fg(term::Color::red)  <<"tour: " << index << "start and end vertex not ok" << endl;
-		tourok = false;
-	}
-	//h. max_shift check
-	vector<double> max_shiftcheck(max_shift.size(), 0);
-	int size = (int)seq.size();
-	double departuretime = 0;
-	max_shiftcheck.back() = (ins->t[index].T_max - deptime.back());
-	double arrivaltime = ins->t[index].LAT - (action.back() * ins->breakdur);//if you break at the end depot subtract breakduration
-	if (action.back() == 1)//break at end depot
-	{
-		if (ins->t[index].LAT > ins->breakend + ins->breakdur)
+		const int vertex = seq[p]->index;
+		if (vertex <= 0 || vertex >= ins->maxvertices - 1)
 		{
-			//cout<<"path: "<<d<< " break position limits maxshift: " << endl;
-			max_shiftcheck.back() = (ins->breakend + ins->breakdur) - (ins->t[index].EDT+deptime.back());
-			arrivaltime = ins->breakend;
+			fail("internal route position is not a customer", p);
+			return false;
 		}
+		if (seen[vertex])
+		{
+			fail("customer occurs more than once", p);
+			return false;
+		}
+		seen[vertex] = true;
+		weightcheck += seq[p]->weight;
+		volumecheck += seq[p]->volume;
 	}
-	Ins::Vertex* y;
-	Ins::Vertex* z;
-	for (int i = 0; i < size - 2; ++i)// depots don't count
+	if (!std::isfinite(weightcheck) || !std::isfinite(weight) ||
+		std::abs(weightcheck - weight) > EPS)
+		mismatch("weight", -1, weightcheck, weight);
+	if (weightcheck > Td.W_max + EPS)
+		fail("weight capacity exceeded");
+	if (!std::isfinite(volumecheck) || !std::isfinite(volume) ||
+		std::abs(volumecheck - volume) > EPS)
+		mismatch("volume", -1, volumecheck, volume);
+	if (volumecheck > Td.V_max + EPS)
+		fail("volume capacity exceeded");
+
+	// Forward validation, independently of cached max_shift values.
+	std::vector<double> departurecheck(n, 0.0); // Absolute times.
+	departurecheck[0] = EDT + deptime[0];
+	if (deptime[0] < -EPS)
+		fail("departure precedes the route-start reference", 0);
+
+	double currenttime = departurecheck[0];
+	for (int p = 1; p <= end; ++p)
 	{
-		//define the 2 elements
-		y = seq[size - (i + 2)];
-		int breaki = action[size - (i + 2)];
-		z = seq[size - (i + 1)];
-		departuretime = ins->departure_time(y->con[z->index], arrivaltime);
-		//TW check on departuretime 
-		if (departuretime > y->UTW[index] + y->serv)
+		Ins::Vertex* last = seq[p - 1];
+		Ins::Vertex* current = seq[p];
+
+		const double arrival =
+			ins->arrival_time(last->con[current->index], currenttime);
+		if (!std::isfinite(arrival))
 		{
-			departuretime = y->UTW[index] + y->serv;
+			fail("non-finite calculated arrival time", p);
+			return false;
 		}
-		//break may limit the maximum allowable shift
-		if (breaki == 1)
+
+		double ready = arrival;
+		if (action[p] == 1)
 		{
-			if (departuretime > ins->breakend + ins->breakdur)
-			{
-				//cout << "break positioning limits maxshift: " << departuretime << "<=>" << ins->breakend + ins->breakdur << endl;
-				departuretime = ins->breakend + ins->breakdur;
-			}
+			// Customers may wait for BSTART. The end-depot exception
+			// permits starting the break immediately upon arrival.
+			const double break_start = (p == end)
+				? arrival : std::max(arrival, BSTART);
+			if (break_start > BEND + EPS)
+				fail("break starts after breakend", p);
+			ready = break_start + B;
 		}
-		//store result
-		max_shiftcheck[size - (i + 2)] = departuretime - (deptime[size - (i + 2)] + ins->t[index].EDT);
-		//reset variable for the calculation of next point
-		arrivaltime = departuretime - (y->serv + breaki * ins->breakdur);
-	}// end for i
-	for (int i = 0; i <= end; ++i)
-	{
-		if (fabs(max_shift[i] - max_shiftcheck[i]) > 0.01)
+
+		const double service_start =
+			std::max(ready, current->LTW[index]);
+		if (service_start > current->UTW[index] + EPS)
+			fail("service starts after the customer/depot closes", p);
+
+		currenttime = service_start + current->serv;
+		if (!std::isfinite(currenttime))
 		{
-			cout << term::fg(term::Color::red) <<"tour: "<< index << "error in max_shift for position: " << i <<" new max_shift: "<<max_shiftcheck[i]<<" stored max_shift: "<<max_shift[i] << endl;
-			tourok = false;
+			fail("non-finite calculated departure time", p);
+			return false;
 		}
+		departurecheck[p] = currenttime;
+
+		const double elapsed_departure = currenttime - EDT;
+		if (std::abs(elapsed_departure - deptime[p]) > EPS)
+			mismatch("departure time", p, elapsed_departure, deptime[p]);
 	}
+
+	if (currenttime - EDT > Td.T_max + EPS)
+		fail("route-duration limit exceeded");
+	if (currenttime > Td.LAT + EPS)
+		fail("latest route-completion time exceeded");
+
+	// Recompute departure slack without modifying the stored cache.
+	// Use the independently reconstructed departures above.
+	std::vector<double> max_shiftcheck(n, 0.0);
+	double L_dep_end = Td.LAT;
+	if (action[end] == 1)
+		L_dep_end = std::min(L_dep_end, BEND + B);
+	max_shiftcheck[end] = L_dep_end - departurecheck[end];
+
+	double arr_cap = L_dep_end - ((action[end] == 1) ? B : 0.0);
+	for (int p = end - 1; p > 0; --p)
+	{
+		Ins::Vertex* y = seq[p];
+		Ins::Vertex* z = seq[p + 1];
+		double L_dep =
+			ins->departure_time(y->con[z->index], arr_cap);
+		if (!std::isfinite(L_dep))
+		{
+			fail("non-finite latest departure time", p);
+			return false;
+		}
+		L_dep = std::min(L_dep, y->UTW[index] + y->serv);
+
+		// No customer-break cap on the post-service departure time.
+		max_shiftcheck[p] = L_dep - departurecheck[p];
+
+		// Apply the latest-break-start bound to incoming arrival time.
+		arr_cap = L_dep - y->serv;
+		if (action[p] == 1)
+			arr_cap = std::min(arr_cap - B, BEND);
+	}
+
+	// Position 0 is excluded: calc_maxshift/update_maxshift do not set it.
+	for (int p = 1; p <= end; ++p)
+	{
+		if (!std::isfinite(max_shift[p]) ||
+			std::abs(max_shift[p] - max_shiftcheck[p]) > EPS)
+			mismatch("max_shift", p, max_shiftcheck[p], max_shift[p]);
+		if (max_shiftcheck[p] < -EPS)
+			fail("negative recomputed slack", p);
+	}
+
 	return tourok;
-}//end tour check
+}
+
 
 std::pair<int, int> Tour::repair(RemovedVertexStats& removed_stats)
 {

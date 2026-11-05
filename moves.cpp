@@ -2400,48 +2400,80 @@ bool Moves::swap_nb(Sol& sol, int mode)
 							if (delta_tt > bestdelta + 1e-9)//local evaluation
 							{
 								bool reqbreak = true;
-								currenttime = ins->t[d].EDT;
-								for (int l = 0; l < end - 1; ++l)//global evaluation
+								bool global_feasible = true;
+
+								const double EDT = ins->t[d].EDT;
+								const double B = ins->breakdur;
+								const double BSTART = ins->breakstart;
+								const double BEND = ins->breakend;
+
+								double globaltime = EDT + tour.deptime[0];
+
+								for (int l = 0; l < end - 1; ++l)
 								{
 									Ins::Vertex* first = tour.seq[map_idx(l)];
-									Ins::Vertex* second = tour.seq[map_idx(l + 1)];//can be the end depot
-									double arrivaltime = ins->arrival_time(first->con[second->index], currenttime);
-									//account for break
-									if ((reqbreak) && ((max(second->LTW[d] - ins->breakdur, arrivaltime) >= ins->breakstart + 1e-9) || (second->index == ins->maxvertices - 1)))
+									Ins::Vertex* second = tour.seq[map_idx(l + 1)];
+
+									const double arrival =ins->arrival_time(first->con[second->index], globaltime);
+									double ready = arrival;
+
+									const bool at_end_depot =(second->index == ins->maxvertices - 1);
+
+									// Keep the existing eligibility policy: take the break when arrival
+									// reaches BSTART, or when a full break after BSTART can fit before
+									// the customer's opening time. The end depot is always eligible.
+									const bool take_break_here = reqbreak &&(at_end_depot ||
+											arrival >= BSTART - 1e-9 ||
+											second->LTW[d] - B >= BSTART - 1e-9);
+
+									if (take_break_here)
 									{
-										arrivaltime += ins->breakdur;
+										const double break_start = at_end_depot
+											? arrival
+											: std::max(arrival, BSTART);
+
+										if (break_start > BEND + 1e-9)
+										{
+											global_feasible = false;
+											break;
+										}
+
+										ready = break_start + B;
 										reqbreak = false;
 									}
-									if (arrivaltime < second->LTW[d])
+
+									const double service_start =std::max(ready, second->LTW[d]);
+
+									if (service_start > second->UTW[d] + 1e-9)
 									{
-										arrivaltime = second->LTW[d];
-									}
-									if (arrivaltime > second->UTW[d] + 1e-9)
-									{
-										currenttime = DBL_MAX;
+										global_feasible = false;
 										break;
 									}
-									arrivaltime += second->serv;
-									currenttime = arrivaltime;
-								}// end l
-								if (reqbreak == true)//als je aankomt bij het einddepot en nog steeds geen break genomen hebt
-								{
-									currenttime += ins->breakdur;//breaktime bijtellen bij aankomst tijd bij einddepot
+
+									globaltime = service_start + second->serv;
 								}
-								newtraveltime = currenttime - departuretime;
-								oldtraveltime = ((ins->t[d].EDT + tour.deptime[end - 1]) - departuretime);
-								delta_tt = oldtraveltime - newtraveltime;
-								if (delta_tt >= bestdelta + 1e-9)//global evaluation
+
+								// No unchecked fallback that adds a break after route evaluation.
+								if (!global_feasible || reqbreak)
+									continue;
+
+								const double new_finish = globaltime - EDT;
+								if (new_finish > ins->t[d].T_max + 1e-9 ||
+									globaltime > ins->t[d].LAT + 1e-9)
+									continue;
+
+								delta_tt = tour.deptime.back() - new_finish;
+
+								if (delta_tt > bestdelta + 1e-9)
 								{
 									improvement = true;
 									bestdelta = delta_tt;
 									besti = i;
 									bestj = j;
+
 									if (mode == 0)
-									{
 										goto swap;
-									}
-								}//end global evaluation
+								}
 							}// end local evaluation
 						}//end tid filter
 					}//end neighbourhood check

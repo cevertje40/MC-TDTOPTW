@@ -1,0 +1,10 @@
+solution methods for the MCTDTOPTW 
+filename,bestscore,score,cpu,gap
+50.3.1.1.txt;619;619;2.0001;0
+50.3.1.1.txt;619;620;2.00004;-0.161551
+50.3.1.1.txt;619;619;2.00004;0
+50.3.1.1.txt;619;619;2.00006;0
+50.3.1.1.txt;619;619;2.0001;0
+filename;avgscore;avgtime;avggap;sdgap
+50.3.1.1.txt;619.2;2.00007;-0.0323102;0.0722478
+avg avg gap: -0.0323102 sd avg gap: -nan(ind) avg cpu: 2.00007

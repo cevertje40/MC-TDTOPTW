@@ -129,6 +129,8 @@ Ins::Ins(MCTDTOPTW textfile)
 			str >> t[tour].T_max >> t[tour].W_max >> t[tour].V_max;
 			//t[tour].W_max *= 1.1;//increase capacity by 10% capacity validation tests
 			//t[tour].V_max *= 1.1;//increase capacity by 10% capacity validation tests
+			//t[tour].W_max *= 0.7;//decrease capacity by 30% capacity validation tests
+			//t[tour].V_max *= 0.7;//decrease capacity by 30% capacity validation tests
 			t[tour].index = tour;
 			t[tour].id = tour + 1;
 			t[tour].EDT = v.back().LTW[tour];

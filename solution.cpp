@@ -883,7 +883,8 @@ void Tour::update_maxshift(int start, int end, double arrivaltime)
 	}// end for i
 }//end update max_shift
 
-void Tour::calc_maxshift() {
+void Tour::calc_maxshift() 
+{
 	const int n = (int)seq.size();
 	const double EDT = ins->t[index].EDT;          // == LTW at end depot
 	const double LAT = ins->t[index].LAT;          // == EDT + T_max
